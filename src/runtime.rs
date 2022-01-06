@@ -1,10 +1,12 @@
+use crate::bindings;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
 
 use rusty_v8 as v8;
 
-// `JsRuntimeState` defines a state of JS runtime that will be stored per v8 isolate.
+// `JsRuntimeState` defines a state that will be stored per v8 isolate.
 pub struct JsRuntimeState {
     context: v8::Global<v8::Context>,
 }
@@ -27,7 +29,7 @@ impl JsRuntime {
 
         let context = {
             let scope = &mut v8::HandleScope::new(&mut isolate);
-            let context = v8::Context::new(scope);
+            let context = bindings::create_new_context(scope);
             v8::Global::new(scope, context)
         };
 
@@ -39,7 +41,7 @@ impl JsRuntime {
     }
 }
 
-// State management implementation
+// State management implementation.
 impl JsRuntime {
     // Returns the runtime state stored in the given isolate.
     pub fn state(isolate: &v8::Isolate) -> Rc<RefCell<JsRuntimeState>> {
@@ -49,7 +51,7 @@ impl JsRuntime {
             .clone()
     }
 
-    // Returns the runtime state for the runtime.
+    // Returns the runtime's state.
     pub fn get_state(&self) -> Rc<RefCell<JsRuntimeState>> {
         Self::state(&self.isolate)
     }

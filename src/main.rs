@@ -1,3 +1,4 @@
+mod bindings;
 mod runtime;
 
 fn main() {
