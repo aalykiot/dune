@@ -1,9 +1,11 @@
 use crate::bindings;
+use crate::exceptions;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
 
+use anyhow::{bail, Error};
 use rusty_v8 as v8;
 
 // `JsRuntimeState` defines a state that will be stored per v8 isolate.
@@ -38,6 +40,48 @@ impl JsRuntime {
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState { context })));
 
         JsRuntime { isolate }
+    }
+
+    pub fn execute(&mut self, filename: &str, source: &str) -> Result<String, Error> {
+        // Getting a reference to isolate's handle scope.
+        let scope = &mut self.get_handle_scope();
+
+        let source = v8::String::new(scope, source).unwrap();
+        let source_map = v8::undefined(scope);
+        let name = v8::String::new(scope, filename).unwrap();
+        let origin = v8::ScriptOrigin::new(
+            scope,
+            name.into(),
+            0,
+            0,
+            false,
+            0,
+            source_map.into(),
+            false,
+            false,
+            false,
+        );
+
+        // The `TryCatch` scope allows us to catch runtime errors rather than panicking.
+        let mut tc_scope = v8::TryCatch::new(scope);
+        let script = match v8::Script::compile(&mut tc_scope, source, Some(&origin)) {
+            Some(script) => script,
+            None => {
+                assert!(tc_scope.has_caught());
+                bail!("{}", exceptions::to_pretty_string(tc_scope));
+            }
+        };
+
+        match script.run(&mut tc_scope) {
+            Some(result) => Ok(result
+                .to_string(&mut tc_scope)
+                .unwrap()
+                .to_rust_string_lossy(&mut tc_scope)),
+            None => {
+                assert!(tc_scope.has_caught());
+                bail!("{}", exceptions::to_pretty_string(tc_scope));
+            }
+        }
     }
 }
 
