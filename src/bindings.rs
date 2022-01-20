@@ -1,3 +1,4 @@
+use super::process;
 use rusty_v8 as v8;
 
 // Populates a new JavaScript context with low-level Rust bindings.
@@ -11,11 +12,8 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
     let global = context.global(scope);
     let scope = &mut v8::ContextScope::new(scope, context);
 
-    /*
-     *
-     * Here we'll bind Rust values/functions to JavaScript. (WIP)
-     *
-     */
+    // Here we'll bind Rust values/functions to JavaScript.
+    process::initialize(scope, global);
 
     scope.escape(context)
 }
