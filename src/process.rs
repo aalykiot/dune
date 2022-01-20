@@ -79,6 +79,36 @@ pub fn initialize<'s>(
         },
     );
 
+    // `process.memoryUsage()` - an object describing the memory usage.
+    set_function_to(
+        scope,
+        process,
+        "memoryUsage",
+        |scope: &mut v8::HandleScope,
+         _args: v8::FunctionCallbackArguments,
+         mut rv: v8::ReturnValue| {
+            // Getting HeapStatistics from the v8 isolate.
+            let mut stats = v8::HeapStatistics::default();
+            scope.get_heap_statistics(&mut stats);
+
+            // TODO: figure out a way to calculate the overall memory usage.
+            let rss = v8::undefined(scope);
+
+            let total_heap = v8::Number::new(scope, stats.total_heap_size() as f64);
+            let used_heap = v8::Number::new(scope, stats.used_heap_size() as f64);
+            let external = v8::Number::new(scope, stats.external_memory() as f64);
+
+            let memory_usage = v8::Object::new(scope);
+
+            set_property_to(scope, memory_usage, "rss", rss.into());
+            set_property_to(scope, memory_usage, "heapTotal", total_heap.into());
+            set_property_to(scope, memory_usage, "heapUsed", used_heap.into());
+            set_property_to(scope, memory_usage, "external", external.into());
+
+            rv.set(memory_usage.into());
+        },
+    );
+
     // `process.pid` - PID of the current process.
     let id = v8::Number::new(scope, std::process::id() as f64);
     set_property_to(scope, process, "pid", id.into());
