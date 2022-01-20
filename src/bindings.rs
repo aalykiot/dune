@@ -26,7 +26,7 @@ pub fn set_property_to<'s>(
     value: v8::Local<v8::Value>,
 ) {
     let key = v8::String::new(scope, name).unwrap();
-    target.set(scope, key.into(), value.into());
+    target.set(scope, key.into(), value);
 }
 
 // Adds a read-only property with the given name and value, into the given object.

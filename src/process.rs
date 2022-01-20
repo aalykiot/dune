@@ -3,12 +3,12 @@
 // This module contains part of the functions/attributes of the Node.js' process object.
 // https://nodejs.org/dist/latest-v17.x/docs/api/process.html
 
-use os_type::{self, OSType};
-use rusty_v8 as v8;
+use crate::bindings::{create_object_under, set_constant_to, set_function_to, set_property_to};
 
 use std::env;
 
-use crate::bindings::{create_object_under, set_constant_to, set_function_to};
+use os_type::{self, OSType};
+use rusty_v8 as v8;
 
 pub fn initialize<'s>(
     scope: &mut v8::ContextScope<'s, v8::EscapableHandleScope>,
@@ -16,6 +16,19 @@ pub fn initialize<'s>(
 ) -> v8::Local<'s, v8::Object> {
     // This represents the global `process` object.
     let process = create_object_under(scope, global, "process");
+
+    // `process.argv` - an array containing the command-line arguments passed
+    //  when the quixel process was launched.
+    let arguments: Vec<String> = env::args().collect();
+    let argv = v8::Array::new(scope, arguments.len() as i32);
+
+    arguments.iter().enumerate().for_each(|(i, arg)| {
+        let index = i as u32;
+        let value = v8::String::new(scope, arg.as_str()).unwrap();
+        argv.set_index(scope, index, value.into()).unwrap();
+    });
+
+    set_property_to(scope, process, "argv", argv.into());
 
     // `process.cwd()` - current working directory.
     set_function_to(
@@ -39,6 +52,17 @@ pub fn initialize<'s>(
         },
     );
 
+    // `process.env` - an object containing the user environment.
+    let environment: Vec<(String, String)> = env::vars().collect();
+    let env = v8::Object::new(scope);
+
+    environment.iter().for_each(|(key, value)| {
+        let value = v8::String::new(scope, value.as_str()).unwrap();
+        set_constant_to(scope, env, key.as_str(), value.into());
+    });
+
+    set_property_to(scope, process, "env", env.into());
+
     // `process.exit([code])` - exits the program with the given code.
     set_function_to(
         scope,
@@ -57,7 +81,7 @@ pub fn initialize<'s>(
 
     // `process.pid` - PID of the current process.
     let id = v8::Number::new(scope, std::process::id() as f64);
-    set_constant_to(scope, process, "pid", id.into());
+    set_property_to(scope, process, "pid", id.into());
 
     // `process.platform` - a string identifying the operating system platform.
     let platform = if cfg!(not(windows)) {
@@ -69,13 +93,13 @@ pub fn initialize<'s>(
     } else {
         "win32"
     };
-    let platform = v8::String::new(scope, platform.into()).unwrap();
-    set_constant_to(scope, process, "platform", platform.into());
+    let platform = v8::String::new(scope, platform).unwrap();
+    set_property_to(scope, process, "platform", platform.into());
 
     // `process.version` - the quixel version.
     let version = format!("v{}", env!("CARGO_PKG_VERSION"));
     let version = v8::String::new(scope, version.as_str()).unwrap();
-    set_constant_to(scope, process, "version", version.into());
+    set_property_to(scope, process, "version", version.into());
 
     // `process.versions` - an object listing the version strings of quixel and its dependencies.
     {
@@ -84,8 +108,8 @@ pub fn initialize<'s>(
         let quixel_version = v8::String::new(scope, env!("CARGO_PKG_VERSION")).unwrap();
         let v8_version = v8::String::new(scope, v8::V8::get_version()).unwrap();
 
-        set_constant_to(scope, versions, "quixel", quixel_version.into());
-        set_constant_to(scope, versions, "v8", v8_version.into());
+        set_property_to(scope, versions, "quixel", quixel_version.into());
+        set_property_to(scope, versions, "v8", v8_version.into());
     }
 
     process
