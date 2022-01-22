@@ -5,10 +5,20 @@
 
 use crate::bindings::{create_object_under, set_constant_to, set_function_to, set_property_to};
 
+use std::collections::HashMap;
 use std::env;
 
-use os_type::{self, OSType};
+use lazy_static::lazy_static;
 use rusty_v8 as v8;
+
+lazy_static! {
+    static ref VERSIONS: HashMap<&'static str, &'static str> = {
+        let mut map = HashMap::new();
+        map.insert("quixel", env!("CARGO_PKG_VERSION"));
+        map.insert("v8", v8::V8::get_version());
+        map
+    };
+}
 
 pub fn initialize<'s>(
     scope: &mut v8::ContextScope<'s, v8::EscapableHandleScope>,
@@ -91,16 +101,12 @@ pub fn initialize<'s>(
             let mut stats = v8::HeapStatistics::default();
             scope.get_heap_statistics(&mut stats);
 
-            // TODO: figure out a way to calculate the overall memory usage.
-            let rss = v8::undefined(scope);
-
             let total_heap = v8::Number::new(scope, stats.total_heap_size() as f64);
             let used_heap = v8::Number::new(scope, stats.used_heap_size() as f64);
             let external = v8::Number::new(scope, stats.external_memory() as f64);
 
             let memory_usage = v8::Object::new(scope);
 
-            set_property_to(scope, memory_usage, "rss", rss.into());
             set_property_to(scope, memory_usage, "heapTotal", total_heap.into());
             set_property_to(scope, memory_usage, "heapUsed", used_heap.into());
             set_property_to(scope, memory_usage, "external", external.into());
@@ -114,33 +120,23 @@ pub fn initialize<'s>(
     set_property_to(scope, process, "pid", id.into());
 
     // `process.platform` - a string identifying the operating system platform.
-    let platform = if cfg!(not(windows)) {
-        match os_type::current_platform().os_type {
-            OSType::OSX => "darwin",
-            OSType::Redhat => "rhel",
-            _ => "linux",
-        }
-    } else {
-        "win32"
-    };
-    let platform = v8::String::new(scope, platform).unwrap();
+    let platform = v8::String::new(scope, env::consts::OS).unwrap();
     set_property_to(scope, process, "platform", platform.into());
 
     // `process.version` - the quixel version.
-    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    let version = format!("v{}", VERSIONS.get("quixel").unwrap());
     let version = v8::String::new(scope, version.as_str()).unwrap();
     set_property_to(scope, process, "version", version.into());
 
     // `process.versions` - an object listing the version strings of quixel and its dependencies.
-    {
-        let versions = create_object_under(scope, process, "versions");
+    let versions = v8::Object::new(scope);
 
-        let quixel_version = v8::String::new(scope, env!("CARGO_PKG_VERSION")).unwrap();
-        let v8_version = v8::String::new(scope, v8::V8::get_version()).unwrap();
+    VERSIONS.iter().for_each(|(name, version)| {
+        let version = v8::String::new(scope, version).unwrap();
+        set_constant_to(scope, versions, name, version.into());
+    });
 
-        set_property_to(scope, versions, "quixel", quixel_version.into());
-        set_property_to(scope, versions, "v8", v8_version.into());
-    }
+    set_property_to(scope, process, "versions", versions.into());
 
     process
 }

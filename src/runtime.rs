@@ -10,10 +10,13 @@ use rusty_v8 as v8;
 
 // `JsRuntimeState` defines a state that will be stored per v8 isolate.
 pub struct JsRuntimeState {
+    // A sand-boxed execution context with its own set of built-in objects and functions.
     context: v8::Global<v8::Context>,
 }
 
 pub struct JsRuntime {
+    // A VM instance with its own heap.
+    // (https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html)
     isolate: v8::OwnedIsolate,
 }
 
@@ -42,7 +45,7 @@ impl JsRuntime {
         JsRuntime { isolate }
     }
 
-    pub fn execute(&mut self, filename: &str, source: &str) -> Result<String, Error> {
+    pub fn eval(&mut self, filename: &str, source: &str) -> Result<String, Error> {
         // Getting a reference to isolate's handle scope.
         let scope = &mut self.get_handle_scope();
 
