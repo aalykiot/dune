@@ -1,5 +1,6 @@
 use crate::bindings;
 use crate::exceptions;
+use crate::modules::{create_origin, ModuleMap};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -11,7 +12,9 @@ use rusty_v8 as v8;
 // `JsRuntimeState` defines a state that will be stored per v8 isolate.
 pub struct JsRuntimeState {
     // A sand-boxed execution context with its own set of built-in objects and functions.
-    context: v8::Global<v8::Context>,
+    pub context: v8::Global<v8::Context>,
+    // Holds information about resolved ES modules.
+    pub module_map: ModuleMap,
 }
 
 pub struct JsRuntime {
@@ -40,7 +43,10 @@ impl JsRuntime {
 
         // Storing state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
-        isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState { context })));
+        isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
+            context,
+            module_map: ModuleMap::default(),
+        })));
 
         JsRuntime { isolate }
     }
@@ -49,21 +55,8 @@ impl JsRuntime {
         // Getting a reference to isolate's handle scope.
         let scope = &mut self.get_handle_scope();
 
+        let origin = create_origin(scope, filename, false);
         let source = v8::String::new(scope, source).unwrap();
-        let source_map = v8::undefined(scope);
-        let name = v8::String::new(scope, filename).unwrap();
-        let origin = v8::ScriptOrigin::new(
-            scope,
-            name.into(),
-            0,
-            0,
-            false,
-            0,
-            source_map.into(),
-            false,
-            false,
-            false,
-        );
 
         // The `TryCatch` scope allows us to catch runtime errors rather than panicking.
         let mut tc_scope = v8::TryCatch::new(scope);

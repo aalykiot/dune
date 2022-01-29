@@ -12,7 +12,20 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
     let global = context.global(scope);
     let scope = &mut v8::ContextScope::new(scope, context);
 
-    // Here we'll bind Rust values/functions to JavaScript.
+    // Simple print function bound to Rust's println! macro (synchronous call).
+    set_function_to(
+        scope,
+        global,
+        "print",
+        |scope: &mut v8::HandleScope,
+         args: v8::FunctionCallbackArguments,
+         mut _rv: v8::ReturnValue| {
+            let value = args.get(0).to_rust_string_lossy(scope);
+            println!("{}", value);
+        },
+    );
+
+    // Here we're exposing low-level functionality to JavaScript.
     process::initialize(scope, global);
 
     scope.escape(context)
