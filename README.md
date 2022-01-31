@@ -1,6 +1,6 @@
-# Quixel
+# Dune
 
-A hobby javascript runtime written in **Rust**, based on the **V8** engine, and developed completely for fun and experimentation.
+A hobby javascript runtime written in **Rust**, based on **V8**, and developed completely for fun and experimentation.
 
 ## API
 
@@ -13,11 +13,11 @@ A hobby javascript runtime written in **Rust**, based on the **V8** engine, and 
 - `ReadableStream` / `WritableStream`: WHATWG streams API.
 - `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: WHATWG timers.
 - `setImmediate` / `clearImmediate`: node.js like immediate timers.
-- `process`: an object that provides info about the current quixel process.
+- `process`: an object that provides info about the current dune process.
 
 ### Process
 
-- `argv`: an array containing the command-line arguments passed when the quixel process was launched.
+- `argv`: an array containing the command-line arguments passed when the dune process was launched.
 - `cwd()`: current working directory.
 - `env`: an object containing the user environment.
 - `exit([code])`: exits the program with the given code.
@@ -26,8 +26,8 @@ A hobby javascript runtime written in **Rust**, based on the **V8** engine, and 
 - `pid`: PID of the process.
 - `platform`: a string identifying the operating system platform.
 - `uptime()`: a number describing the amount of time (in seconds) the process is running.
-- `version`: the quixel version.
-- `versions`: an object listing the version strings of quixel and its dependencies.
+- `version`: the dune version.
+- `versions`: an object listing the version strings of dune and its dependencies.
 - `binding(module)`: exposes modules with bindings to Rust.
 - `kill(pid, [signal])`: sends the signal to the process identified by pid.
 - `stdout`: points to system's `stdout` stream.
@@ -64,13 +64,6 @@ A hobby javascript runtime written in **Rust**, based on the **V8** engine, and 
 - GNU/Linux
 - MacOS
 - Windows
-
-## Dependencies
-
-Quixel wouldn't be a thing without these libraries:
-
-- <a href="https://v8.dev/">v8</a>: the most performant JavaScript engine.
-- <a href="https://crates.io/crates/v8">rusty_v8</a>: rust bindings to v8.
 
 ## License
 

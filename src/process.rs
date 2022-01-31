@@ -14,7 +14,7 @@ use rusty_v8 as v8;
 lazy_static! {
     static ref VERSIONS: HashMap<&'static str, &'static str> = {
         let mut map = HashMap::new();
-        map.insert("quixel", env!("CARGO_PKG_VERSION"));
+        map.insert("dune", env!("CARGO_PKG_VERSION"));
         map.insert("v8", v8::V8::get_version());
         map
     };
@@ -28,7 +28,7 @@ pub fn initialize<'s>(
     let process = create_object_under(scope, global, "process");
 
     // `process.argv` - an array containing the command-line arguments passed
-    //  when the quixel process was launched.
+    //  when the dune process was launched.
     let arguments: Vec<String> = env::args().collect();
     let argv = v8::Array::new(scope, arguments.len() as i32);
 
@@ -123,12 +123,12 @@ pub fn initialize<'s>(
     let platform = v8::String::new(scope, env::consts::OS).unwrap();
     set_property_to(scope, process, "platform", platform.into());
 
-    // `process.version` - the quixel version.
-    let version = format!("v{}", VERSIONS.get("quixel").unwrap());
+    // `process.version` - the dune version.
+    let version = format!("v{}", VERSIONS.get("dune").unwrap());
     let version = v8::String::new(scope, version.as_str()).unwrap();
     set_property_to(scope, process, "version", version.into());
 
-    // `process.versions` - an object listing the version strings of quixel and its dependencies.
+    // `process.versions` - an object listing the version strings of dune and its dependencies.
     let versions = v8::Object::new(scope);
 
     VERSIONS.iter().for_each(|(name, version)| {

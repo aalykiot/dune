@@ -13,7 +13,7 @@ fn main() {
     let mut editor = Editor::<()>::new();
     let mut rt = JsRuntime::new();
 
-    println!("Welcome to Quixel v{}", env!("CARGO_PKG_VERSION"));
+    println!("Welcome to Dune v{}", env!("CARGO_PKG_VERSION"));
 
     let prompt = ">> ".color(Color::Cyan).bold().to_string();
 
