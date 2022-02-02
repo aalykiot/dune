@@ -4,12 +4,10 @@
 // https://nodejs.org/dist/latest-v17.x/docs/api/process.html
 
 use crate::bindings::{create_object_under, set_constant_to, set_function_to, set_property_to};
-
-use std::collections::HashMap;
-use std::env;
-
 use lazy_static::lazy_static;
 use rusty_v8 as v8;
+use std::collections::HashMap;
+use std::env;
 
 lazy_static! {
     static ref VERSIONS: HashMap<&'static str, &'static str> = {

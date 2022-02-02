@@ -1,13 +1,11 @@
 use crate::bindings;
 use crate::exceptions;
 use crate::modules::{create_origin, ModuleMap};
-
+use anyhow::{bail, Error};
+use rusty_v8 as v8;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
-
-use anyhow::{bail, Error};
-use rusty_v8 as v8;
 
 // `JsRuntimeState` defines a state that will be stored per v8 isolate.
 pub struct JsRuntimeState {

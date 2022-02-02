@@ -1,8 +1,13 @@
+use anyhow::{bail, Context, Error};
+use colored::*;
+use path_clean::PathClean;
+use reqwest::Url;
+use sha::sha1::Sha1;
+use sha::utils::{Digest, DigestExt};
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-
-use anyhow::{bail, Error};
-use path_clean::PathClean;
+use std::str::FromStr;
 
 // Defining the behavior for any kind of module loader.
 pub trait ModuleLoader {
@@ -63,6 +68,7 @@ impl FsModuleLoader {
 }
 
 impl ModuleLoader for FsModuleLoader {
+    // Basic file-system loader.
     fn load(&self, specifier: &str) -> Result<String, Error> {
         let source = fs::read_to_string(specifier)?;
         let source = match self.is_json_import(specifier) {
@@ -112,5 +118,57 @@ impl ModuleLoader for FsModuleLoader {
         }
 
         bail!("Failed to resolve module \"{}\"", specifier);
+    }
+}
+
+#[derive(Default)]
+pub struct WebModuleLoader;
+
+impl WebModuleLoader {
+    fn resolve_as_url(&self, referrer: &str, specifier: &str) -> Result<Url, Error> {
+        // Check if the referrer is a valid URL.
+        if let Ok(referrer) = Url::parse(referrer) {
+            let options = Url::options();
+            let url = options.base_url(Some(&referrer));
+            let url = url.parse(specifier)?;
+            return Ok(url);
+        }
+        Ok(Url::from_str(specifier).unwrap())
+    }
+}
+
+impl ModuleLoader for WebModuleLoader {
+    // Support importing URLs because...why not?
+    fn load(&self, specifier: &str) -> Result<String, Error> {
+        // Create a .cache directory if it does not exist.
+        let cache_dir = env::current_dir()?.join(".cache");
+        fs::create_dir_all(&cache_dir).context("Failed to create cache directory")?;
+
+        // Every URL module is hashed into a unique path.
+        let hash = Sha1::default().digest(specifier.as_bytes()).to_hex();
+        let module_path = cache_dir.join(&hash);
+
+        // If the file is already in cache, just load it.
+        if module_path.is_file() {
+            let source = fs::read_to_string(&module_path).unwrap();
+            return Ok(source);
+        }
+
+        println!("{} {}", "Downloading".green(), specifier);
+
+        // Not in cache, so we'll download it.
+        let source = reqwest::blocking::get(specifier)
+            .and_then(|response| response.bytes())
+            .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+            .with_context(|| format!("Failed to fetch {}", specifier))?;
+
+        fs::write(&module_path, &source)?;
+
+        Ok(source)
+    }
+
+    fn resolve(&self, referrer: &str, specifier: &str) -> Result<String, Error> {
+        self.resolve_as_url(referrer, specifier)
+            .map(|url| url.as_str().to_string())
     }
 }

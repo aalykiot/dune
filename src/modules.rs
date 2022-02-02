@@ -1,9 +1,7 @@
 use crate::loaders::{FsModuleLoader, ModuleLoader};
 use crate::runtime::JsRuntime;
-
-use std::collections::HashMap;
-
 use rusty_v8 as v8;
+use std::collections::HashMap;
 
 // Utility to easily create v8 script origins.
 pub fn create_origin<'s>(
@@ -13,7 +11,6 @@ pub fn create_origin<'s>(
 ) -> v8::ScriptOrigin<'s> {
     let name = v8::String::new(scope, name).unwrap();
     let source_map = v8::undefined(scope);
-
     v8::ScriptOrigin::new(
         scope,
         name.into(),
@@ -36,7 +33,7 @@ pub type ModuleReference = v8::Global<v8::Module>;
 pub struct ModuleMap(HashMap<ModulePath, ModuleReference>);
 
 impl std::ops::Deref for ModuleMap {
-    type Target = HashMap<String, v8::Global<v8::Module>>;
+    type Target = HashMap<ModulePath, ModuleReference>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -54,6 +51,7 @@ pub fn fetch_module_tree<'a>(
     scope: &mut v8::HandleScope<'a>,
     filename: &str,
 ) -> Option<v8::Local<'a, v8::Module>> {
+    // For now, will use the file-system loader.
     let loader = FsModuleLoader::default();
     let origin = create_origin(scope, filename, true);
 
@@ -62,7 +60,7 @@ pub fn fetch_module_tree<'a>(
     let source = v8::script_compiler::Source::new(source, Some(&origin));
 
     let module = match v8::script_compiler::compile_module(scope, source) {
-        Some(value) => value,
+        Some(module) => module,
         None => return None,
     };
 
@@ -84,7 +82,7 @@ pub fn fetch_module_tree<'a>(
         let specifier = request.get_specifier().to_rust_string_lossy(scope);
 
         let target = match loader.resolve(filename, &specifier) {
-            Ok(value) => value,
+            Ok(target) => target,
             Err(_) => return None,
         };
         // Using recursion resolve the rest sub-tree of modules.
@@ -107,7 +105,6 @@ pub fn module_resolve_cb<'a>(
     // Getting a CallbackScope from the given context.
     let scope = &mut unsafe { v8::CallbackScope::new(context) };
     let state = JsRuntime::state(scope);
-
     // The following should never fail (that's why we use unwrap) since any errors should
     // have been caught at the `fetch_module_tree` step.
     let dependant = state
@@ -118,17 +115,16 @@ pub fn module_resolve_cb<'a>(
         .map(|(target, _)| target.clone())
         .unwrap();
 
-    let specifier = specifier.to_rust_string_lossy(scope);
-
     let loader = FsModuleLoader::default();
 
-    let import = match loader.resolve(&dependant, &specifier) {
-        Ok(value) => value,
+    let specifier = specifier.to_rust_string_lossy(scope);
+    let specifier = match loader.resolve(&dependant, &specifier) {
+        Ok(specifier) => specifier,
         Err(_) => return None,
     };
 
-    let module = match state.borrow_mut().module_map.get(&import) {
-        Some(value) => value.clone(),
+    let module = match state.borrow_mut().module_map.get(&specifier) {
+        Some(module) => module.clone(),
         None => return None,
     };
 
