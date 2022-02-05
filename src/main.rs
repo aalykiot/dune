@@ -24,12 +24,12 @@ fn main() {
             Ok(line) => match rt.eval("<anonymous>", line.trim_end()) {
                 Ok(v) => println!("{}", v),
                 Err(v) => {
-                    eprintln!("{}: {}", "Uncaught".red().bold(), v);
+                    eprintln!("{} {}", "Uncaught".red().bold(), v);
                 }
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
             Err(err) => {
-                eprintln!("{}: {:?}", "Unknown".red().bold(), err);
+                eprintln!("{} {:?}", "Unknown".red().bold(), err);
                 break;
             }
         }
