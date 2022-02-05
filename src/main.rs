@@ -4,6 +4,7 @@ mod loaders;
 mod modules;
 mod process;
 mod runtime;
+mod stdio;
 
 use colored::*;
 use runtime::JsRuntime;

@@ -4,6 +4,7 @@
 // https://nodejs.org/dist/latest-v17.x/docs/api/process.html
 
 use crate::bindings::{create_object_under, set_constant_to, set_function_to, set_property_to};
+use crate::runtime::JsRuntime;
 use lazy_static::lazy_static;
 use rusty_v8 as v8;
 use std::collections::HashMap;
@@ -135,6 +136,36 @@ pub fn initialize<'s>(
     });
 
     set_property_to(scope, process, "versions", versions.into());
+
+    // `process.binding` - exposes native modules to JavaScript.
+    set_function_to(
+        scope,
+        process,
+        "binding",
+        |scope: &mut v8::HandleScope,
+         args: v8::FunctionCallbackArguments,
+         mut rv: v8::ReturnValue| {
+            // Get the requested native binding.
+            let request = args.get(0).to_rust_string_lossy(scope);
+            let state = JsRuntime::state(scope);
+
+            match state.borrow().bindings.get(request.as_str()) {
+                // If native binding exists, initialize it and return it.
+                Some(initializer) => {
+                    let binding = initializer(scope);
+                    let binding = v8::Local::new(scope, binding);
+                    rv.set(binding.into());
+                }
+                // Else, throw an exception to JavaScript.
+                None => {
+                    let message = format!("No such module: \"{}\"", request);
+                    let message = v8::String::new(scope, &message).unwrap();
+                    let exception = v8::Exception::error(scope, message);
+                    scope.throw_exception(exception);
+                }
+            };
+        },
+    );
 
     process
 }

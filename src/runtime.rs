@@ -1,23 +1,33 @@
 use crate::bindings;
 use crate::exceptions;
 use crate::modules::{create_origin, ModuleMap};
+use crate::stdio;
 use anyhow::{bail, Error};
 use rusty_v8 as v8;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Once;
+
+// Function pointer for the bindings initializers.
+type BindingInitFn = fn(&mut v8::HandleScope<'_>) -> v8::Global<v8::Object>;
 
 // `JsRuntimeState` defines a state that will be stored per v8 isolate.
 pub struct JsRuntimeState {
     // A sand-boxed execution context with its own set of built-in objects and functions.
+    // https://v8.dev/docs/embed#contexts
     pub context: v8::Global<v8::Context>,
     // Holds information about resolved ES modules.
+    // https://hacks.mozilla.org/2018/03/es-modules-a-cartoon-deep-dive/
     pub module_map: ModuleMap,
+    // Holds initializers for Rust native bindings.
+    // https://stackoverflow.com/questions/20382396/what-are-node-js-bindings
+    pub bindings: HashMap<&'static str, BindingInitFn>,
 }
 
 pub struct JsRuntime {
     // A VM instance with its own heap.
-    // (https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html)
+    // https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html
     isolate: v8::OwnedIsolate,
 }
 
@@ -39,11 +49,17 @@ impl JsRuntime {
             v8::Global::new(scope, context)
         };
 
+        // Creating the native bindings map.
+        let mut bindings: HashMap<&'static str, BindingInitFn> = HashMap::new();
+
+        bindings.insert("stdio", stdio::initialize);
+
         // Storing state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
             context,
             module_map: ModuleMap::default(),
+            bindings,
         })));
 
         JsRuntime { isolate }
