@@ -1,7 +1,9 @@
-use crate::loaders::{FsModuleLoader, ModuleLoader};
+use crate::loaders::{FsModuleLoader, ModuleLoader, UrlModuleLoader};
 use crate::runtime::JsRuntime;
+use anyhow::Result;
 use rusty_v8 as v8;
 use std::collections::HashMap;
+use url::Url;
 
 // Utility to easily create v8 script origins.
 pub fn create_origin<'s>(
@@ -45,17 +47,46 @@ impl std::ops::DerefMut for ModuleMap {
     }
 }
 
+// Finds the right loader, and resolves the import.
+pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<String> {
+    // Looking at the params to decide the loader.
+    let loader: Box<dyn ModuleLoader> = match (base, Url::parse(specifier).is_ok()) {
+        // If the specifier is a valid URL, we're done!
+        (_, true) => Box::new(UrlModuleLoader),
+        // We need to take a look at the import base to decide.
+        (Some(base), _) => match Url::parse(base).is_ok() {
+            true => Box::new(UrlModuleLoader),
+            false => Box::new(FsModuleLoader),
+        },
+        // For anything else, use the FS loader.
+        _ => Box::new(FsModuleLoader),
+    };
+    // Resolve module.
+    loader.resolve(base, specifier)
+}
+
+// Finds the right loader, and loads the import.
+pub fn load_import(specifier: &str) -> Result<String> {
+    // Looking at the params to decide the loader.
+    let loader: Box<dyn ModuleLoader> = match Url::parse(specifier) {
+        Ok(_) => Box::new(UrlModuleLoader),
+        Err(_) => Box::new(FsModuleLoader),
+    };
+    // Load module.
+    loader.load(specifier)
+}
+
 // It resolves module imports ahead of time (useful for async).
 // https://source.chromium.org/chromium/v8/v8.git/+/51e736ca62bd5c7bfd82488a5587fed31dbf45d5:src/d8.cc;l=741
 pub fn fetch_module_tree<'a>(
     scope: &mut v8::HandleScope<'a>,
     filename: &str,
 ) -> Option<v8::Local<'a, v8::Module>> {
-    // For now, will use the file-system loader.
-    let loader = FsModuleLoader::default();
+    // Create a script origin for the import.
     let origin = create_origin(scope, filename, true);
 
-    let source = loader.load(filename).unwrap();
+    // Todo: Don't unwrap, handle error.
+    let source = load_import(filename).unwrap();
     let source = v8::String::new(scope, &source).unwrap();
     let source = v8::script_compiler::Source::new(source, Some(&origin));
 
@@ -81,13 +112,13 @@ pub fn fetch_module_tree<'a>(
         // Transforming v8's ModuleRequest into a Rust string.
         let specifier = request.get_specifier().to_rust_string_lossy(scope);
 
-        let target = match loader.resolve(filename, &specifier) {
-            Ok(target) => target,
+        let specifier = match resolve_import(Some(filename), &specifier) {
+            Ok(specifier) => specifier,
             Err(_) => return None,
         };
         // Using recursion resolve the rest sub-tree of modules.
-        if !state.borrow().module_map.contains_key(&target) {
-            fetch_module_tree(scope, &target)?;
+        if !state.borrow().module_map.contains_key(&specifier) {
+            fetch_module_tree(scope, &specifier)?;
         }
     }
 
@@ -115,10 +146,9 @@ pub fn module_resolve_cb<'a>(
         .map(|(target, _)| target.clone())
         .unwrap();
 
-    let loader = FsModuleLoader::default();
-
     let specifier = specifier.to_rust_string_lossy(scope);
-    let specifier = match loader.resolve(&dependant, &specifier) {
+
+    let specifier = match resolve_import(Some(&dependant), &specifier) {
         Ok(specifier) => specifier,
         Err(_) => return None,
     };

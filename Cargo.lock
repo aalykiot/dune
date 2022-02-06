@@ -138,6 +138,7 @@ dependencies = [
  "rusty_v8",
  "rustyline",
  "sha",
+ "url",
 ]
 
 [[package]]
