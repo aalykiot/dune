@@ -186,69 +186,71 @@ mod tests {
     use super::*;
     #[test]
     fn test_imports() {
-        let loader = FsModuleLoader::default();
-        {
-            let got = loader.resolve(None, "/dev/core/tests/005_more_imports.ts");
-            let want = "/dev/core/tests/005_more_imports.ts";
-            assert_eq!(got.unwrap(), want);
-        }
-        {
-            let got = loader.resolve(
+        // Tests to run later on.
+        let tests = vec![
+            (
+                None,
+                "/dev/core/tests/005_more_imports.ts",
+                "/dev/core/tests/005_more_imports.ts",
+            ),
+            (
                 Some("/dev/core/tests/005_more_imports.ts"),
                 "./006_more_imports.ts",
-            );
-            let want = "/dev/core/tests/006_more_imports.ts";
-            assert_eq!(got.unwrap(), want);
-        }
-        {
-            let got = loader.resolve(
+                "/dev/core/tests/006_more_imports.ts",
+            ),
+            (
                 Some("/dev/core/tests/005_more_imports.ts"),
                 "../006_more_imports.ts",
-            );
-            let want = "/dev/core/006_more_imports.ts";
-            assert_eq!(got.unwrap(), want);
-        }
-        {
-            let got = loader.resolve(
+                "/dev/core/006_more_imports.ts",
+            ),
+            (
                 Some("/dev/core/tests/005_more_imports.ts"),
                 "/dev/core/tests/006_more_imports.ts",
-            );
-            let want = "/dev/core/tests/006_more_imports.ts";
-            assert_eq!(got.unwrap(), want);
+                "/dev/core/tests/006_more_imports.ts",
+            ),
+        ];
+
+        // Run tests.
+        let loader = FsModuleLoader::default();
+
+        for (base, specifier, expected) in tests {
+            let path = loader.resolve(base, specifier).unwrap();
+            assert_eq!(path, expected);
         }
     }
 
     #[test]
     fn test_url_imports() {
-        let loader = UrlModuleLoader::default();
-        {
-            let got = loader.resolve(None, "http://github.com/x/core/tests/006_url_imports.ts");
-            let want = "http://github.com/x/core/tests/006_url_imports.ts";
-            assert_eq!(got.unwrap(), want);
-        }
-        {
-            let got = loader.resolve(
+        // Tests to run later on.
+        let tests = vec![
+            (
+                None,
+                "http://github.com/x/core/tests/006_url_imports.ts",
+                "http://github.com/x/core/tests/006_url_imports.ts",
+            ),
+            (
                 Some("http://github.com/x/core/tests/006_url_imports.ts"),
                 "./005_more_imports.ts",
-            );
-            let want = "http://github.com/x/core/tests/005_more_imports.ts";
-            assert_eq!(got.unwrap(), want);
-        }
-        {
-            let got = loader.resolve(
+                "http://github.com/x/core/tests/005_more_imports.ts",
+            ),
+            (
                 Some("http://github.com/x/core/tests/006_url_imports.ts"),
                 "../005_more_imports.ts",
-            );
-            let want = "http://github.com/x/core/005_more_imports.ts";
-            assert_eq!(got.unwrap(), want);
-        }
-        {
-            let got = loader.resolve(
+                "http://github.com/x/core/005_more_imports.ts",
+            ),
+            (
                 Some("http://github.com/x/core/tests/006_url_imports.ts"),
                 "http://github.com/x/core/tests/005_more_imports.ts",
-            );
-            let want = "http://github.com/x/core/tests/005_more_imports.ts";
-            assert_eq!(got.unwrap(), want);
+                "http://github.com/x/core/tests/005_more_imports.ts",
+            ),
+        ];
+
+        // Run tests.
+        let loader = UrlModuleLoader::default();
+
+        for (base, specifier, expected) in tests {
+            let url = loader.resolve(base, specifier).unwrap();
+            assert_eq!(url, expected);
         }
     }
 }
