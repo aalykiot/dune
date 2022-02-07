@@ -21,7 +21,7 @@ fn main() {
     loop {
         match editor.readline(&prompt) {
             Ok(line) if line == ".exit" => break,
-            Ok(line) => match rt.eval("<anonymous>", line.trim_end()) {
+            Ok(line) => match rt.execute("<anonymous>", line.trim_end()) {
                 Ok(v) => println!("{}", v),
                 Err(v) => {
                     eprintln!("{} {}", "Uncaught".red().bold(), v);

@@ -15,13 +15,10 @@ type BindingInitFn = fn(&mut v8::HandleScope<'_>) -> v8::Global<v8::Object>;
 // `JsRuntimeState` defines a state that will be stored per v8 isolate.
 pub struct JsRuntimeState {
     // A sand-boxed execution context with its own set of built-in objects and functions.
-    // https://v8.dev/docs/embed#contexts
     pub context: v8::Global<v8::Context>,
     // Holds information about resolved ES modules.
-    // https://hacks.mozilla.org/2018/03/es-modules-a-cartoon-deep-dive/
     pub module_map: ModuleMap,
-    // Holds initializers for Rust native bindings.
-    // https://stackoverflow.com/questions/20382396/what-are-node-js-bindings
+    // Holds native bindings.
     pub bindings: HashMap<&'static str, BindingInitFn>,
 }
 
@@ -49,10 +46,8 @@ impl JsRuntime {
             v8::Global::new(scope, context)
         };
 
-        // Creating the native bindings map.
-        let mut bindings: HashMap<&'static str, BindingInitFn> = HashMap::new();
-
-        bindings.insert("stdio", stdio::initialize);
+        let bindings: Vec<(&'static str, BindingInitFn)> = vec![("stdio", stdio::initialize)];
+        let bindings = HashMap::from_iter(bindings.into_iter());
 
         // Storing state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
@@ -65,7 +60,7 @@ impl JsRuntime {
         JsRuntime { isolate }
     }
 
-    pub fn eval(&mut self, filename: &str, source: &str) -> Result<String, Error> {
+    pub fn execute(&mut self, filename: &str, source: &str) -> Result<String, Error> {
         // Getting a reference to isolate's handle scope.
         let scope = &mut self.get_handle_scope();
 
