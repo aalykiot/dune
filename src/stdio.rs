@@ -12,24 +12,26 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     v8::Global::new(scope, target)
 }
 
+// Writes data to the stdout stream.
 fn write(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _rv: v8::ReturnValue) {
-    // Transform contents to bytes.
-    let contents = args.get(0).to_rust_string_lossy(scope);
-    let contents = contents.as_bytes();
+    // Convert string to bytes.
+    let content = args.get(0).to_rust_string_lossy(scope);
+    let content = content.as_bytes();
     // Flush bytes to stdout.
-    io::stdout().write_all(contents).unwrap();
+    io::stdout().write_all(content).unwrap();
     io::stdout().flush().unwrap();
 }
 
+// Writes data to the stderr stream.
 fn write_error(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
-    // Transform contents to bytes.
-    let contents = args.get(0).to_rust_string_lossy(scope);
-    let contents = contents.as_bytes();
+    // Convert string to bytes.
+    let content = args.get(0).to_rust_string_lossy(scope);
+    let content = content.as_bytes();
     // Flush bytes to stderr.
-    io::stderr().write_all(contents).unwrap();
+    io::stderr().write_all(content).unwrap();
     io::stderr().flush().unwrap();
 }
