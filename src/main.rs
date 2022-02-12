@@ -22,9 +22,13 @@ fn main() {
         match editor.readline(&prompt) {
             Ok(line) if line == ".exit" => break,
             Ok(line) => match rt.execute("<anonymous>", line.trim_end()) {
-                Ok(v) => println!("{}", v),
-                Err(v) => {
-                    eprintln!("{} {}", "Uncaught".red().bold(), v);
+                Ok(value) => {
+                    let scope = &mut rt.handle_scope();
+                    let value = value.open(scope);
+                    println!("{}", value.to_rust_string_lossy(scope));
+                }
+                Err(value) => {
+                    eprintln!("{} {}", "Uncaught".red().bold(), value);
                 }
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,

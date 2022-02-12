@@ -3,6 +3,7 @@ use crate::exceptions;
 use crate::modules::{create_origin, ModuleMap};
 use crate::stdio;
 use anyhow::{bail, Error};
+use colored::*;
 use rusty_v8 as v8;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -57,31 +58,45 @@ impl JsRuntime {
             bindings,
         })));
 
-        JsRuntime { isolate }
+        let mut runtime = JsRuntime { isolate };
+
+        // Load the JavaScript environment to the runtime. (see lib/main.js)
+        runtime.init_environment();
+
+        runtime
     }
 
-    pub fn execute(&mut self, filename: &str, source: &str) -> Result<String, Error> {
+    fn init_environment(&mut self) {
+        match self.execute("<environment>", include_str!("../lib/main.js")) {
+            Ok(_) => {}
+            Err(value) => {
+                eprintln!("{} {}", "Uncaught".red().bold(), value);
+                std::process::exit(1);
+            }
+        };
+    }
+
+    pub fn execute(
+        &mut self,
+        filename: &str,
+        source: &str,
+    ) -> Result<v8::Global<v8::Value>, Error> {
         // Getting a reference to isolate's handle scope.
-        let scope = &mut self.get_handle_scope();
+        let scope = &mut self.handle_scope();
 
         let origin = create_origin(scope, filename, false);
         let source = v8::String::new(scope, source).unwrap();
 
         // The `TryCatch` scope allows us to catch runtime errors rather than panicking.
-        let mut tc_scope = v8::TryCatch::new(scope);
-        let script = match v8::Script::compile(&mut tc_scope, source, Some(&origin)) {
+        let tc_scope = &mut v8::TryCatch::new(scope);
+
+        let script = match v8::Script::compile(tc_scope, source, Some(&origin)) {
             Some(script) => script,
-            None => {
-                assert!(tc_scope.has_caught());
-                bail!("{}", exceptions::to_pretty_string(tc_scope));
-            }
+            None => bail!("{}", exceptions::to_pretty_string(tc_scope)),
         };
 
-        match script.run(&mut tc_scope) {
-            Some(result) => Ok(result
-                .to_string(&mut tc_scope)
-                .unwrap()
-                .to_rust_string_lossy(&mut tc_scope)),
+        match script.run(tc_scope) {
+            Some(value) => Ok(v8::Global::new(tc_scope, value)),
             None => {
                 assert!(tc_scope.has_caught());
                 bail!("{}", exceptions::to_pretty_string(tc_scope));
@@ -107,14 +122,14 @@ impl JsRuntime {
 
     // Returns a v8 handle scope for the runtime.
     // https://v8docs.nodesource.com/node-0.8/d3/d95/classv8_1_1_handle_scope.html.
-    pub fn get_handle_scope(&mut self) -> v8::HandleScope {
-        let context = self.get_context();
+    pub fn handle_scope(&mut self) -> v8::HandleScope {
+        let context = self.context();
         v8::HandleScope::with_context(&mut self.isolate, context)
     }
 
     // Returns a context created for the runtime.
     // https://v8docs.nodesource.com/node-0.8/df/d69/classv8_1_1_context.html
-    pub fn get_context(&mut self) -> v8::Global<v8::Context> {
+    pub fn context(&mut self) -> v8::Global<v8::Context> {
         let state = self.get_state();
         let state = state.borrow();
         state.context.clone()
