@@ -1,9 +1,7 @@
 use crate::bindings;
-use crate::exceptions;
+use crate::errors::JsError;
 use crate::modules::{create_origin, ModuleMap};
 use crate::stdio;
-use anyhow::{bail, Error};
-use colored::*;
 use rusty_v8 as v8;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -67,10 +65,10 @@ impl JsRuntime {
     }
 
     fn init_environment(&mut self) {
-        match self.execute("<environment>", include_str!("../lib/main.js")) {
+        match self.execute("pluto::<main.js>", include_str!("../lib/main.js")) {
             Ok(_) => {}
-            Err(value) => {
-                eprintln!("{} {}", "Uncaught".red().bold(), value);
+            Err(e) => {
+                e.show();
                 std::process::exit(1);
             }
         };
@@ -80,7 +78,7 @@ impl JsRuntime {
         &mut self,
         filename: &str,
         source: &str,
-    ) -> Result<v8::Global<v8::Value>, Error> {
+    ) -> Result<v8::Global<v8::Value>, JsError> {
         // Getting a reference to isolate's handle scope.
         let scope = &mut self.handle_scope();
 
@@ -92,14 +90,17 @@ impl JsRuntime {
 
         let script = match v8::Script::compile(tc_scope, source, Some(&origin)) {
             Some(script) => script,
-            None => bail!("{}", exceptions::to_pretty_string(tc_scope)),
+            None => {
+                assert!(tc_scope.has_caught());
+                return Err(JsError::from_v8_exception(tc_scope));
+            }
         };
 
         match script.run(tc_scope) {
             Some(value) => Ok(v8::Global::new(tc_scope, value)),
             None => {
                 assert!(tc_scope.has_caught());
-                bail!("{}", exceptions::to_pretty_string(tc_scope));
+                return Err(JsError::from_v8_exception(tc_scope));
             }
         }
     }

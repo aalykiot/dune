@@ -1,5 +1,5 @@
 mod bindings;
-mod exceptions;
+mod errors;
 mod loaders;
 mod modules;
 mod process;
@@ -27,13 +27,11 @@ fn main() {
                     let value = value.open(scope);
                     println!("{}", value.to_rust_string_lossy(scope));
                 }
-                Err(value) => {
-                    eprintln!("{} {}", "Uncaught".red().bold(), value);
-                }
+                Err(e) => println!("{}", e),
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
-            Err(err) => {
-                eprintln!("{} {:?}", "Unknown".red().bold(), err);
+            Err(e) => {
+                eprintln!("{}", e);
                 break;
             }
         }
