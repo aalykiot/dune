@@ -1,7 +1,11 @@
 use crate::bindings;
+use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
-use crate::modules::{create_origin, ModuleMap};
+use crate::modules::create_origin;
+use crate::modules::ModuleMap;
 use crate::stdio;
+use anyhow::bail;
+use anyhow::Error;
 use rusty_v8 as v8;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -37,7 +41,15 @@ impl JsRuntime {
             v8::V8::initialize();
         });
 
+        let flags = concat!(
+            " --harmony-import-assertions",
+            " --harmony-top-level-await false"
+        );
+        v8::V8::set_flags_from_string(flags);
+
         let mut isolate = v8::Isolate::new(v8::CreateParams::default());
+
+        isolate.set_capture_stack_trace_for_uncaught_exceptions(true, 10);
 
         let context = {
             let scope = &mut v8::HandleScope::new(&mut isolate);
@@ -59,26 +71,16 @@ impl JsRuntime {
         let mut runtime = JsRuntime { isolate };
 
         // Load the JavaScript environment to the runtime. (see lib/main.js)
-        runtime.init_environment();
+        unwrap_or_exit(runtime.execute("<environment>", include_str!("../lib/main.js")));
 
         runtime
-    }
-
-    fn init_environment(&mut self) {
-        match self.execute("pluto::<main.js>", include_str!("../lib/main.js")) {
-            Ok(_) => {}
-            Err(e) => {
-                e.show();
-                std::process::exit(1);
-            }
-        };
     }
 
     pub fn execute(
         &mut self,
         filename: &str,
         source: &str,
-    ) -> Result<v8::Global<v8::Value>, JsError> {
+    ) -> Result<v8::Global<v8::Value>, Error> {
         // Getting a reference to isolate's handle scope.
         let scope = &mut self.handle_scope();
 
@@ -92,7 +94,8 @@ impl JsRuntime {
             Some(script) => script,
             None => {
                 assert!(tc_scope.has_caught());
-                return Err(JsError::from_v8_exception(tc_scope));
+                let exception = tc_scope.exception().unwrap();
+                bail!(JsError::from_v8_exception(tc_scope, exception));
             }
         };
 
@@ -100,7 +103,8 @@ impl JsRuntime {
             Some(value) => Ok(v8::Global::new(tc_scope, value)),
             None => {
                 assert!(tc_scope.has_caught());
-                return Err(JsError::from_v8_exception(tc_scope));
+                let exception = tc_scope.exception().unwrap();
+                bail!(JsError::from_v8_exception(tc_scope, exception));
             }
         }
     }

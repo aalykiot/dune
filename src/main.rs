@@ -27,7 +27,7 @@ fn main() {
                     let value = value.open(scope);
                     println!("{}", value.to_rust_string_lossy(scope));
                 }
-                Err(e) => println!("{}", e),
+                Err(e) => eprintln!("{}", e),
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
             Err(e) => {
