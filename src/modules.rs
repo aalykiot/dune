@@ -1,4 +1,9 @@
-use crate::loaders::{FsModuleLoader, ModuleLoader, UrlModuleLoader};
+use crate::errors::unwrap_or_exit;
+use crate::loaders::FsModuleLoader;
+use crate::loaders::ModuleLoader;
+use crate::loaders::ModuleSource;
+use crate::loaders::ModuleSpecifier;
+use crate::loaders::UrlModuleLoader;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
 use rusty_v8 as v8;
@@ -48,7 +53,7 @@ impl std::ops::DerefMut for ModuleMap {
 }
 
 // Finds the right loader, and resolves the import.
-pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<String> {
+pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModuleSpecifier> {
     // Looking at the params to decide the loader.
     let loader: Box<dyn ModuleLoader> = match (base, Url::parse(specifier).is_ok()) {
         // If the specifier is a valid URL, we're done!
@@ -66,7 +71,7 @@ pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<String> {
 }
 
 // Finds the right loader, and loads the import.
-pub fn load_import(specifier: &str) -> Result<String> {
+pub fn load_import(specifier: &str) -> Result<ModuleSource> {
     // Looking at the params to decide the loader.
     let loader: Box<dyn ModuleLoader> = match Url::parse(specifier) {
         Ok(_) => Box::new(UrlModuleLoader),
@@ -86,7 +91,7 @@ pub fn fetch_module_tree<'a>(
     let origin = create_origin(scope, filename, true);
 
     // Todo: Don't unwrap, handle error.
-    let source = load_import(filename).unwrap();
+    let source = unwrap_or_exit(load_import(filename));
     let source = v8::String::new(scope, &source).unwrap();
     let source = v8::script_compiler::Source::new(source, Some(&origin));
 
@@ -112,10 +117,8 @@ pub fn fetch_module_tree<'a>(
         // Transforming v8's ModuleRequest into a Rust string.
         let specifier = request.get_specifier().to_rust_string_lossy(scope);
 
-        let specifier = match resolve_import(Some(filename), &specifier) {
-            Ok(specifier) => specifier,
-            Err(_) => return None,
-        };
+        let specifier = unwrap_or_exit(resolve_import(Some(filename), &specifier));
+
         // Using recursion resolve the rest sub-tree of modules.
         if !state.borrow().module_map.contains_key(&specifier) {
             fetch_module_tree(scope, &specifier)?;
@@ -130,7 +133,7 @@ pub fn fetch_module_tree<'a>(
 pub fn module_resolve_cb<'a>(
     context: v8::Local<'a, v8::Context>,
     specifier: v8::Local<'a, v8::String>,
-    _import_assertions: v8::Local<'a, v8::FixedArray>,
+    _: v8::Local<'a, v8::FixedArray>,
     referrer: v8::Local<'a, v8::Module>,
 ) -> Option<v8::Local<'a, v8::Module>> {
     // Getting a CallbackScope from the given context.
@@ -147,16 +150,16 @@ pub fn module_resolve_cb<'a>(
         .unwrap();
 
     let specifier = specifier.to_rust_string_lossy(scope);
+    let specifier = unwrap_or_exit(resolve_import(Some(&dependant), &specifier));
 
-    let specifier = match resolve_import(Some(&dependant), &specifier) {
-        Ok(specifier) => specifier,
-        Err(_) => return None,
-    };
-
-    let module = match state.borrow_mut().module_map.get(&specifier) {
-        Some(module) => module.clone(),
-        None => return None,
-    };
+    // This call should always give us back the module. Any errors will be caught
+    // on the `fetch_module_tree` step.
+    let module = state
+        .borrow_mut()
+        .module_map
+        .get(&specifier)
+        .unwrap()
+        .clone();
 
     Some(v8::Local::new(scope, module))
 }

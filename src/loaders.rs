@@ -1,17 +1,24 @@
-use anyhow::{anyhow, Result};
+use crate::errors::CustomError;
+use anyhow::bail;
+use anyhow::Result;
 use colored::*;
 use path_clean::PathClean;
 use sha::sha1::Sha1;
-use sha::utils::{Digest, DigestExt};
+use sha::utils::Digest;
+use sha::utils::DigestExt;
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use url::Url;
+
+pub type ModuleSpecifier = String;
+pub type ModuleSource = String;
 
 // Defines the behavior of a module loader.
 pub trait ModuleLoader {
-    fn load(&self, specifier: &str) -> Result<String>;
-    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<String>;
+    fn load(&self, specifier: &str) -> Result<ModuleSource>;
+    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModuleSpecifier>;
 }
 
 static EXTENSIONS: &[&str] = &["js", "json"];
@@ -53,7 +60,10 @@ impl FsModuleLoader {
             }
         }
         // 3. Bail out with an error.
-        Err(anyhow!("Module not found \"{}\"", path.display()))
+        bail!(CustomError::generic(format!(
+            "Module not found \"{}\"",
+            path.display()
+        )));
     }
     // If import is a directory, load it using the 'index.[ext]' convention.
     fn resolve_as_directory(&self, path: &Path) -> Result<PathBuf> {
@@ -63,12 +73,15 @@ impl FsModuleLoader {
                 return Ok(path);
             }
         }
-        Err(anyhow!("Module not found \"{}\"", path.display()))
+        bail!(CustomError::generic(format!(
+            "Module not found \"{}\"",
+            path.display()
+        )));
     }
 }
 
 impl ModuleLoader for FsModuleLoader {
-    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<String> {
+    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModuleSpecifier> {
         // 1. Try to resolve specifier as a relative import.
         if specifier.starts_with('/') {
             let base_directory = &Path::new("/");
@@ -98,13 +111,22 @@ impl ModuleLoader for FsModuleLoader {
             let path = base.join(target);
             let path = std::env::current_dir().unwrap().join(path);
 
+            // Use `.js` as the default extension.
+            let path = match path.extension() {
+                Some(_) => path,
+                None => PathBuf::from(format!("{}.js", path.display())),
+            };
+
             return self.clean(path);
         }
 
-        Err(anyhow!("Can't resolve import \"{}\"", specifier))
+        bail!(CustomError::generic(format!(
+            "Module not found \"{}\"",
+            specifier
+        )));
     }
 
-    fn load(&self, specifier: &str) -> Result<String> {
+    fn load(&self, specifier: &str) -> Result<ModuleSource> {
         // Check is specifier references a file, folder, etc.
         let path = Path::new(specifier);
         let path = self
@@ -128,7 +150,7 @@ impl ModuleLoader for FsModuleLoader {
 pub struct UrlModuleLoader;
 
 impl ModuleLoader for UrlModuleLoader {
-    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<String> {
+    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModuleSpecifier> {
         // 1. Check if the specifier is a valid URL.
         if let Ok(url) = Url::parse(specifier) {
             return Ok(url.into());
@@ -143,15 +165,17 @@ impl ModuleLoader for UrlModuleLoader {
             }
         }
 
-        return Err(anyhow!("Base is not a valid URL"));
+        bail!(CustomError::generic("Base is not a valid URL"));
     }
 
-    fn load(&self, specifier: &str) -> Result<String> {
+    fn load(&self, specifier: &str) -> Result<ModuleSource> {
         // Create a .cache directory if it does not exist.
         let cache_dir = env::current_dir()?.join(".cache");
 
         if fs::create_dir_all(&cache_dir).is_err() {
-            return Err(anyhow!("Failed to create module caching directory"));
+            bail!(CustomError::generic(
+                "Failed to create module caching directory"
+            ));
         }
 
         // Every URL module is hashed into a unique path.
@@ -172,7 +196,10 @@ impl ModuleLoader for UrlModuleLoader {
             .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
         {
             Ok(source) => source,
-            Err(_) => return Err(anyhow!("Module not found \"{}\"", specifier)),
+            Err(_) => bail!(CustomError::generic(format!(
+                "Module not found \"{}\"",
+                specifier
+            ))),
         };
 
         fs::write(&module_path, &source)?;

@@ -3,7 +3,10 @@
 // This module contains part of the functions/attributes of the Node.js' process object.
 // https://nodejs.org/dist/latest-v17.x/docs/api/process.html
 
-use crate::bindings::{create_object_under, set_constant_to, set_function_to, set_property_to};
+use crate::bindings::create_object_under;
+use crate::bindings::set_constant_to;
+use crate::bindings::set_function_to;
+use crate::bindings::set_property_to;
 use crate::runtime::JsRuntime;
 use lazy_static::lazy_static;
 use rusty_v8 as v8;

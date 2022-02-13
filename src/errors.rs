@@ -1,6 +1,35 @@
 use anyhow::Error;
 use colored::*;
 use rusty_v8 as v8;
+use std::borrow::Cow;
+use std::fmt::Debug;
+use std::fmt::Display;
+
+// A simple error type that lets the creator specify both the error message and
+// the error class name.
+#[derive(Debug)]
+pub struct CustomError {
+    class: &'static str,
+    message: Cow<'static, str>,
+}
+
+impl CustomError {
+    pub fn generic(message: impl Into<Cow<'static, str>>) -> Error {
+        CustomError {
+            class: "Error",
+            message: message.into(),
+        }
+        .into()
+    }
+}
+
+impl std::error::Error for CustomError {}
+
+impl Display for CustomError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.class.red().bold(), self.message)
+    }
+}
 
 // Represents an exception coming from V8.
 #[derive(PartialEq, Clone)]
@@ -69,7 +98,7 @@ impl JsError {
 impl std::error::Error for JsError {}
 
 // Should display the minified version of the error. (used in repl)
-impl std::fmt::Display for JsError {
+impl Display for JsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Unwrapping values.
         let line = self.line_number.unwrap_or_default();
@@ -87,7 +116,7 @@ impl std::fmt::Display for JsError {
 }
 
 // Should display the full version of the error with stacktrace.
-impl std::fmt::Debug for JsError {
+impl Debug for JsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Basic exception information.
         writeln!(f, "{} {}", "Uncaught".red().bold(), self.message)?;

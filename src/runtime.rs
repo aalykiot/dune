@@ -1,7 +1,11 @@
 use crate::bindings;
 use crate::errors::unwrap_or_exit;
+use crate::errors::CustomError;
 use crate::errors::JsError;
 use crate::modules::create_origin;
+use crate::modules::fetch_module_tree;
+use crate::modules::module_resolve_cb;
+use crate::modules::resolve_import;
 use crate::modules::ModuleMap;
 use crate::stdio;
 use anyhow::bail;
@@ -106,6 +110,48 @@ impl JsRuntime {
                 let exception = tc_scope.exception().unwrap();
                 bail!(JsError::from_v8_exception(tc_scope, exception));
             }
+        }
+    }
+
+    pub fn execute_module(&mut self, filename: &str) -> Result<v8::Global<v8::Value>, Error> {
+        // Getting a reference to isolate's handle scope.
+        let scope = &mut self.handle_scope();
+        let tc_scope = &mut v8::TryCatch::new(scope);
+
+        // Convert filename to full path specifier.
+        let filename = unwrap_or_exit(resolve_import(None, filename));
+
+        let module = match fetch_module_tree(tc_scope, &filename) {
+            Some(module) => module,
+            None => {
+                assert!(tc_scope.has_caught());
+                let exception = tc_scope.exception().unwrap();
+                bail!(JsError::from_v8_exception(tc_scope, exception));
+            }
+        };
+
+        if module
+            .instantiate_module(tc_scope, module_resolve_cb)
+            .is_none()
+        {
+            assert!(tc_scope.has_caught());
+            let exception = tc_scope.exception().unwrap();
+            bail!(JsError::from_v8_exception(tc_scope, exception));
+        }
+
+        let module_result = module.evaluate(tc_scope);
+
+        // Check module status first.
+        if module.get_status() == v8::ModuleStatus::Errored {
+            let exception = module.get_exception();
+            bail!(JsError::from_v8_exception(tc_scope, exception));
+        }
+
+        match module_result {
+            Some(value) => Ok(v8::Global::new(tc_scope, value)),
+            None => bail!(CustomError::generic(
+                "Cannot evaluate module, because JavaScript execution has been terminated."
+            )),
         }
     }
 }
