@@ -1,4 +1,4 @@
-# Pluto
+# Dune
 
 A hobby javascript runtime written in **Rust**, based on **V8**, and developed completely for fun and experimentation.
 
@@ -13,11 +13,11 @@ A hobby javascript runtime written in **Rust**, based on **V8**, and developed c
 - `ReadableStream` / `WritableStream`: WHATWG streams API.
 - `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: WHATWG timers.
 - `setImmediate` / `clearImmediate`: node.js like immediate timers.
-- `process`: an object that provides info about the current pluto process.
+- `process`: an object that provides info about the current dune process.
 
 ### Process
 
-- `argv`: an array containing the command-line arguments passed when the pluto process was launched.
+- `argv`: an array containing the command-line arguments passed when the dune process was launched.
 - `cwd()`: current working directory.
 - `env`: an object containing the user environment.
 - `exit([code])`: exits the program with the given code.
@@ -26,8 +26,8 @@ A hobby javascript runtime written in **Rust**, based on **V8**, and developed c
 - `pid`: PID of the process.
 - `platform`: a string identifying the operating system platform.
 - `uptime()`: a number describing the amount of time (in seconds) the process is running.
-- `version`: the pluto version.
-- `versions`: an object listing the version strings of pluto and its dependencies.
+- `version`: the dune version.
+- `versions`: an object listing the version strings of dune and its dependencies.
 - `binding(module)`: exposes modules with bindings to Rust.
 - `kill(pid, [signal])`: sends the signal to the process identified by pid.
 - `stdout`: points to system's `stdout` stream.
