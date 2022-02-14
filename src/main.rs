@@ -3,37 +3,24 @@ mod errors;
 mod loaders;
 mod modules;
 mod process;
+mod repl;
 mod runtime;
 mod stdio;
 
-use colored::*;
 use runtime::JsRuntime;
-use rustyline::{error::ReadlineError, Editor};
+use std::env;
 
 fn main() {
-    let mut editor = Editor::<()>::new();
-    let mut rt = JsRuntime::new();
-
-    println!("Welcome to Dune v{}", env!("CARGO_PKG_VERSION"));
-
-    let prompt = ">> ".color(Color::Cyan).bold().to_string();
-
-    loop {
-        match editor.readline(&prompt) {
-            Ok(line) if line == ".exit" => break,
-            Ok(line) => match rt.execute("<anonymous>", line.trim_end()) {
-                Ok(value) => {
-                    let scope = &mut rt.handle_scope();
-                    let value = value.open(scope);
-                    println!("{}", value.to_rust_string_lossy(scope));
-                }
-                Err(e) => eprintln!("{}", e),
-            },
-            Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
-            Err(e) => {
-                eprintln!("{}", e);
-                break;
-            }
+    // Getting the filename from command-line arguments
+    let args: Vec<String> = env::args().collect();
+    // If filename is specified run it as a module, otherwise start the repl.
+    if let Some(filename) = args.get(1) {
+        let mut runtime = JsRuntime::new();
+        let mod_result = runtime.execute_module(&filename);
+        if let Err(e) = mod_result {
+            eprintln!("{:#?}", e);
         }
+    } else {
+        repl::start();
     }
 }
