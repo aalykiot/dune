@@ -6,12 +6,10 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
     // Here we need an EscapableHandleScope so V8 doesn't drop the
     // newly created HandleScope on return. (https://v8.dev/docs/embed#handles-and-garbage-collection)
     let scope = &mut v8::EscapableHandleScope::new(scope);
-
     // Creating and entering a new JavaScript context.
     let context = v8::Context::new(scope);
     let global = context.global(scope);
     let scope = &mut v8::ContextScope::new(scope, context);
-
     // Simple print function bound to Rust's println! macro (synchronous call).
     set_function_to(
         scope,
@@ -24,10 +22,8 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
             println!("{}", value);
         },
     );
-
     // Here we're exposing low-level functionality to JavaScript.
     process::initialize(scope, global);
-
     scope.escape(context)
 }
 

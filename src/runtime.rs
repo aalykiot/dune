@@ -1,6 +1,6 @@
 use crate::bindings;
+use crate::errors::generic_error;
 use crate::errors::unwrap_or_exit;
-use crate::errors::CustomError;
 use crate::errors::JsError;
 use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
@@ -149,7 +149,7 @@ impl JsRuntime {
 
         match module_result {
             Some(value) => Ok(v8::Global::new(tc_scope, value)),
-            None => bail!(CustomError::generic(
+            None => bail!(generic_error(
                 "Cannot evaluate module, because JavaScript execution has been terminated."
             )),
         }

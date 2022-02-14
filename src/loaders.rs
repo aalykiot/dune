@@ -1,4 +1,4 @@
-use crate::errors::CustomError;
+use crate::errors::generic_error;
 use anyhow::bail;
 use anyhow::Result;
 use colored::*;
@@ -28,8 +28,8 @@ pub struct FsModuleLoader;
 
 impl FsModuleLoader {
     // Helper method to "clean" messy path strings and convert PathBuf to String.
-    fn clean(&self, path: PathBuf) -> Result<String> {
-        Ok(path.clean().into_os_string().into_string().unwrap())
+    fn clean(&self, path: PathBuf) -> String {
+        path.clean().into_os_string().into_string().unwrap()
     }
 
     // Simple function that checks if import is a JSON file.
@@ -60,10 +60,9 @@ impl FsModuleLoader {
             }
         }
         // 3. Bail out with an error.
-        bail!(CustomError::generic(format!(
-            "Module not found \"{}\"",
-            path.display()
-        )));
+        let path = self.clean(path.to_path_buf());
+        let err_message = format!("Module not found \"{}\"", path);
+        bail!(generic_error(err_message));
     }
     // If import is a directory, load it using the 'index.[ext]' convention.
     fn resolve_as_directory(&self, path: &Path) -> Result<PathBuf> {
@@ -73,10 +72,9 @@ impl FsModuleLoader {
                 return Ok(path);
             }
         }
-        bail!(CustomError::generic(format!(
-            "Module not found \"{}\"",
-            path.display()
-        )));
+        let path = self.clean(path.to_path_buf());
+        let err_message = format!("Module not found \"{}\"", path);
+        bail!(generic_error(err_message));
     }
 }
 
@@ -86,7 +84,11 @@ impl ModuleLoader for FsModuleLoader {
         if specifier.starts_with('/') {
             let base_directory = &Path::new("/");
             let path = base_directory.join(specifier);
-            return self.clean(path);
+
+            return self
+                .resolve_as_file(&path)
+                .or_else(|_| self.resolve_as_directory(&path))
+                .and_then(|path| Ok(self.clean(path)));
         }
         // 2. Try to resolve specifier as an absolute import.
         let cwd = &Path::new(".");
@@ -111,32 +113,19 @@ impl ModuleLoader for FsModuleLoader {
             let path = base.join(target);
             let path = std::env::current_dir().unwrap().join(path);
 
-            // Use `.js` as the default extension.
-            let path = match path.extension() {
-                Some(_) => path,
-                None => PathBuf::from(format!("{}.js", path.display())),
-            };
-
-            return self.clean(path);
+            return self
+                .resolve_as_file(&path)
+                .or_else(|_| self.resolve_as_directory(&path))
+                .and_then(|path| Ok(self.clean(path)));
         }
 
-        bail!(CustomError::generic(format!(
-            "Module not found \"{}\"",
-            specifier
-        )));
+        bail!(generic_error(format!("Module not found \"{}\"", specifier)));
     }
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
-        // Check is specifier references a file, folder, etc.
-        let path = Path::new(specifier);
-        let path = self
-            .resolve_as_file(path)
-            .or_else(|_| self.resolve_as_directory(path))
-            .and_then(|path| self.clean(path))?;
-
         // Load source from path.
-        let source = fs::read_to_string(&path)?;
-        let source = match self.is_json_import(&path) {
+        let source = fs::read_to_string(specifier)?;
+        let source = match self.is_json_import(specifier) {
             true => self.wrap_json(source.as_str()),
             false => source,
         };
@@ -165,7 +154,8 @@ impl ModuleLoader for UrlModuleLoader {
             }
         }
 
-        bail!(CustomError::generic("Base is not a valid URL"));
+        // This error shouldn't be showing up often.
+        bail!(generic_error("Base is not a valid URL"));
     }
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
@@ -173,9 +163,7 @@ impl ModuleLoader for UrlModuleLoader {
         let cache_dir = env::current_dir()?.join(".cache");
 
         if fs::create_dir_all(&cache_dir).is_err() {
-            bail!(CustomError::generic(
-                "Failed to create module caching directory"
-            ));
+            bail!(generic_error("Failed to create module caching directory"))
         }
 
         // Every URL module is hashed into a unique path.
@@ -196,10 +184,7 @@ impl ModuleLoader for UrlModuleLoader {
             .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
         {
             Ok(source) => source,
-            Err(_) => bail!(CustomError::generic(format!(
-                "Module not found \"{}\"",
-                specifier
-            ))),
+            Err(_) => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
         };
 
         fs::write(&module_path, &source)?;
@@ -212,63 +197,28 @@ impl ModuleLoader for UrlModuleLoader {
 mod tests {
     use super::*;
     #[test]
-    fn test_imports() {
-        // Tests to run later on.
-        let tests = vec![
-            (
-                None,
-                "/dev/core/tests/005_more_imports.ts",
-                "/dev/core/tests/005_more_imports.ts",
-            ),
-            (
-                Some("/dev/core/tests/005_more_imports.ts"),
-                "./006_more_imports.ts",
-                "/dev/core/tests/006_more_imports.ts",
-            ),
-            (
-                Some("/dev/core/tests/005_more_imports.ts"),
-                "../006_more_imports.ts",
-                "/dev/core/006_more_imports.ts",
-            ),
-            (
-                Some("/dev/core/tests/005_more_imports.ts"),
-                "/dev/core/tests/006_more_imports.ts",
-                "/dev/core/tests/006_more_imports.ts",
-            ),
-        ];
-
-        // Run tests.
-        let loader = FsModuleLoader::default();
-
-        for (base, specifier, expected) in tests {
-            let path = loader.resolve(base, specifier).unwrap();
-            assert_eq!(path, expected);
-        }
-    }
-
-    #[test]
     fn test_url_imports() {
         // Tests to run later on.
         let tests = vec![
             (
                 None,
-                "http://github.com/x/core/tests/006_url_imports.ts",
-                "http://github.com/x/core/tests/006_url_imports.ts",
+                "http://github.com/x/core/tests/006_url_imports.js",
+                "http://github.com/x/core/tests/006_url_imports.js",
             ),
             (
-                Some("http://github.com/x/core/tests/006_url_imports.ts"),
-                "./005_more_imports.ts",
-                "http://github.com/x/core/tests/005_more_imports.ts",
+                Some("http://github.com/x/core/tests/006_url_imports.js"),
+                "./005_more_imports.js",
+                "http://github.com/x/core/tests/005_more_imports.js",
             ),
             (
-                Some("http://github.com/x/core/tests/006_url_imports.ts"),
-                "../005_more_imports.ts",
-                "http://github.com/x/core/005_more_imports.ts",
+                Some("http://github.com/x/core/tests/006_url_imports.js"),
+                "../005_more_imports.js",
+                "http://github.com/x/core/005_more_imports.js",
             ),
             (
-                Some("http://github.com/x/core/tests/006_url_imports.ts"),
-                "http://github.com/x/core/tests/005_more_imports.ts",
-                "http://github.com/x/core/tests/005_more_imports.ts",
+                Some("http://github.com/x/core/tests/006_url_imports.js"),
+                "http://github.com/x/core/tests/005_more_imports.js",
+                "http://github.com/x/core/tests/005_more_imports.js",
             ),
         ];
 

@@ -8,15 +8,15 @@ use std::fmt::Display;
 // A simple error type that lets the creator specify both the error message and
 // the error class name.
 #[derive(Debug)]
-pub struct CustomError {
+struct CustomError {
     class: &'static str,
     message: Cow<'static, str>,
 }
 
 impl CustomError {
-    pub fn generic(message: impl Into<Cow<'static, str>>) -> Error {
+    pub fn new(class: &'static str, message: impl Into<Cow<'static, str>>) -> Error {
         CustomError {
-            class: "Error",
+            class,
             message: message.into(),
         }
         .into()
@@ -29,6 +29,10 @@ impl Display for CustomError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.class.red().bold(), self.message)
     }
+}
+
+pub fn generic_error(message: impl Into<Cow<'static, str>>) -> Error {
+    CustomError::new("Error", message)
 }
 
 // Represents an exception coming from V8.
