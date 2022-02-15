@@ -16,7 +16,7 @@ fn main() {
     // If filename is specified run it as a module, otherwise start the repl.
     if let Some(filename) = args.get(1) {
         let mut runtime = JsRuntime::new();
-        let mod_result = runtime.execute_module(&filename, None);
+        let mod_result = runtime.execute_module(filename, None);
         if let Err(e) = mod_result {
             eprintln!("{:#?}", e);
         }

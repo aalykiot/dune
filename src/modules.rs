@@ -1,9 +1,11 @@
 use crate::errors::unwrap_or_exit;
+use crate::loaders::CoreModuleLoader;
 use crate::loaders::FsModuleLoader;
 use crate::loaders::ModuleLoader;
 use crate::loaders::ModuleSource;
 use crate::loaders::ModuleSpecifier;
 use crate::loaders::UrlModuleLoader;
+use crate::loaders::CORE_MODULES;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
 use rusty_v8 as v8;
@@ -55,16 +57,16 @@ impl std::ops::DerefMut for ModuleMap {
 // Finds the right loader, and resolves the import.
 pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModuleSpecifier> {
     // Looking at the params to decide the loader.
-    let loader: Box<dyn ModuleLoader> = match (base, Url::parse(specifier).is_ok()) {
-        // If the specifier is a valid URL, we're done!
-        (_, true) => Box::new(UrlModuleLoader),
-        // We need to take a look at the import base to decide.
-        (Some(base), _) => match Url::parse(base).is_ok() {
-            true => Box::new(UrlModuleLoader),
-            false => Box::new(FsModuleLoader),
-        },
-        // For anything else, use the FS loader.
-        _ => Box::new(FsModuleLoader),
+    let loader: Box<dyn ModuleLoader> = {
+        let is_core_module_import = CORE_MODULES.contains_key(specifier);
+        let is_url_import =
+            Url::parse(specifier).is_ok() || (base.is_some() && Url::parse(base.unwrap()).is_ok());
+
+        match (is_core_module_import, is_url_import) {
+            (true, _) => Box::new(CoreModuleLoader),
+            (_, true) => Box::new(UrlModuleLoader),
+            _ => Box::new(FsModuleLoader),
+        }
     };
     // Resolve module.
     loader.resolve(base, specifier)
@@ -73,9 +75,13 @@ pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModuleSpeci
 // Finds the right loader, and loads the import.
 pub fn load_import(specifier: &str) -> Result<ModuleSource> {
     // Looking at the params to decide the loader.
-    let loader: Box<dyn ModuleLoader> = match Url::parse(specifier) {
-        Ok(_) => Box::new(UrlModuleLoader),
-        Err(_) => Box::new(FsModuleLoader),
+    let loader: Box<dyn ModuleLoader> = match (
+        CORE_MODULES.contains_key(specifier),
+        Url::parse(specifier).is_ok(),
+    ) {
+        (true, _) => Box::new(CoreModuleLoader),
+        (_, true) => Box::new(UrlModuleLoader),
+        _ => Box::new(FsModuleLoader),
     };
     // Load module.
     loader.load(specifier)

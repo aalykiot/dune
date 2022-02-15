@@ -2,15 +2,24 @@ use crate::errors::generic_error;
 use anyhow::bail;
 use anyhow::Result;
 use colored::*;
+use lazy_static::lazy_static;
 use path_clean::PathClean;
 use sha::sha1::Sha1;
 use sha::utils::Digest;
 use sha::utils::DigestExt;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use url::Url;
+
+lazy_static! {
+    pub static ref CORE_MODULES: HashMap<&'static str, &'static str> = {
+        let core_modules = vec![("console", include_str!("../lib/console.js"))];
+        HashMap::from_iter(core_modules.into_iter())
+    };
+}
 
 pub type ModuleSpecifier = String;
 pub type ModuleSource = String;
@@ -80,7 +89,7 @@ impl FsModuleLoader {
 
 impl ModuleLoader for FsModuleLoader {
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModuleSpecifier> {
-        // 1. Try to resolve specifier as a relative import.
+        // 1. Try to resolve specifier as an absolute import.
         if specifier.starts_with('/') {
             let base_directory = &Path::new("/");
             let path = base_directory.join(specifier);
@@ -88,11 +97,11 @@ impl ModuleLoader for FsModuleLoader {
             return self
                 .resolve_as_file(&path)
                 .or_else(|_| self.resolve_as_directory(&path))
-                .and_then(|path| Ok(self.clean(path)));
+                .map(|path| self.clean(path));
         }
-        // 2. Try to resolve specifier as an absolute import.
+        // 2. Try to resolve specifier as a relative import.
         let cwd = &Path::new(".");
-        let mut base = base.map(|v| Path::new(v).parent().unwrap()).unwrap_or(cwd);
+        let mut base_dir = base.map(|v| Path::new(v).parent().unwrap()).unwrap_or(cwd);
 
         if specifier.starts_with("./") || specifier.starts_with("../") {
             let win_target;
@@ -101,7 +110,7 @@ impl ModuleLoader for FsModuleLoader {
                 let t = if specifier.starts_with("./") {
                     &specifier[2..]
                 } else {
-                    base = base.parent().unwrap();
+                    base_dir = base_dir.parent().unwrap();
                     &specifier[3..]
                 };
                 win_target = t.replace("/", "\\");
@@ -110,16 +119,20 @@ impl ModuleLoader for FsModuleLoader {
                 specifier
             };
 
-            let path = base.join(target);
+            let path = base_dir.join(target);
             let path = std::env::current_dir().unwrap().join(path);
 
             return self
                 .resolve_as_file(&path)
                 .or_else(|_| self.resolve_as_directory(&path))
-                .and_then(|path| Ok(self.clean(path)));
+                .map(|path| self.clean(path));
         }
 
-        bail!(generic_error(format!("Module not found \"{}\"", specifier)));
+        // Try make specifier a relative import and retry resolution.
+        match self.resolve(base, &format!("./{}", specifier)) {
+            Ok(value) => Ok(value),
+            Err(_) => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
+        }
     }
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
@@ -190,6 +203,23 @@ impl ModuleLoader for UrlModuleLoader {
         fs::write(&module_path, &source)?;
 
         Ok(source)
+    }
+}
+
+#[derive(Default)]
+pub struct CoreModuleLoader;
+
+impl ModuleLoader for CoreModuleLoader {
+    fn resolve(&self, _: Option<&str>, specifier: &str) -> Result<ModuleSpecifier> {
+        match CORE_MODULES.get(specifier) {
+            Some(_) => Ok(specifier.to_string()),
+            None => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
+        }
+    }
+    fn load(&self, specifier: &str) -> Result<ModuleSource> {
+        // Since any errors will be caught at the resolve stage, we can
+        // go ahead an unwrap the value with no worries.
+        Ok(CORE_MODULES.get(specifier).unwrap().to_string())
     }
 }
 

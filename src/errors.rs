@@ -14,6 +14,7 @@ struct CustomError {
 }
 
 impl CustomError {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(class: &'static str, message: impl Into<Cow<'static, str>>) -> Error {
         CustomError {
             class,
