@@ -113,7 +113,11 @@ impl JsRuntime {
         }
     }
 
-    pub fn execute_module(&mut self, filename: &str) -> Result<v8::Global<v8::Value>, Error> {
+    pub fn execute_module(
+        &mut self,
+        filename: &str,
+        source: Option<&str>,
+    ) -> Result<v8::Global<v8::Value>, Error> {
         // Getting a reference to isolate's handle scope.
         let scope = &mut self.handle_scope();
         let tc_scope = &mut v8::TryCatch::new(scope);
@@ -121,7 +125,7 @@ impl JsRuntime {
         // Convert filename to full path specifier.
         let filename = unwrap_or_exit(resolve_import(None, filename));
 
-        let module = match fetch_module_tree(tc_scope, &filename) {
+        let module = match fetch_module_tree(tc_scope, &filename, source) {
             Some(module) => module,
             None => {
                 assert!(tc_scope.has_caught());

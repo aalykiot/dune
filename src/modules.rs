@@ -86,12 +86,15 @@ pub fn load_import(specifier: &str) -> Result<ModuleSource> {
 pub fn fetch_module_tree<'a>(
     scope: &mut v8::HandleScope<'a>,
     filename: &str,
+    source: Option<&str>,
 ) -> Option<v8::Local<'a, v8::Module>> {
     // Create a script origin for the import.
     let origin = create_origin(scope, filename, true);
-
-    // Todo: Don't unwrap, handle error.
-    let source = unwrap_or_exit(load_import(filename));
+    // Check if source is specified from caller, if not, use a loader.
+    let source = match source {
+        Some(source) => source.into(),
+        None => unwrap_or_exit(load_import(filename)),
+    };
     let source = v8::String::new(scope, &source).unwrap();
     let source = v8::script_compiler::Source::new(source, Some(&origin));
 
@@ -121,7 +124,7 @@ pub fn fetch_module_tree<'a>(
 
         // Using recursion resolve the rest sub-tree of modules.
         if !state.borrow().module_map.contains_key(&specifier) {
-            fetch_module_tree(scope, &specifier)?;
+            fetch_module_tree(scope, &specifier, None)?;
         }
     }
 
