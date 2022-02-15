@@ -1,5 +1,6 @@
 mod bindings;
 mod errors;
+mod hooks;
 mod loaders;
 mod modules;
 mod process;
