@@ -13,15 +13,14 @@ pub fn module_resolve_cb<'a>(
 ) -> Option<v8::Local<'a, v8::Module>> {
     // Getting a CallbackScope from the given context.
     let scope = &mut unsafe { v8::CallbackScope::new(context) };
-    let state = JsRuntime::state(scope);
+    let module_map_rc = JsRuntime::module_map(scope);
     // The following should never fail (that's why we use unwrap) since any errors should
     // have been caught at the `fetch_module_tree` step.
-    let dependant = state
+    let dependant = module_map_rc
         .borrow()
-        .module_map
         .iter()
         .find(|(_, module)| **module == v8::Global::new(scope, referrer))
-        .map(|(target, _)| target.clone())
+        .map(|(path, _)| path.clone())
         .unwrap();
 
     let specifier = specifier.to_rust_string_lossy(scope);
@@ -29,12 +28,7 @@ pub fn module_resolve_cb<'a>(
 
     // This call should always give us back the module. Any errors will be caught
     // on the `fetch_module_tree` step.
-    let module = state
-        .borrow_mut()
-        .module_map
-        .get(&specifier)
-        .unwrap()
-        .clone();
+    let module = module_map_rc.borrow().get(&specifier).unwrap().clone();
 
     Some(v8::Local::new(scope, module))
 }

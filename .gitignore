@@ -14,5 +14,5 @@ Cargo.lock
 *.pdb
 
 # Custom
-/test
+/temp
 /.cache

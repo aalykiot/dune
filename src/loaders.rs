@@ -1,33 +1,24 @@
 use crate::errors::generic_error;
+use crate::modules::ModulePath;
+use crate::modules::ModuleSource;
+use crate::modules::CORE_MODULES;
 use anyhow::bail;
 use anyhow::Result;
 use colored::*;
-use lazy_static::lazy_static;
 use path_clean::PathClean;
 use sha::sha1::Sha1;
 use sha::utils::Digest;
 use sha::utils::DigestExt;
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use url::Url;
 
-lazy_static! {
-    pub static ref CORE_MODULES: HashMap<&'static str, &'static str> = {
-        let core_modules = vec![("console", include_str!("../lib/console.js"))];
-        HashMap::from_iter(core_modules.into_iter())
-    };
-}
-
-pub type ModuleSpecifier = String;
-pub type ModuleSource = String;
-
 // Defines the behavior of a module loader.
 pub trait ModuleLoader {
     fn load(&self, specifier: &str) -> Result<ModuleSource>;
-    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModuleSpecifier>;
+    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath>;
 }
 
 static EXTENSIONS: &[&str] = &["js", "json"];
@@ -88,7 +79,7 @@ impl FsModuleLoader {
 }
 
 impl ModuleLoader for FsModuleLoader {
-    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModuleSpecifier> {
+    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath> {
         // 1. Try to resolve specifier as an absolute import.
         if specifier.starts_with('/') {
             let base_directory = &Path::new("/");
@@ -128,11 +119,7 @@ impl ModuleLoader for FsModuleLoader {
                 .map(|path| self.clean(path));
         }
 
-        // Try make specifier a relative import and retry resolution.
-        match self.resolve(base, &format!("./{}", specifier)) {
-            Ok(value) => Ok(value),
-            Err(_) => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
-        }
+        bail!(generic_error(format!("Module not found \"{}\"", specifier)))
     }
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
@@ -152,7 +139,7 @@ impl ModuleLoader for FsModuleLoader {
 pub struct UrlModuleLoader;
 
 impl ModuleLoader for UrlModuleLoader {
-    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModuleSpecifier> {
+    fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath> {
         // 1. Check if the specifier is a valid URL.
         if let Ok(url) = Url::parse(specifier) {
             return Ok(url.into());
@@ -210,7 +197,7 @@ impl ModuleLoader for UrlModuleLoader {
 pub struct CoreModuleLoader;
 
 impl ModuleLoader for CoreModuleLoader {
-    fn resolve(&self, _: Option<&str>, specifier: &str) -> Result<ModuleSpecifier> {
+    fn resolve(&self, _: Option<&str>, specifier: &str) -> Result<ModulePath> {
         match CORE_MODULES.get(specifier) {
             Some(_) => Ok(specifier.to_string()),
             None => bail!(generic_error(format!("Module not found \"{}\"", specifier))),

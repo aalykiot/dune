@@ -24,9 +24,9 @@ pub struct JsRuntimeState {
     // A sand-boxed execution context with its own set of built-in objects and functions.
     pub context: v8::Global<v8::Context>,
     // Holds information about resolved ES modules.
-    pub module_map: ModuleMap,
+    pub module_map: Rc<RefCell<ModuleMap>>,
     // Holds native bindings.
-    pub bindings: HashMap<&'static str, BindingInitFn>,
+    pub bindings: Rc<HashMap<&'static str, BindingInitFn>>,
 }
 
 pub struct JsRuntime {
@@ -68,8 +68,8 @@ impl JsRuntime {
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
             context,
-            module_map: ModuleMap::default(),
-            bindings,
+            module_map: Rc::new(RefCell::new(ModuleMap::default())),
+            bindings: Rc::new(bindings),
         })));
 
         let mut runtime = JsRuntime { isolate };
@@ -188,5 +188,22 @@ impl JsRuntime {
         let state = self.get_state();
         let state = state.borrow();
         state.context.clone()
+    }
+}
+
+// Implementations for getting references to object located
+// to isolate's state.
+impl JsRuntime {
+    // `module_map` returns the `ModuleMap` object in the Rust world linked to the given isolate.
+    pub fn module_map(isolate: &v8::Isolate) -> Rc<RefCell<ModuleMap>> {
+        let state = Self::state(isolate);
+        let state = state.borrow();
+        state.module_map.clone()
+    }
+    // `bindings` returns the `Bindings` object in the Rust world linked to the given isolate.
+    pub fn bindings(isolate: &v8::Isolate) -> Rc<HashMap<&'static str, BindingInitFn>> {
+        let state = Self::state(isolate);
+        let state = state.borrow();
+        state.bindings.clone()
     }
 }

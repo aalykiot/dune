@@ -2,15 +2,21 @@ use crate::errors::unwrap_or_exit;
 use crate::loaders::CoreModuleLoader;
 use crate::loaders::FsModuleLoader;
 use crate::loaders::ModuleLoader;
-use crate::loaders::ModuleSource;
-use crate::loaders::ModuleSpecifier;
 use crate::loaders::UrlModuleLoader;
-use crate::loaders::CORE_MODULES;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
+use lazy_static::lazy_static;
 use rusty_v8 as v8;
 use std::collections::HashMap;
 use url::Url;
+
+// Initializing core modules.
+lazy_static! {
+    pub static ref CORE_MODULES: HashMap<&'static str, &'static str> = {
+        let modules = vec![("console", include_str!("../lib/console.js"))];
+        HashMap::from_iter(modules.into_iter())
+    };
+}
 
 // Utility to easily create v8 script origins.
 pub fn create_origin<'s>(
@@ -35,27 +41,45 @@ pub fn create_origin<'s>(
 }
 
 pub type ModulePath = String;
+pub type ModuleSource = String;
+
+// Points to a module that lives inside v8.
 pub type ModuleReference = v8::Global<v8::Module>;
 
 // Holds information about resolved ES modules.
 #[derive(Default)]
-pub struct ModuleMap(HashMap<ModulePath, ModuleReference>);
+pub struct ModuleMap {
+    main: Option<ModulePath>,
+    map: HashMap<ModulePath, ModuleReference>,
+}
+
+impl ModuleMap {
+    pub fn new_es_module<'a>(
+        &mut self,
+        scope: &mut v8::HandleScope<'a>,
+        path: &str,
+        module: v8::Local<'a, v8::Module>,
+    ) {
+        let module_ref = v8::Global::new(scope, module);
+        self.map.insert(path.into(), module_ref);
+    }
+}
 
 impl std::ops::Deref for ModuleMap {
     type Target = HashMap<ModulePath, ModuleReference>;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.map
     }
 }
 
 impl std::ops::DerefMut for ModuleMap {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.map
     }
 }
 
 // Finds the right loader, and resolves the import.
-pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModuleSpecifier> {
+pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath> {
     // Looking at the params to decide the loader.
     let loader: Box<dyn ModuleLoader> = {
         let is_core_module_import = CORE_MODULES.contains_key(specifier);
@@ -96,6 +120,8 @@ pub fn fetch_module_tree<'a>(
 ) -> Option<v8::Local<'a, v8::Module>> {
     // Create a script origin for the import.
     let origin = create_origin(scope, filename, true);
+    let module_map_rc = JsRuntime::module_map(scope);
+
     // Check if source is specified from caller, if not, use a loader.
     let source = match source {
         Some(source) => source.into(),
@@ -109,12 +135,10 @@ pub fn fetch_module_tree<'a>(
         None => return None,
     };
 
-    let state = JsRuntime::state(scope);
-
-    state
+    // Add new es module to runtime's module map.
+    module_map_rc
         .borrow_mut()
-        .module_map
-        .insert(filename.to_string(), v8::Global::new(scope, module));
+        .new_es_module(scope, filename, module);
 
     let requests = module.get_module_requests();
 
@@ -125,11 +149,10 @@ pub fn fetch_module_tree<'a>(
 
         // Transforming v8's ModuleRequest into a Rust string.
         let specifier = request.get_specifier().to_rust_string_lossy(scope);
-
         let specifier = unwrap_or_exit(resolve_import(Some(filename), &specifier));
 
         // Using recursion resolve the rest sub-tree of modules.
-        if !state.borrow().module_map.contains_key(&specifier) {
+        if !module_map_rc.borrow().contains_key(&specifier) {
             fetch_module_tree(scope, &specifier, None)?;
         }
     }
