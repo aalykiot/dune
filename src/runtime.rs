@@ -75,7 +75,8 @@ impl JsRuntime {
         let mut runtime = JsRuntime { isolate };
 
         // Load the JavaScript environment to the runtime. (see lib/main.js)
-        unwrap_or_exit(runtime.execute("<environment>", include_str!("../lib/main.js")));
+        let main_js = include_str!("../lib/main.js");
+        unwrap_or_exit(runtime.execute_module("<environment>", Some(main_js)));
 
         runtime
     }
@@ -118,12 +119,17 @@ impl JsRuntime {
         filename: &str,
         source: Option<&str>,
     ) -> Result<v8::Global<v8::Value>, Error> {
+        // The following code allows the runtime to load the core
+        // javascript module (lib/main.js) that does not have a valid
+        // filename since it's loaded from memory.
+        let filename = match source.is_some() {
+            true => filename.to_string(),
+            false => unwrap_or_exit(resolve_import(None, filename)),
+        };
+        
         // Getting a reference to isolate's handle scope.
         let scope = &mut self.handle_scope();
         let tc_scope = &mut v8::TryCatch::new(scope);
-
-        // Convert filename to full path specifier.
-        let filename = unwrap_or_exit(resolve_import(None, filename));
 
         let module = match fetch_module_tree(tc_scope, &filename, source) {
             Some(module) => module,
