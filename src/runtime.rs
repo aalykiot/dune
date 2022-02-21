@@ -76,7 +76,7 @@ impl JsRuntime {
 
         // Load the JavaScript environment to the runtime. (see lib/main.js)
         let main_js = include_str!("../lib/main.js");
-        unwrap_or_exit(runtime.execute_module("<environment>", Some(main_js)));
+        unwrap_or_exit(runtime.execute_module("dune:environment/main", Some(main_js)));
 
         runtime
     }
