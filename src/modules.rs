@@ -10,10 +10,13 @@ use rusty_v8 as v8;
 use std::collections::HashMap;
 use url::Url;
 
-// Initializing core modules.
+// Initializing built-in modules.
 lazy_static! {
     pub static ref CORE_MODULES: HashMap<&'static str, &'static str> = {
-        let modules = vec![("console", include_str!("../lib/console.js"))];
+        let modules = vec![
+            ("dune:core/console", include_str!("../lib/console.js")),
+            ("dune:core/events", include_str!("../lib/events.js")),
+        ];
         HashMap::from_iter(modules.into_iter())
     };
 }
