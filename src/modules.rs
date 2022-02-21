@@ -16,6 +16,7 @@ lazy_static! {
         let modules = vec![
             ("dune:core/console", include_str!("../lib/console.js")),
             ("dune:core/events", include_str!("../lib/events.js")),
+            ("dune:core/process", include_str!("../lib/process.js")),
         ];
         HashMap::from_iter(modules.into_iter())
     };
