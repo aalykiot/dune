@@ -10,16 +10,55 @@ use rusty_v8 as v8;
 use std::collections::HashMap;
 use url::Url;
 
-// Initializing built-in modules.
+// Registering core modules into a vector.
 lazy_static! {
-    pub static ref CORE_MODULES: HashMap<&'static str, &'static str> = {
-        let modules = vec![
-            ("dune:core/console", include_str!("../lib/console.js")),
-            ("dune:core/events", include_str!("../lib/events.js")),
-            ("dune:core/process", include_str!("../lib/process.js")),
-        ];
-        HashMap::from_iter(modules.into_iter())
+    pub static ref CORE_MODULES: Vec<CoreModule> = {
+        vec![
+            CoreModule::new(
+                "dune:modules/console",
+                "console",
+                include_str!("../lib/console.js"),
+            ),
+            CoreModule::new(
+                "dune:modules/events",
+                "events",
+                include_str!("../lib/events.js"),
+            ),
+            CoreModule::new(
+                "dune:modules/process",
+                "process",
+                include_str!("../lib/process.js"),
+            ),
+            CoreModule::new(
+                "dune:internal/btree",
+                "_internal/btree",
+                include_str!("../lib/_btree.js"),
+            ),
+        ]
     };
+}
+
+#[derive(Debug)]
+pub struct CoreModule {
+    pub path: String,
+    pub alias: String,
+    pub code: String,
+    pub internal: bool,
+}
+
+impl CoreModule {
+    fn new(path: &str, alias: &str, code: &str) -> CoreModule {
+        CoreModule {
+            path: path.into(),
+            alias: alias.into(),
+            code: code.into(),
+            internal: false,
+        }
+    }
+
+    pub fn match_against(&self, key: &str) -> bool {
+        self.path == key || self.alias == key
+    }
 }
 
 // Utility to easily create v8 script origins.
@@ -53,7 +92,7 @@ pub type ModuleReference = v8::Global<v8::Module>;
 // Holds information about resolved ES modules.
 #[derive(Default)]
 pub struct ModuleMap {
-    main: Option<ModulePath>,
+    // main: Option<ModulePath>,
     map: HashMap<ModulePath, ModuleReference>,
 }
 
@@ -86,7 +125,7 @@ impl std::ops::DerefMut for ModuleMap {
 pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath> {
     // Looking at the params to decide the loader.
     let loader: Box<dyn ModuleLoader> = {
-        let is_core_module_import = CORE_MODULES.contains_key(specifier);
+        let is_core_module_import = CORE_MODULES.iter().any(|cm| cm.match_against(specifier));
         let is_url_import =
             Url::parse(specifier).is_ok() || (base.is_some() && Url::parse(base.unwrap()).is_ok());
 
@@ -104,7 +143,7 @@ pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath>
 pub fn load_import(specifier: &str) -> Result<ModuleSource> {
     // Looking at the params to decide the loader.
     let loader: Box<dyn ModuleLoader> = match (
-        CORE_MODULES.contains_key(specifier),
+        CORE_MODULES.iter().any(|cm| cm.match_against(specifier)),
         Url::parse(specifier).is_ok(),
     ) {
         (true, _) => Box::new(CoreModuleLoader),
