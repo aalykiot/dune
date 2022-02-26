@@ -12,53 +12,15 @@ use url::Url;
 
 // Registering core modules into a vector.
 lazy_static! {
-    pub static ref CORE_MODULES: Vec<CoreModule> = {
-        vec![
-            CoreModule::new(
-                "dune:modules/console",
-                "console",
-                include_str!("../lib/console.js"),
-            ),
-            CoreModule::new(
-                "dune:modules/events",
-                "events",
-                include_str!("../lib/events.js"),
-            ),
-            CoreModule::new(
-                "dune:modules/process",
-                "process",
-                include_str!("../lib/process.js"),
-            ),
-            CoreModule::new(
-                "dune:internal/btree",
-                "_internal/btree",
-                include_str!("../lib/_btree.js"),
-            ),
-        ]
+    pub static ref CORE_MODULES: HashMap<&'static str, &'static str> = {
+        let modules = vec![
+            ("console", include_str!("../lib/console.js")),
+            ("events", include_str!("../lib/events.js")),
+            ("process", include_str!("../lib/process.js")),
+            ("_internals/btree", include_str!("../lib/_btree.js")),
+        ];
+        HashMap::from_iter(modules.into_iter())
     };
-}
-
-#[derive(Debug)]
-pub struct CoreModule {
-    pub path: String,
-    pub alias: String,
-    pub code: String,
-    pub internal: bool,
-}
-
-impl CoreModule {
-    fn new(path: &str, alias: &str, code: &str) -> CoreModule {
-        CoreModule {
-            path: path.into(),
-            alias: alias.into(),
-            code: code.into(),
-            internal: false,
-        }
-    }
-
-    pub fn match_against(&self, key: &str) -> bool {
-        self.path == key || self.alias == key
-    }
 }
 
 // Utility to easily create v8 script origins.
@@ -125,7 +87,7 @@ impl std::ops::DerefMut for ModuleMap {
 pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath> {
     // Looking at the params to decide the loader.
     let loader: Box<dyn ModuleLoader> = {
-        let is_core_module_import = CORE_MODULES.iter().any(|cm| cm.match_against(specifier));
+        let is_core_module_import = CORE_MODULES.contains_key(specifier);
         let is_url_import =
             Url::parse(specifier).is_ok() || (base.is_some() && Url::parse(base.unwrap()).is_ok());
 
@@ -143,7 +105,7 @@ pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath>
 pub fn load_import(specifier: &str) -> Result<ModuleSource> {
     // Looking at the params to decide the loader.
     let loader: Box<dyn ModuleLoader> = match (
-        CORE_MODULES.iter().any(|cm| cm.match_against(specifier)),
+        CORE_MODULES.contains_key(specifier),
         Url::parse(specifier).is_ok(),
     ) {
         (true, _) => Box::new(CoreModuleLoader),

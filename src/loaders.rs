@@ -198,22 +198,15 @@ pub struct CoreModuleLoader;
 
 impl ModuleLoader for CoreModuleLoader {
     fn resolve(&self, _: Option<&str>, specifier: &str) -> Result<ModulePath> {
-        match CORE_MODULES
-            .iter()
-            .find(|module| module.match_against(specifier))
-        {
-            Some(module) => Ok(module.path.clone()),
+        match CORE_MODULES.get(specifier) {
+            Some(_) => Ok(specifier.to_string()),
             None => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
         }
     }
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
-        match CORE_MODULES
-            .iter()
-            .find(|module| module.match_against(specifier))
-        {
-            Some(module) => Ok(module.code.clone()),
-            _ => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
-        }
+        // Since any errors will be caught at the resolve stage, we can
+        // go ahead an unwrap the value with no worries.
+        Ok(CORE_MODULES.get(specifier).unwrap().to_string())
     }
 }
 
