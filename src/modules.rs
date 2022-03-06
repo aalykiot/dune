@@ -17,7 +17,7 @@ lazy_static! {
             ("console", include_str!("../lib/console.js")),
             ("events", include_str!("../lib/events.js")),
             ("process", include_str!("../lib/process.js")),
-            ("_internals/btree", include_str!("../lib/_btree.js")),
+            ("timers", include_str!("../lib/timers.js")),
         ];
         HashMap::from_iter(modules.into_iter())
     };
@@ -125,7 +125,7 @@ pub fn fetch_module_tree<'a>(
 ) -> Option<v8::Local<'a, v8::Module>> {
     // Create a script origin for the import.
     let origin = create_origin(scope, filename, true);
-    let module_map_rc = JsRuntime::module_map(scope);
+    let state = JsRuntime::state(scope);
 
     // Check if source is specified from caller, if not, use a loader.
     let source = match source {
@@ -141,8 +141,9 @@ pub fn fetch_module_tree<'a>(
     };
 
     // Add new es module to runtime's module map.
-    module_map_rc
+    state
         .borrow_mut()
+        .modules
         .new_es_module(scope, filename, module);
 
     let requests = module.get_module_requests();
@@ -157,7 +158,7 @@ pub fn fetch_module_tree<'a>(
         let specifier = unwrap_or_exit(resolve_import(Some(filename), &specifier));
 
         // Using recursion resolve the rest sub-tree of modules.
-        if !module_map_rc.borrow().contains_key(&specifier) {
+        if !state.borrow().modules.contains_key(&specifier) {
             fetch_module_tree(scope, &specifier, None)?;
         }
     }

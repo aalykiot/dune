@@ -150,9 +150,10 @@ pub fn initialize<'s>(
          mut rv: v8::ReturnValue| {
             // Get the requested native binding.
             let request = args.get(0).to_rust_string_lossy(scope);
-            let bindings_rc = JsRuntime::bindings(scope);
+            let state = JsRuntime::state(scope);
+            let state = state.borrow();
 
-            match bindings_rc.get(request.as_str()) {
+            match state.bindings.get(request.as_str()) {
                 // If native binding exists, initialize it and return it.
                 Some(initializer) => {
                     let binding = initializer(scope);

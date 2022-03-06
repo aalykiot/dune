@@ -8,25 +8,40 @@ use crate::modules::fetch_module_tree;
 use crate::modules::resolve_import;
 use crate::modules::ModuleMap;
 use crate::stdio;
+use crate::timers;
 use anyhow::bail;
 use anyhow::Error;
 use rusty_v8 as v8;
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Once;
+use std::time::Instant;
 
 // Function pointer for the bindings initializers.
 type BindingInitFn = fn(&mut v8::HandleScope<'_>) -> v8::Global<v8::Object>;
+
+// Represents a JavaScript handle for an async operation.
+pub enum JsHandle {
+    // This handle resolves a provided promise.
+    Promise(v8::Global<v8::PromiseResolver>),
+    // This handle runs the callback.
+    Callback(v8::Global<v8::Function>),
+}
 
 // `JsRuntimeState` defines a state that will be stored per v8 isolate.
 pub struct JsRuntimeState {
     // A sand-boxed execution context with its own set of built-in objects and functions.
     pub context: v8::Global<v8::Context>,
     // Holds information about resolved ES modules.
-    pub module_map: Rc<RefCell<ModuleMap>>,
+    pub modules: ModuleMap,
     // Holds native bindings.
-    pub bindings: Rc<HashMap<&'static str, BindingInitFn>>,
+    pub bindings: HashMap<&'static str, BindingInitFn>,
+    // JavaScript handles that keep the event-loop alive.
+    pub resources: HashMap<usize, JsHandle>,
+    // Holds all our timers.
+    pub timers: BTreeMap<Instant, timers::Timer>,
 }
 
 pub struct JsRuntime {
@@ -61,15 +76,21 @@ impl JsRuntime {
             v8::Global::new(scope, context)
         };
 
-        let bindings: Vec<(&'static str, BindingInitFn)> = vec![("stdio", stdio::initialize)];
+        let bindings: Vec<(&'static str, BindingInitFn)> = vec![
+            ("stdio", stdio::initialize),
+            ("timer_wrap", timers::initialize),
+        ];
+
         let bindings = HashMap::from_iter(bindings.into_iter());
 
         // Storing state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
             context,
-            module_map: Rc::new(RefCell::new(ModuleMap::default())),
-            bindings: Rc::new(bindings),
+            bindings,
+            modules: ModuleMap::default(),
+            resources: HashMap::default(),
+            timers: BTreeMap::default(),
         })));
 
         let mut runtime = JsRuntime { isolate };
@@ -126,7 +147,7 @@ impl JsRuntime {
             true => filename.to_string(),
             false => unwrap_or_exit(resolve_import(None, filename)),
         };
-        
+
         // Getting a reference to isolate's handle scope.
         let scope = &mut self.handle_scope();
         let tc_scope = &mut v8::TryCatch::new(scope);
@@ -194,22 +215,5 @@ impl JsRuntime {
         let state = self.get_state();
         let state = state.borrow();
         state.context.clone()
-    }
-}
-
-// Implementations for getting references to object located
-// to isolate's state.
-impl JsRuntime {
-    // `module_map` returns the `ModuleMap` object in the Rust world linked to the given isolate.
-    pub fn module_map(isolate: &v8::Isolate) -> Rc<RefCell<ModuleMap>> {
-        let state = Self::state(isolate);
-        let state = state.borrow();
-        state.module_map.clone()
-    }
-    // `bindings` returns the `Bindings` object in the Rust world linked to the given isolate.
-    pub fn bindings(isolate: &v8::Isolate) -> Rc<HashMap<&'static str, BindingInitFn>> {
-        let state = Self::state(isolate);
-        let state = state.borrow();
-        state.bindings.clone()
     }
 }
