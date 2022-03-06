@@ -10,7 +10,7 @@ A hobby javascript runtime written in **Rust**, based on **V8**, and developed c
 - `globalThis`: same as `global`.
 - `console`: a subset of the WHATWG console.
 - `TextEncoder` / `TextDecoder`: WHATWG encoding API.
-- `ReadableStream` / `WritableStream`: WHATWG streams API.
+- <s>`ReadableStream` / `WritableStream`: WHATWG streams API.</s>
 - `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: WHATWG timers.
 - `setImmediate` / `clearImmediate`: node.js like immediate timers.
 - `process`: an object that provides info about the current dune process.
@@ -39,8 +39,8 @@ A hobby javascript runtime written in **Rust**, based on **V8**, and developed c
 > This module should also include a `Sync` method for every async operation available.
 
 - `copyFile(src, dest)`: copies `src` to `dest`.
-- `createReadStream(path, [options])`: creates a readable WHATWG stream.
-- `createWriteStream(path, [options])`: creates a writable WHATWG stream.
+- `createReadStream(path, [options])`: creates a readable IO stream.
+- `createWriteStream(path, [options])`: creates a writable IO stream.
 - `open(path, [flags, [mode]])`: asynchronous file open.
 - `mkdir(path)`: creates a directory.
 - `readFile(path)`: reads the entire contents of a file.
@@ -53,8 +53,8 @@ A hobby javascript runtime written in **Rust**, based on **V8**, and developed c
 
 - `fd`: the numeric file descriptor.
 - `close()`: closes the file.
-- `createReadStream()`: creates a readable WHATWG stream.
-- `createWriteStream()`: creates a writable WHATWG stream.
+- `createReadStream()`: creates a readable IO stream.
+- `createWriteStream()`: creates a writable IO stream.
 - `read([size, [offset]])`: reads data from the file.
 - `stat()`: retrieves statistics for the file.
 - `write(String|Uint8Array, [offset])`: writes data to the file.
