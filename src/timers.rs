@@ -1,7 +1,10 @@
 use crate::bindings::set_function_to;
+use crate::runtime::AsyncHandle;
+use crate::runtime::JsRuntime;
 use rusty_v8 as v8;
 
-pub struct Timer {
+#[derive(Debug)]
+pub struct Timeout {
     pub id: usize,
     pub handle: usize,
     pub delay: u64,
@@ -17,21 +20,23 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     v8::Global::new(scope, target)
 }
 
-// Creates a new timer instance in JavaScript.
+// Registers a new timeout instance to the event-loop.
 fn create_timeout(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
     // Get timer's ID.
-    let id = args.get(0).int32_value(scope).unwrap() as i32;
+    let id = args.get(0).int32_value(scope).unwrap() as usize;
+
     // Get timer's timeout callback.
     let callback = v8::Local::<v8::Function>::try_from(args.get(1)).unwrap();
     let callback = v8::Global::new(scope, callback);
-    // Get timer's delay.
-    let delay = args.get(2).int32_value(scope).unwrap() as i32;
 
-    // Converting the params argument (Array<Local<Value>>) to a vector.
+    // Get timer's delay.
+    let delay = args.get(2).int32_value(scope).unwrap() as u64;
+
+    // Converting the params argument (Array<Local<Value>>) to a Rust vector.
     let params = match v8::Local::<v8::Array>::try_from(args.get(3)) {
         Ok(params) => {
             (0..params.length()).fold(Vec::<v8::Global<v8::Value>>::new(), |mut acc, i| {
@@ -40,17 +45,26 @@ fn create_timeout(
                 acc
             })
         }
-        Err(_) => Vec::default(),
+        Err(_) => vec![],
     };
 
-    // Is this a recurring timeout ??
+    // Check if this is a recurring timeout.
     let repeat = args.get(4).to_rust_string_lossy(scope).as_str() == "true";
 
-    println!("DEBUG: {}", id);
-    println!("DEBUG: {}", delay);
-    println!("DEBUG: {:?}", params);
-    println!("DEBUG: {}", repeat);
+    // Create a new async handle from the callback.
+    let handle = JsRuntime::ev_async_handle(scope, AsyncHandle::Callback(callback));
 
-    // Return timer's ID.
+    let timeout = Timeout {
+        id,
+        handle,
+        delay,
+        args: params,
+        repeat,
+    };
+
+    // Insert timeout to the event-loop.
+    JsRuntime::ev_schedule_timeout(scope, timeout);
+
+    // Return timeout ID.
     rv.set(v8::Number::new(scope, id as f64).into());
 }

@@ -12,7 +12,7 @@ pub fn start() {
     loop {
         match editor.readline(&prompt) {
             Ok(line) if line == ".exit" => break,
-            Ok(line) => match rt.execute("<anonymous>", line.trim_end()) {
+            Ok(line) => match rt.execute_script("<anonymous>", line.trim_end()) {
                 Ok(value) => {
                     let scope = &mut rt.handle_scope();
                     let value = value.open(scope);

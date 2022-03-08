@@ -1,32 +1,26 @@
 use crate::bindings;
-use crate::errors::generic_error;
-use crate::errors::unwrap_or_exit;
-use crate::errors::JsError;
+use crate::errors::{generic_error, unwrap_or_exit, JsError};
 use crate::hooks::module_resolve_cb;
-use crate::modules::create_origin;
-use crate::modules::fetch_module_tree;
-use crate::modules::resolve_import;
-use crate::modules::ModuleMap;
+use crate::modules::{create_origin, fetch_module_tree, resolve_import, ModuleMap};
 use crate::stdio;
-use crate::timers;
-use anyhow::bail;
-use anyhow::Error;
+use crate::timers::{self, Timeout};
+use anyhow::{bail, Error};
 use rusty_v8 as v8;
 use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 use std::sync::Once;
+use std::time::Duration;
 use std::time::Instant;
 
 // Function pointer for the bindings initializers.
 type BindingInitFn = fn(&mut v8::HandleScope<'_>) -> v8::Global<v8::Object>;
 
-// Represents a JavaScript handle for an async operation.
-pub enum JsHandle {
-    // This handle resolves a provided promise.
+// The type of handling results from async operations.
+pub enum AsyncHandle {
+    // JavaScript promise.
     Promise(v8::Global<v8::PromiseResolver>),
-    // This handle runs the callback.
+    // JavaScript callback.
     Callback(v8::Global<v8::Function>),
 }
 
@@ -38,10 +32,10 @@ pub struct JsRuntimeState {
     pub modules: ModuleMap,
     // Holds native bindings.
     pub bindings: HashMap<&'static str, BindingInitFn>,
-    // JavaScript handles that keep the event-loop alive.
-    pub resources: HashMap<usize, JsHandle>,
-    // Holds all our timers.
-    pub timers: BTreeMap<Instant, timers::Timer>,
+    // Holds the timers.
+    pub(crate) timers: BTreeMap<Instant, Timeout>,
+    // List of registered async handles.
+    pub(crate) async_handles: HashMap<usize, AsyncHandle>,
 }
 
 pub struct JsRuntime {
@@ -89,8 +83,8 @@ impl JsRuntime {
             context,
             bindings,
             modules: ModuleMap::default(),
-            resources: HashMap::default(),
             timers: BTreeMap::default(),
+            async_handles: HashMap::default(),
         })));
 
         let mut runtime = JsRuntime { isolate };
@@ -102,7 +96,7 @@ impl JsRuntime {
         runtime
     }
 
-    pub fn execute(
+    pub fn execute_script(
         &mut self,
         filename: &str,
         source: &str,
@@ -215,5 +209,31 @@ impl JsRuntime {
         let state = self.get_state();
         let state = state.borrow();
         state.context.clone()
+    }
+}
+
+// Event-loop specific methods.
+impl JsRuntime {
+    // Registers a new async_handle and returns it's ID.
+    pub fn ev_async_handle(isolate: &v8::Isolate, handle: AsyncHandle) -> usize {
+        // Access the isolate's state.
+        let state = Self::state(isolate);
+        let mut state = state.borrow_mut();
+        // The `key` is just the length of the hashmap.
+        let key = state.async_handles.len();
+        state.async_handles.insert(key, handle);
+
+        key
+    }
+    // Registers a new timeout the the timers BtreeMap.
+    pub fn ev_schedule_timeout(isolate: &v8::Isolate, timeout: Timeout) {
+        // Get runtime's state.
+        let state = Self::state(isolate);
+        let mut state = state.borrow_mut();
+        // Calculate timer's next run.
+        let now = Instant::now();
+        let duration = now + Duration::from_millis(timeout.delay);
+        // Insert timeout to event-loop.
+        state.timers.insert(duration, timeout);
     }
 }
