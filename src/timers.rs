@@ -20,7 +20,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     v8::Global::new(scope, target)
 }
 
-// Registers a new timeout instance to the event-loop.
+/// Enrolls a new timeout instance to the event-loop.
 fn create_timeout(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
@@ -52,7 +52,8 @@ fn create_timeout(
     let repeat = args.get(4).to_rust_string_lossy(scope).as_str() == "true";
 
     // Create a new async handle from the callback.
-    let handle = JsRuntime::ev_async_handle(scope, AsyncHandle::Callback(callback));
+    let handle = AsyncHandle::Callback(callback);
+    let handle = JsRuntime::ev_enroll_async_handle(scope, handle);
 
     let timeout = Timeout {
         id,
@@ -62,9 +63,9 @@ fn create_timeout(
         repeat,
     };
 
-    // Insert timeout to the event-loop.
-    JsRuntime::ev_schedule_timeout(scope, timeout);
+    // Enroll timeout to the event-loop.
+    JsRuntime::ev_enroll_timeout(scope, timeout);
 
-    // Return timeout ID.
+    // Return timeout's ID.
     rv.set(v8::Number::new(scope, id as f64).into());
 }

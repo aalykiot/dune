@@ -13,40 +13,40 @@ use std::sync::Once;
 use std::time::Duration;
 use std::time::Instant;
 
-// Function pointer for the bindings initializers.
+/// Function pointer for the bindings initializers.
 type BindingInitFn = fn(&mut v8::HandleScope<'_>) -> v8::Global<v8::Object>;
 
-// The type of handling results from async operations.
+/// Type of completion of an asynchronous operation.
 pub enum AsyncHandle {
-    // JavaScript promise.
+    /// JavaScript promise.
     Promise(v8::Global<v8::PromiseResolver>),
-    // JavaScript callback.
+    /// JavaScript callback.
     Callback(v8::Global<v8::Function>),
 }
 
-// `JsRuntimeState` defines a state that will be stored per v8 isolate.
+/// The state to be stored per v8 isolate.
 pub struct JsRuntimeState {
-    // A sand-boxed execution context with its own set of built-in objects and functions.
+    /// A sand-boxed execution context with its own set of built-in objects and functions.
     pub context: v8::Global<v8::Context>,
-    // Holds information about resolved ES modules.
+    /// Holds information about resolved ES modules.
     pub modules: ModuleMap,
-    // Holds native bindings.
+    /// Holds native bindings.
     pub bindings: HashMap<&'static str, BindingInitFn>,
-    // Holds the timers.
+    /// Holds the timers.
     pub(crate) timers: BTreeMap<Instant, Timeout>,
-    // List of registered async handles.
+    /// Holds completion handles for async operations.
     pub(crate) async_handles: HashMap<usize, AsyncHandle>,
 }
 
 pub struct JsRuntime {
-    // A VM instance with its own heap.
-    // https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html
+    /// A VM instance with its own heap.
+    /// https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html
     isolate: v8::OwnedIsolate,
 }
 
 impl JsRuntime {
     pub fn new() -> JsRuntime {
-        // Firing up the v8 engine.
+        // Firing up the v8 engine under the hood.
         static V8_INIT: Once = Once::new();
         V8_INIT.call_once(move || {
             let platform = v8::new_default_platform(0, false).make_shared();
@@ -89,13 +89,14 @@ impl JsRuntime {
 
         let mut runtime = JsRuntime { isolate };
 
-        // Load the JavaScript environment to the runtime. (see lib/main.js)
-        let main_js = include_str!("../lib/main.js");
-        unwrap_or_exit(runtime.execute_module("dune:environment/main", Some(main_js)));
+        // Initializing the core environment. (see lib/main.js)
+        let main = include_str!("../lib/main.js");
+        unwrap_or_exit(runtime.execute_module("dune:environment/main", Some(main)));
 
         runtime
     }
 
+    /// Executes traditional JavaScript code (traditional = not ES modules).
     pub fn execute_script(
         &mut self,
         filename: &str,
@@ -129,20 +130,20 @@ impl JsRuntime {
         }
     }
 
+    /// Executes JavaScript ES modules.
     pub fn execute_module(
         &mut self,
         filename: &str,
         source: Option<&str>,
     ) -> Result<v8::Global<v8::Value>, Error> {
-        // The following code allows the runtime to load the core
-        // javascript module (lib/main.js) that does not have a valid
+        // The following code allows the runtime to load the core JavaScript
+        // environment (lib/main.js) that does not have a valid
         // filename since it's loaded from memory.
         let filename = match source.is_some() {
             true => filename.to_string(),
             false => unwrap_or_exit(resolve_import(None, filename)),
         };
 
-        // Getting a reference to isolate's handle scope.
         let scope = &mut self.handle_scope();
         let tc_scope = &mut v8::TryCatch::new(scope);
 
@@ -166,7 +167,6 @@ impl JsRuntime {
 
         let module_result = module.evaluate(tc_scope);
 
-        // Check module status first.
         if module.get_status() == v8::ModuleStatus::Errored {
             let exception = module.get_exception();
             bail!(JsError::from_v8_exception(tc_scope, exception));
@@ -181,9 +181,12 @@ impl JsRuntime {
     }
 }
 
+// ----------------------------------------------------
 // State management implementation.
+// ----------------------------------------------------
+
 impl JsRuntime {
-    // Returns the runtime state stored in the given isolate.
+    /// Returns the runtime state stored in the given isolate.
     pub fn state(isolate: &v8::Isolate) -> Rc<RefCell<JsRuntimeState>> {
         isolate
             .get_slot::<Rc<RefCell<JsRuntimeState>>>()
@@ -191,20 +194,20 @@ impl JsRuntime {
             .clone()
     }
 
-    // Returns the runtime's state.
+    /// Returns the runtime's state.
     pub fn get_state(&self) -> Rc<RefCell<JsRuntimeState>> {
         Self::state(&self.isolate)
     }
 
-    // Returns a v8 handle scope for the runtime.
-    // https://v8docs.nodesource.com/node-0.8/d3/d95/classv8_1_1_handle_scope.html.
+    /// Returns a v8 handle scope for the runtime.
+    /// https://v8docs.nodesource.com/node-0.8/d3/d95/classv8_1_1_handle_scope.html.
     pub fn handle_scope(&mut self) -> v8::HandleScope {
         let context = self.context();
         v8::HandleScope::with_context(&mut self.isolate, context)
     }
 
-    // Returns a context created for the runtime.
-    // https://v8docs.nodesource.com/node-0.8/df/d69/classv8_1_1_context.html
+    /// Returns a context created for the runtime.
+    /// https://v8docs.nodesource.com/node-0.8/df/d69/classv8_1_1_context.html
     pub fn context(&mut self) -> v8::Global<v8::Context> {
         let state = self.get_state();
         let state = state.borrow();
@@ -212,28 +215,32 @@ impl JsRuntime {
     }
 }
 
-// Event-loop specific methods.
+// ----------------------------------------------------
+// Event-Loop specific methods.
+// ----------------------------------------------------
+
 impl JsRuntime {
-    // Registers a new async_handle and returns it's ID.
-    pub fn ev_async_handle(isolate: &v8::Isolate, handle: AsyncHandle) -> usize {
-        // Access the isolate's state.
+    /// Enrolls an async handle to the event-loop.
+    pub fn ev_enroll_async_handle(isolate: &v8::Isolate, handle: AsyncHandle) -> usize {
+        // We need to get a mut reference to the isolate's state first.
         let state = Self::state(isolate);
         let mut state = state.borrow_mut();
-        // The `key` is just the length of the hashmap.
+        // The length of the hashmap will be the next key. (for now!)
         let key = state.async_handles.len();
         state.async_handles.insert(key, handle);
 
         key
     }
-    // Registers a new timeout the the timers BtreeMap.
-    pub fn ev_schedule_timeout(isolate: &v8::Isolate, timeout: Timeout) {
-        // Get runtime's state.
+
+    // Enrolls a new timeout to the timers shorted list.
+    pub fn ev_enroll_timeout(isolate: &v8::Isolate, timeout: Timeout) {
+        // We need to get a mut reference to the isolate's state first.
         let state = Self::state(isolate);
         let mut state = state.borrow_mut();
-        // Calculate timer's next run.
+        // Calculate the next time the timeout will go OFF!
         let now = Instant::now();
         let duration = now + Duration::from_millis(timeout.delay);
-        // Insert timeout to event-loop.
+
         state.timers.insert(duration, timeout);
     }
 }
