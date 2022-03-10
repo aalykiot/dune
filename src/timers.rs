@@ -52,8 +52,7 @@ fn create_timeout(
     let repeat = args.get(4).to_rust_string_lossy(scope).as_str() == "true";
 
     // Create a new async handle from the callback.
-    let handle = AsyncHandle::Callback(callback);
-    let handle = JsRuntime::ev_enroll_async_handle(scope, handle);
+    let handle = JsRuntime::ev_enroll_async_handle(scope, AsyncHandle::Callback(callback));
 
     let timeout = Timeout {
         id,
@@ -63,7 +62,6 @@ fn create_timeout(
         repeat,
     };
 
-    // Enroll timeout to the event-loop.
     JsRuntime::ev_enroll_timeout(scope, timeout);
 
     // Return timeout's ID.

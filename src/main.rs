@@ -30,9 +30,11 @@ fn main() {
         let mut runtime = JsRuntime::new();
         let mod_result = runtime.execute_module(&filename, None);
 
-        if let Err(e) = mod_result {
-            eprintln!("{:#?}", e);
-        }
+        match mod_result {
+            Ok(_) => runtime.run_event_loop(),
+            Err(e) => eprintln!("{:#?}", e),
+        };
+
         return;
     }
 

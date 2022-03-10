@@ -1,22 +1,25 @@
 use crate::bindings;
-use crate::errors::{generic_error, unwrap_or_exit, JsError};
+use crate::errors::generic_error;
+use crate::errors::unwrap_or_exit;
+use crate::errors::JsError;
 use crate::hooks::module_resolve_cb;
-use crate::modules::{create_origin, fetch_module_tree, resolve_import, ModuleMap};
-use crate::stdio;
-use crate::timers::{self, Timeout};
-use anyhow::{bail, Error};
+use crate::modules::create_origin;
+use crate::modules::fetch_module_tree;
+use crate::modules::resolve_import;
+use crate::modules::ModuleMap;
+use crate::timers::Timeout;
+use anyhow::bail;
+use anyhow::Error;
 use rusty_v8 as v8;
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Once;
 use std::time::Duration;
 use std::time::Instant;
 
-/// Function pointer for the bindings initializers.
-type BindingInitFn = fn(&mut v8::HandleScope<'_>) -> v8::Global<v8::Object>;
-
-/// Type of completion of an asynchronous operation.
+/// Completion type of an asynchronous operation.
 pub enum AsyncHandle {
     /// JavaScript promise.
     Promise(v8::Global<v8::PromiseResolver>),
@@ -30,8 +33,8 @@ pub struct JsRuntimeState {
     pub context: v8::Global<v8::Context>,
     /// Holds information about resolved ES modules.
     pub modules: ModuleMap,
-    /// Holds native bindings.
-    pub bindings: HashMap<&'static str, BindingInitFn>,
+    /// The number of events keeping the event-loop alive.
+    pub(crate) pending_events: usize,
     /// Holds the timers.
     pub(crate) timers: BTreeMap<Instant, Timeout>,
     /// Holds completion handles for async operations.
@@ -70,19 +73,12 @@ impl JsRuntime {
             v8::Global::new(scope, context)
         };
 
-        let bindings: Vec<(&'static str, BindingInitFn)> = vec![
-            ("stdio", stdio::initialize),
-            ("timer_wrap", timers::initialize),
-        ];
-
-        let bindings = HashMap::from_iter(bindings.into_iter());
-
         // Storing state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
             context,
-            bindings,
             modules: ModuleMap::default(),
+            pending_events: 0,
             timers: BTreeMap::default(),
             async_handles: HashMap::default(),
         })));
@@ -232,15 +228,103 @@ impl JsRuntime {
         key
     }
 
-    // Enrolls a new timeout to the timers shorted list.
+    /// Enrolls a new timeout to the timers shorted list.
     pub fn ev_enroll_timeout(isolate: &v8::Isolate, timeout: Timeout) {
         // We need to get a mut reference to the isolate's state first.
         let state = Self::state(isolate);
         let mut state = state.borrow_mut();
+
         // Calculate the next time the timeout will go OFF!
         let now = Instant::now();
         let duration = now + Duration::from_millis(timeout.delay);
 
         state.timers.insert(duration, timeout);
+
+        // Increase the pending events
+        state.pending_events += 1;
+    }
+
+    /// Checks for expired timers (first step of the event-loop).
+    fn ev_run_timers(&mut self) {
+        // Get runtime's handle scope.
+        let scope = &mut self.handle_scope();
+        let undefined = v8::undefined(scope).into();
+
+        // We need to get a mut reference to the isolate's state first.
+        let state = Self::state(scope);
+        let mut state = state.borrow_mut();
+
+        // Finding the timers we need to process.
+        let timestamps = state
+            .timers
+            .range(..=Instant::now())
+            .fold(vec![], |mut acc, (t, _)| {
+                acc.push(*t);
+                acc
+            });
+
+        let mut unhooked = vec![];
+
+        timestamps.iter().for_each(|key| {
+            // Removing the timeout from the list is an acceptable approach
+            // since if it's an one-off timeout it will be removed anyway and,
+            // if it's a recurring will be rescheduled with a different timestamp key.
+            let timeout = match state.timers.remove(&key) {
+                Some(timeout) => timeout,
+                None => return,
+            };
+
+            // Create a local v8 handle for each argument.
+            let args: Vec<v8::Local<v8::Value>> = timeout
+                .args
+                .iter()
+                .map(|arg| v8::Local::new(scope, arg))
+                .collect();
+
+            // Get timeout's completion handle.
+            let handle = state.async_handles.get(&timeout.handle).unwrap();
+            let handle = match &handle {
+                AsyncHandle::Callback(cb) => cb,
+                _ => unreachable!(),
+            };
+
+            let callback = v8::Local::new(scope, handle);
+
+            // Run timer's callback.
+            callback.call(scope, undefined, args.as_slice());
+
+            // We'll decrement the pending events count for every timeout
+            // and let the `ev_enroll_timeout` method  later handle the
+            // increments for the recurring ones.
+            state.pending_events -= 1;
+
+            if timeout.repeat {
+                unhooked.push(timeout);
+                return;
+            }
+
+            // If the timeout is a one-off, remove it's handle from async_handles.
+            state.async_handles.remove(&timeout.handle).unwrap();
+        });
+
+        // Note: The reason we have this temp `unhooked` vector is because we can't
+        // call `ev_enroll_timeout` directly inside the above for_each. Calling the
+        // the previously mentioned method while still holding a mut reference to the
+        // isolate's state will make Rust panic at runtime.
+
+        drop(state);
+
+        unhooked
+            .drain(..)
+            .for_each(|t| Self::ev_enroll_timeout(scope, t));
+    }
+
+    /// Starts the event-loop.
+    pub fn run_event_loop(&mut self) {
+        let state = self.get_state();
+        while state.borrow().pending_events > 0 {
+            // Timers.
+            self.ev_run_timers();
+        }
     }
 }

@@ -1,5 +1,22 @@
-use super::process;
+use crate::process;
+use crate::stdio;
+use crate::timers;
+use lazy_static::lazy_static;
 use rusty_v8 as v8;
+use std::collections::HashMap;
+
+/// Function pointer for the bindings initializers.
+type BindingInitFn = fn(&mut v8::HandleScope<'_>) -> v8::Global<v8::Object>;
+
+lazy_static! {
+    pub static ref BINDINGS: HashMap<&'static str, BindingInitFn> = {
+        let bindings: Vec<(&'static str, BindingInitFn)> = vec![
+            ("stdio", stdio::initialize),
+            ("timer_wrap", timers::initialize),
+        ];
+        HashMap::from_iter(bindings.into_iter())
+    };
+}
 
 // Populates a new JavaScript context with low-level Rust bindings.
 pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<'s, v8::Context> {

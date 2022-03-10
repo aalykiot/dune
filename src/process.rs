@@ -7,7 +7,7 @@ use crate::bindings::create_object_under;
 use crate::bindings::set_constant_to;
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
-use crate::runtime::JsRuntime;
+use crate::bindings::BINDINGS;
 use lazy_static::lazy_static;
 use rusty_v8 as v8;
 use std::collections::HashMap;
@@ -150,10 +150,8 @@ pub fn initialize<'s>(
          mut rv: v8::ReturnValue| {
             // Get the requested native binding.
             let request = args.get(0).to_rust_string_lossy(scope);
-            let state = JsRuntime::state(scope);
-            let state = state.borrow();
 
-            match state.bindings.get(request.as_str()) {
+            match BINDINGS.get(request.as_str()) {
                 // If native binding exists, initialize it and return it.
                 Some(initializer) => {
                     let binding = initializer(scope);
