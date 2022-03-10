@@ -269,7 +269,7 @@ impl JsRuntime {
             // Removing the timeout from the list is an acceptable approach
             // since if it's an one-off timeout it will be removed anyway and,
             // if it's a recurring will be rescheduled with a different timestamp key.
-            let timeout = match state.timers.remove(&key) {
+            let timeout = match state.timers.remove(key) {
                 Some(timeout) => timeout,
                 None => return,
             };
