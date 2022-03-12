@@ -16,6 +16,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // A local object that we'll attach all methods to it.
     let target = v8::Object::new(scope);
     set_function_to(scope, target, "createTimeout", create_timeout);
+    set_function_to(scope, target, "removeTimeout", remove_timeout);
     // Return it as a global reference.
     v8::Global::new(scope, target)
 }
@@ -52,7 +53,7 @@ fn create_timeout(
     let repeat = args.get(4).to_rust_string_lossy(scope).as_str() == "true";
 
     // Create a new async handle from the callback.
-    let handle = JsRuntime::ev_enroll_async_handle(scope, AsyncHandle::Callback(callback));
+    let handle = JsRuntime::ev_register_async_handle(scope, AsyncHandle::Callback(callback));
 
     let timeout = Timeout {
         id,
@@ -62,8 +63,19 @@ fn create_timeout(
         repeat,
     };
 
-    JsRuntime::ev_enroll_timeout(scope, timeout);
+    JsRuntime::ev_register_timeout(scope, timeout);
 
     // Return timeout's ID.
     rv.set(v8::Number::new(scope, id as f64).into());
+}
+
+/// Desenrolls a timeout from the event-loop.
+fn remove_timeout(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    // Get the timeout's ID and call the remove method.
+    let id = args.get(0).int32_value(scope).unwrap() as usize;
+    JsRuntime::ev_remove_timeout(scope, id);
 }

@@ -37,6 +37,8 @@ pub struct JsRuntimeState {
     pub(crate) pending_events: usize,
     /// Holds the timers.
     pub(crate) timers: BTreeMap<Instant, Timeout>,
+    /// Holds timers that are unscheduled manually by the user.
+    pub(crate) timers_bin: Vec<usize>,
     /// Holds completion handles for async operations.
     pub(crate) async_handles: HashMap<usize, AsyncHandle>,
 }
@@ -80,6 +82,7 @@ impl JsRuntime {
             modules: ModuleMap::default(),
             pending_events: 0,
             timers: BTreeMap::default(),
+            timers_bin: vec![],
             async_handles: HashMap::default(),
         })));
 
@@ -216,8 +219,8 @@ impl JsRuntime {
 // ----------------------------------------------------
 
 impl JsRuntime {
-    /// Enrolls an async handle to the event-loop.
-    pub fn ev_enroll_async_handle(isolate: &v8::Isolate, handle: AsyncHandle) -> usize {
+    /// Registers an async handle to the event-loop.
+    pub fn ev_register_async_handle(isolate: &v8::Isolate, handle: AsyncHandle) -> usize {
         // We need to get a mut reference to the isolate's state first.
         let state = Self::state(isolate);
         let mut state = state.borrow_mut();
@@ -228,8 +231,8 @@ impl JsRuntime {
         key
     }
 
-    /// Enrolls a new timeout to the timers shorted list.
-    pub fn ev_enroll_timeout(isolate: &v8::Isolate, timeout: Timeout) {
+    /// Registers a new timeout to the timers shorted list.
+    pub fn ev_register_timeout(isolate: &v8::Isolate, timeout: Timeout) {
         // We need to get a mut reference to the isolate's state first.
         let state = Self::state(isolate);
         let mut state = state.borrow_mut();
@@ -244,32 +247,53 @@ impl JsRuntime {
         state.pending_events += 1;
     }
 
+    /// Removes a timeout from the event-loop.
+    pub fn ev_remove_timeout(isolate: &v8::Isolate, id: usize) {
+        // We need to get a mut reference to the isolate's state first.
+        let state = Self::state(isolate);
+        let mut state = state.borrow_mut();
+
+        state.timers_bin.push(id);
+
+        // Find the timestamp of the timeout we want to remove.
+        let timestamp = match state.timers.iter().find(|(_, t)| t.id == id) {
+            Some((t, _)) => *t,
+            None => return,
+        };
+
+        // If it's a valid timeout, remove it from the list and delete
+        // it's async_handle.
+        if let Some(timeout) = state.timers.remove(&timestamp) {
+            state.async_handles.remove(&timeout.handle).unwrap();
+            state.pending_events -= 1;
+        }
+    }
+
     /// Checks for expired timers (first step of the event-loop).
     fn ev_run_timers(&mut self) {
         // Get runtime's handle scope.
         let scope = &mut self.handle_scope();
         let undefined = v8::undefined(scope).into();
 
-        // We need to get a mut reference to the isolate's state first.
+        // We need to get a pointer to isolate's state.
         let state = Self::state(scope);
-        let mut state = state.borrow_mut();
 
         // Finding the timers we need to process.
-        let timestamps = state
-            .timers
-            .range(..=Instant::now())
-            .fold(vec![], |mut acc, (t, _)| {
-                acc.push(*t);
-                acc
-            });
-
-        let mut unhooked = vec![];
+        let timestamps =
+            state
+                .borrow()
+                .timers
+                .range(..=Instant::now())
+                .fold(vec![], |mut acc, (t, _)| {
+                    acc.push(*t);
+                    acc
+                });
 
         timestamps.iter().for_each(|key| {
             // Removing the timeout from the list is an acceptable approach
             // since if it's an one-off timeout it will be removed anyway and,
             // if it's a recurring will be rescheduled with a different timestamp key.
-            let timeout = match state.timers.remove(key) {
+            let timeout = match state.borrow_mut().timers.remove(key) {
                 Some(timeout) => timeout,
                 None => return,
             };
@@ -282,10 +306,14 @@ impl JsRuntime {
                 .collect();
 
             // Get timeout's completion handle.
-            let handle = state.async_handles.get(&timeout.handle).unwrap();
-            let handle = match &handle {
-                AsyncHandle::Callback(cb) => cb,
-                _ => unreachable!(),
+            let handle = {
+                let state = state.borrow();
+                let handle = state.async_handles.get(&timeout.handle).unwrap();
+                let handle = match &handle {
+                    AsyncHandle::Callback(cb) => cb,
+                    _ => unreachable!(),
+                };
+                handle.clone()
             };
 
             let callback = v8::Local::new(scope, handle);
@@ -294,29 +322,27 @@ impl JsRuntime {
             callback.call(scope, undefined, args.as_slice());
 
             // We'll decrement the pending events count for every timeout
-            // and let the `ev_enroll_timeout` method  later handle the
+            // and let the `ev_register_timeout` method  later handle the
             // increments for the recurring ones.
-            state.pending_events -= 1;
+            state.borrow_mut().pending_events -= 1;
 
-            if timeout.repeat {
-                unhooked.push(timeout);
+            // The second part of the condition tries to prevent re-registering recurring
+            // timers that unregister themselves while running their callback.
+            if timeout.repeat && !state.borrow().timers_bin.contains(&timeout.id) {
+                Self::ev_register_timeout(scope, timeout);
                 return;
+            } else {
+                // If the timeout is a one-off, remove it's handle from async_handles.
+                state
+                    .borrow_mut()
+                    .async_handles
+                    .remove(&timeout.handle)
+                    .unwrap();
             }
 
-            // If the timeout is a one-off, remove it's handle from async_handles.
-            state.async_handles.remove(&timeout.handle).unwrap();
+            // Clean-up the timers bin.
+            state.borrow_mut().timers_bin.clear();
         });
-
-        // Note: The reason we have this temp `unhooked` vector is because we can't
-        // call `ev_enroll_timeout` directly inside the above for_each. Calling the
-        // the previously mentioned method while still holding a mut reference to the
-        // isolate's state will make Rust panic at runtime.
-
-        drop(state);
-
-        unhooked
-            .drain(..)
-            .for_each(|t| Self::ev_enroll_timeout(scope, t));
     }
 
     /// Starts the event-loop.
