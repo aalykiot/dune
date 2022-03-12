@@ -21,7 +21,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     v8::Global::new(scope, target)
 }
 
-/// Enrolls a new timeout instance to the event-loop.
+/// Creates a new timeout instance and registers it to the event-loop.
 fn create_timeout(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
@@ -69,7 +69,7 @@ fn create_timeout(
     rv.set(v8::Number::new(scope, id as f64).into());
 }
 
-/// Desenrolls a timeout from the event-loop.
+/// Removes a timeout from the event-loop.
 fn remove_timeout(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,

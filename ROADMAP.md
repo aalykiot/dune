@@ -7,7 +7,7 @@
 - [x] `console`: a subset of the WHATWG console.
 - [ ] `TextEncoder` / `TextDecoder`: WHATWG encoding API.
 - [ ] <s>`ReadableStream` / `WritableStream`: WHATWG streams API.</s>
-- [ ] `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: WHATWG timers.
+- [x] `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: DOM style timers.
 - [ ] `setImmediate` / `clearImmediate`: node.js like immediate timers.
 - [x] `process`: an object that provides info about the current dune process.
 

@@ -37,7 +37,7 @@ pub struct JsRuntimeState {
     pub(crate) pending_events: usize,
     /// Holds the timers.
     pub(crate) timers: BTreeMap<Instant, Timeout>,
-    /// Holds timers that are unscheduled manually by the user.
+    /// Holds timers that are removed manually by the user.
     pub(crate) timers_bin: Vec<usize>,
     /// Holds completion handles for async operations.
     pub(crate) async_handles: HashMap<usize, AsyncHandle>,
@@ -269,7 +269,7 @@ impl JsRuntime {
         }
     }
 
-    /// Checks for expired timers (first step of the event-loop).
+    /// Processes all the expired timeouts.
     fn ev_run_timers(&mut self) {
         // Get runtime's handle scope.
         let scope = &mut self.handle_scope();
@@ -278,7 +278,7 @@ impl JsRuntime {
         // We need to get a pointer to isolate's state.
         let state = Self::state(scope);
 
-        // Finding the timers we need to process.
+        // Finding the timeouts we need to process.
         let timestamps =
             state
                 .borrow()
@@ -318,7 +318,7 @@ impl JsRuntime {
 
             let callback = v8::Local::new(scope, handle);
 
-            // Run timer's callback.
+            // Run timeout's callback.
             callback.call(scope, undefined, args.as_slice());
 
             // We'll decrement the pending events count for every timeout
