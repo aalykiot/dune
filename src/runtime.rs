@@ -37,7 +37,7 @@ pub struct JsRuntimeState {
     pub(crate) pending_events: usize,
     /// Holds the timers.
     pub(crate) timers: BTreeMap<Instant, Timeout>,
-    /// Holds timers that are removed manually by the user.
+    /// Holds timers that are removed manually by JavaScript.
     pub(crate) timers_bin: Vec<usize>,
     /// Holds completion handles for async operations.
     pub(crate) async_handles: HashMap<usize, AsyncHandle>,
@@ -81,9 +81,9 @@ impl JsRuntime {
             context,
             modules: ModuleMap::default(),
             pending_events: 0,
-            timers: BTreeMap::default(),
+            timers: BTreeMap::new(),
             timers_bin: vec![],
-            async_handles: HashMap::default(),
+            async_handles: HashMap::new(),
         })));
 
         let mut runtime = JsRuntime { isolate };
@@ -278,7 +278,7 @@ impl JsRuntime {
         // We need to get a pointer to isolate's state.
         let state = Self::state(scope);
 
-        // Finding the timeouts we need to process.
+        // Finding the timeouts we have to process.
         let timestamps =
             state
                 .borrow()
@@ -352,5 +352,41 @@ impl JsRuntime {
             // Timers.
             self.ev_run_timers();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_execute_script_return_value() {
+        let mut runtime = JsRuntime::new();
+        let value_global = runtime.execute_script("<anon>", "a = 1 + 2").unwrap();
+        {
+            let scope = &mut runtime.handle_scope();
+            let value = value_global.open(scope);
+            assert_eq!(value.integer_value(scope).unwrap(), 3);
+        }
+        let value_global = runtime.execute_script("<anon>", "b = 'foobar'").unwrap();
+        {
+            let scope = &mut runtime.handle_scope();
+            let value = value_global.open(scope);
+            assert!(value.is_string());
+            assert_eq!(
+                value.to_string(scope).unwrap().to_rust_string_lossy(scope),
+                "foobar"
+            );
+        }
+    }
+
+    #[test]
+    fn syntax_error() {
+        let mut runtime = JsRuntime::new();
+        let src = "hocuspocus(";
+        let r = runtime.execute_script("i.js", src);
+        let e = r.unwrap_err();
+        let js_error = e.downcast::<JsError>().unwrap();
+        assert_eq!(js_error.end_column, Some(11));
     }
 }

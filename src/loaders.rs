@@ -213,8 +213,76 @@ impl ModuleLoader for CoreModuleLoader {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
+
     #[test]
-    fn test_url_imports() {
+    fn test_file_import_resolution() {
+        // Create a directory inside of `std::env::temp_dir()`.
+        let temp_dir = tempdir().unwrap();
+
+        let filenames = vec![
+            ("tests/core/", "005_more_imports.js"),
+            ("tests/core/", "006_more_imports.js"),
+            ("tests/", "006_more_imports.js"),
+            ("tests/core/007_more_imports", "index.js"),
+        ];
+
+        filenames.iter().for_each(|(base, name)| {
+            std::fs::create_dir_all(temp_dir.path().join(base)).unwrap();
+            std::fs::File::create(temp_dir.path().join(base).join(name)).unwrap();
+        });
+
+        let wrap = |filename: &str| format!("{}", temp_dir.path().join(filename).display());
+
+        // tests = Vec<(Base, Specifier, Expected_Result)>
+        let tests = vec![
+            (
+                None,
+                wrap("tests/core/005_more_imports.js"),
+                wrap("tests/core/005_more_imports.js"),
+            ),
+            (
+                Some(wrap("tests/core/005_more_imports.js")),
+                "./006_more_imports.js".into(),
+                wrap("tests/core/006_more_imports.js"),
+            ),
+            (
+                Some(wrap("tests/core/005_more_imports.js")),
+                "./006_more_imports".into(),
+                wrap("tests/core/006_more_imports.js"),
+            ),
+            (
+                Some(wrap("tests/core/005_more_imports.js")),
+                "../006_more_imports.js".into(),
+                wrap("tests/006_more_imports.js"),
+            ),
+            (
+                Some(wrap("tests/core/005_more_imports.js")),
+                "../006_more_imports".into(),
+                wrap("tests/006_more_imports.js"),
+            ),
+            (
+                None,
+                wrap("tests/core/007_more_imports"),
+                wrap("tests/core/007_more_imports/index.js"),
+            ),
+        ];
+
+        let loader = FsModuleLoader::default();
+
+        for (base, specifier, expected) in tests {
+            let path = match base {
+                Some(base) => loader.resolve(Some(&base), specifier.as_str()),
+                None => loader.resolve(None, specifier.as_str()),
+            };
+
+            assert!(path.is_ok());
+            assert_eq!(path.unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn test_url_import_resolution() {
         // Tests to run later on.
         let tests = vec![
             (
