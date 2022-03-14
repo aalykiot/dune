@@ -10,6 +10,7 @@ use crate::modules::ModuleMap;
 use crate::timers::Timeout;
 use anyhow::bail;
 use anyhow::Error;
+use nanoid::nanoid;
 use rusty_v8 as v8;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -40,7 +41,7 @@ pub struct JsRuntimeState {
     /// Holds timers that are removed manually by JavaScript.
     pub(crate) timers_bin: Vec<usize>,
     /// Holds completion handles for async operations.
-    pub(crate) async_handles: HashMap<usize, AsyncHandle>,
+    pub(crate) async_handles: HashMap<String, AsyncHandle>,
 }
 
 pub struct JsRuntime {
@@ -220,13 +221,13 @@ impl JsRuntime {
 
 impl JsRuntime {
     /// Registers an async handle to the event-loop.
-    pub fn ev_register_async_handle(isolate: &v8::Isolate, handle: AsyncHandle) -> usize {
+    pub fn ev_register_async_handle(isolate: &v8::Isolate, handle: AsyncHandle) -> String {
         // We need to get a mut reference to the isolate's state first.
         let state = Self::state(isolate);
         let mut state = state.borrow_mut();
-        // The length of the hashmap will be the next key. (for now!)
-        let key = state.async_handles.len();
-        state.async_handles.insert(key, handle);
+        // The key (aka ID) of the handle will be a short UUID value.
+        let key = nanoid!();
+        state.async_handles.insert(key.clone(), handle);
 
         key
     }

@@ -6,7 +6,7 @@ use rusty_v8 as v8;
 #[derive(Debug)]
 pub struct Timeout {
     pub id: usize,
-    pub handle: usize,
+    pub handle: String,
     pub delay: u64,
     pub args: Vec<v8::Global<v8::Value>>,
     pub repeat: bool,
