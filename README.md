@@ -1,5 +1,7 @@
 # Dune
 
+![ci workflow](https://github.com/aalykiot/dune/actions/workflows/ci.yml/badge.svg)
+
 A hobby javascript runtime written in **Rust**, based on **V8**, and developed completely for fun and experimentation.
 
 ## API
