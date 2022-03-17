@@ -346,12 +346,17 @@ impl JsRuntime {
         });
     }
 
-    /// Starts the event-loop.
+    /// Runs a single tick of the event-loop.
+    pub fn poll_event_loop(&mut self) {
+        // Timers.
+        self.ev_run_timers();
+    }
+
+    /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
         let state = self.get_state();
         while state.borrow().pending_events > 0 {
-            // Timers.
-            self.ev_run_timers();
+            self.poll_event_loop();
         }
     }
 }
