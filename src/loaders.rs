@@ -13,6 +13,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use ureq;
 use url::Url;
 
 // Defines the behavior of a module loader.
@@ -179,10 +180,7 @@ impl ModuleLoader for UrlModuleLoader {
         println!("{} {}", "Downloading".green(), specifier);
 
         // Not in cache, so we'll download it.
-        let source = match reqwest::blocking::get(specifier)
-            .and_then(|response| response.bytes())
-            .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
-        {
+        let source = match ureq::get(specifier).call()?.into_string() {
             Ok(source) => source,
             Err(_) => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
         };
