@@ -13,7 +13,6 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use ureq;
 use url::Url;
 
 // Defines the behavior of a module loader.

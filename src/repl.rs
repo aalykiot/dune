@@ -15,6 +15,7 @@ use rustyline_derive::Completer;
 use rustyline_derive::Helper;
 use rustyline_derive::Hinter;
 use std::borrow::Cow;
+use std::fs;
 use std::sync::mpsc;
 use std::thread;
 
@@ -183,9 +184,10 @@ enum ReplMessage {
 }
 
 /// CLI configuration for REPL.
+static CLI_ROOT: &str = ".dune";
 static CLI_HISTORY: &str = ".dune_history";
 
-/// Starts the REPL thread.
+/// Starts the REPL server.
 pub fn start(mut runtime: JsRuntime) {
     // Create a channel for thread communication.
     let (sender, receiver) = mpsc::channel::<ReplMessage>();
@@ -193,8 +195,10 @@ pub fn start(mut runtime: JsRuntime) {
     // Spawn the REPL thread.
     thread::spawn(move || {
         let mut editor = Editor::new();
-        editor.load_history(CLI_HISTORY).unwrap_or_default();
+        let history_file_path = &dirs::home_dir().unwrap().join(CLI_ROOT).join(CLI_HISTORY);
+
         editor.set_helper(Some(RLHelper::new()));
+        editor.load_history(history_file_path).unwrap_or_default();
 
         println!("Welcome to Dune v{}", env!("CARGO_PKG_VERSION"));
         let prompt = "> ".to_string();
@@ -223,13 +227,16 @@ pub fn start(mut runtime: JsRuntime) {
                 }
             }
         }
+        // Saving REPL's history before exiting.
+        fs::create_dir_all(history_file_path.parent().unwrap()).unwrap();
+        editor.save_history(history_file_path).unwrap()
     });
 
     loop {
         // Check if the REPL sent any new messages.
         let maybe_message = receiver.try_recv();
-        // If not, poll the event-loop one more time.
-        if let Err(_) = maybe_message {
+        // If not, poll the event-loop again.
+        if maybe_message.is_err() {
             runtime.poll_event_loop();
             continue;
         }

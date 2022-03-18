@@ -20,6 +20,7 @@ rusty_v8 = "0.32.1"
 url = "2.2.2"
 nanoid = "0.4.0"
 regex = "1.5.5"
+dirs = "4.0.0"
 ureq = { version = "2.4.0", features = ["charset"] }
 phf = { version = "0.10.1", features = ["macros"] }
 
