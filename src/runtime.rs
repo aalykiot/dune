@@ -221,7 +221,7 @@ impl JsRuntime {
 
 impl JsRuntime {
     /// Registers an async handle to the event-loop.
-    pub fn ev_register_async_handle(isolate: &v8::Isolate, handle: AsyncHandle) -> String {
+    pub fn ev_set_handle(isolate: &v8::Isolate, handle: AsyncHandle) -> String {
         // We need to get a mut reference to the isolate's state first.
         let state = Self::state(isolate);
         let mut state = state.borrow_mut();
@@ -232,8 +232,17 @@ impl JsRuntime {
         key
     }
 
+    /// Removes an async handle from the event-loop.
+    pub fn ev_unset_handle(isolate: &v8::Isolate, id: &str) {
+        // We need to get a mut reference to the isolate's state first.
+        let state = Self::state(isolate);
+        let mut state = state.borrow_mut();
+        // Remove handle from the hash-map.
+        state.async_handles.remove(id);
+    }
+
     /// Registers a new timeout to the timers shorted list.
-    pub fn ev_register_timeout(isolate: &v8::Isolate, timeout: Timeout) {
+    pub fn ev_set_timeout(isolate: &v8::Isolate, timeout: Timeout) {
         // We need to get a mut reference to the isolate's state first.
         let state = Self::state(isolate);
         let mut state = state.borrow_mut();
@@ -249,24 +258,24 @@ impl JsRuntime {
     }
 
     /// Removes a timeout from the event-loop.
-    pub fn ev_remove_timeout(isolate: &v8::Isolate, id: usize) {
-        // We need to get a mut reference to the isolate's state first.
+    pub fn ev_unset_timeout(isolate: &v8::Isolate, id: usize) {
+        // We need to get a reference to the isolate's state first.
         let state = Self::state(isolate);
-        let mut state = state.borrow_mut();
 
-        state.timers_bin.push(id);
+        state.borrow_mut().timers_bin.push(id);
 
         // Find the timestamp of the timeout we want to remove.
-        let timestamp = match state.timers.iter().find(|(_, t)| t.id == id) {
+        let timestamp = match state.borrow().timers.iter().find(|(_, t)| t.id == id) {
             Some((t, _)) => *t,
             None => return,
         };
 
-        // If it's a valid timeout, remove it from the list and delete
-        // it's async_handle.
-        if let Some(timeout) = state.timers.remove(&timestamp) {
-            state.async_handles.remove(&timeout.handle).unwrap();
-            state.pending_events -= 1;
+        // Remove timeout from the list.
+        let maybe_timeout = state.borrow_mut().timers.remove(&timestamp);
+
+        if let Some(timeout) = maybe_timeout {
+            Self::ev_unset_handle(isolate, &timeout.handle);
+            state.borrow_mut().pending_events -= 1;
         }
     }
 
@@ -323,27 +332,22 @@ impl JsRuntime {
             callback.call(scope, undefined, args.as_slice());
 
             // We'll decrement the pending events count for every timeout
-            // and let the `ev_register_timeout` method  later handle the
+            // and let the `ev_set_timeout` method  later handle the
             // increments for the recurring ones.
             state.borrow_mut().pending_events -= 1;
 
-            // The second part of the condition tries to prevent re-registering recurring
+            // The second part of the condition tries to prevent re-setting recurring
             // timers that unregister themselves while running their callback.
             if timeout.repeat && !state.borrow().timers_bin.contains(&timeout.id) {
-                Self::ev_register_timeout(scope, timeout);
+                Self::ev_set_timeout(scope, timeout);
                 return;
-            } else {
-                // If the timeout is a one-off, remove it's handle from async_handles.
-                state
-                    .borrow_mut()
-                    .async_handles
-                    .remove(&timeout.handle)
-                    .unwrap();
             }
-
-            // Clean-up the timers bin.
-            state.borrow_mut().timers_bin.clear();
+            // If it's a one-off timer, remove it's handle.
+            Self::ev_unset_handle(scope, &timeout.handle);
         });
+
+        // Clean-up the timers bin.
+        state.borrow_mut().timers_bin.clear();
     }
 
     /// Runs a single tick of the event-loop.
