@@ -6,6 +6,7 @@ use crate::loaders::UrlModuleLoader;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
 use lazy_static::lazy_static;
+use regex::Regex;
 use rusty_v8 as v8;
 use std::collections::HashMap;
 use url::Url;
@@ -87,9 +88,15 @@ impl std::ops::DerefMut for ModuleMap {
 pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath> {
     // Looking at the params to decide the loader.
     let loader: Box<dyn ModuleLoader> = {
+        // Regex to match valid URLs based on Python's URL validation.
+        let url_regex = Regex::new(
+            r"/http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+/gm",
+        )
+        .unwrap();
+
         let is_core_module_import = CORE_MODULES.contains_key(specifier);
         let is_url_import =
-            Url::parse(specifier).is_ok() || (base.is_some() && Url::parse(base.unwrap()).is_ok());
+            url_regex.is_match(specifier) || (base.is_some() && url_regex.is_match(base.unwrap()));
 
         match (is_core_module_import, is_url_import) {
             (true, _) => Box::new(CoreModuleLoader),
@@ -103,13 +110,17 @@ pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath>
 
 // Finds the right loader, and loads the import.
 pub fn load_import(specifier: &str) -> Result<ModuleSource> {
+    // Windows absolute path regex validator.
+    let windows_regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
     // Looking at the params to decide the loader.
     let loader: Box<dyn ModuleLoader> = match (
         CORE_MODULES.contains_key(specifier),
+        windows_regex.is_match(specifier),
         Url::parse(specifier).is_ok(),
     ) {
-        (true, _) => Box::new(CoreModuleLoader),
-        (_, true) => Box::new(UrlModuleLoader),
+        (true, _, _) => Box::new(CoreModuleLoader),
+        (_, true, _) => Box::new(FsModuleLoader),
+        (_, _, true) => Box::new(UrlModuleLoader),
         _ => Box::new(FsModuleLoader),
     };
     // Load module.

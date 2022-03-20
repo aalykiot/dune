@@ -6,6 +6,7 @@ use anyhow::bail;
 use anyhow::Result;
 use colored::*;
 use path_clean::PathClean;
+use regex::Regex;
 use sha::sha1::Sha1;
 use sha::utils::Digest;
 use sha::utils::DigestExt;
@@ -90,8 +91,18 @@ impl ModuleLoader for FsModuleLoader {
                 .or_else(|_| self.resolve_as_directory(&path))
                 .map(|path| self.clean(path));
         }
+
+        #[cfg(target_os = "windows")]
+        if Regex::new(r"^[a-zA-Z]:\\").unwrap().is_match(specifier) {
+            let path = PathBuf::from(specifier);
+            return self
+                .resolve_as_file(&path)
+                .or_else(|_| self.resolve_as_directory(&path))
+                .map(|path| self.clean(path));
+        }
+
         // 2. Try to resolve specifier as a relative import.
-        let cwd = &Path::new(".");
+        let cwd = &env::current_dir().unwrap();
         let mut base_dir = base.map(|v| Path::new(v).parent().unwrap()).unwrap_or(cwd);
 
         if specifier.starts_with("./") || specifier.starts_with("../") {
@@ -104,14 +115,13 @@ impl ModuleLoader for FsModuleLoader {
                     base_dir = base_dir.parent().unwrap();
                     &specifier[3..]
                 };
-                win_target = t.replace("/", "\\");
+                win_target = t.replace('/', "\\");
                 &*win_target
             } else {
                 specifier
             };
 
-            let path = base_dir.join(target);
-            let path = std::env::current_dir().unwrap().join(path);
+            let path = base_dir.join(target).clean();
 
             return self
                 .resolve_as_file(&path)
