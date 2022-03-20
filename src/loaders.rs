@@ -226,7 +226,8 @@ mod tests {
     use path_clean::PathClean;
 
     #[test]
-    fn file_import_resolution() {
+    #[cfg(target_os = "unix")]
+    fn test_resolve_file_import() {
         // Create a directory inside of `std::env::temp_dir()`.
         let temp = assert_fs::TempDir::new().unwrap();
 
@@ -278,17 +279,69 @@ mod tests {
         }
 
         // Let's test absolute import resolution (unix only)
-        if cfg!(target_os = "unix") {
-            let path = loader.resolve(None, &abs("./tests/core/002_file_import.js"));
-            let expected = abs("./tests/core/002_file_import.js");
+        let path = loader.resolve(None, &abs("./tests/core/002_file_import.js"));
+        let expected = abs("./tests/core/002_file_import.js");
 
+        assert!(path.is_ok());
+        assert_eq!(path.unwrap(), expected);
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_resolve_file_import() {
+        // Create a directory inside of `std::env::temp_dir()`.
+        let temp = assert_fs::TempDir::new().unwrap();
+
+        let filenames = vec![
+            ".\\tests\\001_file_import.js",
+            ".\\tests\\core\\002_file_import.js",
+            ".\\tests\\core\\003_file_import.js",
+            ".\\tests\\core\\core_2\\004_file_import.js",
+        ];
+
+        filenames.iter().for_each(|filename| {
+            let path = PathBuf::from(filename).clean();
+            let path_file = temp.child(path);
+
+            path_file.touch().unwrap();
+        });
+
+        let abs =
+            |filename: &str| format!("{}", temp.child(PathBuf::from(filename).clean()).display());
+
+        // Vec<(Base, Specifier, Expected_Result)>
+        let tests = vec![
+            (
+                Some(abs(".\\tests\\core\\002_file_import.js")),
+                "./003_file_import.js",
+                ".\\tests\\core\\003_file_import.js",
+            ),
+            (
+                Some(abs(".\\tests\\core\\002_file_import.js")),
+                "./core_2/004_file_import.js",
+                ".\\tests\\core\\core_2\\004_file_import.js",
+            ),
+            (
+                Some(abs(".\\tests\\core\\002_file_import.js")),
+                "../001_file_import.js",
+                ".\\tests\\001_file_import.js",
+            ),
+        ];
+
+        let loader = FsModuleLoader::default();
+
+        for (base, specifier, expected) in tests {
+            let path = match base {
+                Some(base) => loader.resolve(Some(&base), specifier),
+                None => loader.resolve(None, specifier),
+            };
             assert!(path.is_ok());
-            assert_eq!(path.unwrap(), expected);
+            assert_eq!(path.unwrap(), abs(expected));
         }
     }
 
     #[test]
-    fn url_import_resolution() {
+    fn test_resolve_url_import() {
         // Tests to run later on.
         let tests = vec![
             (

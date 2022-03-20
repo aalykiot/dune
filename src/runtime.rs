@@ -21,6 +21,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 /// Completion type of an asynchronous operation.
+#[allow(dead_code)]
 pub enum AsyncHandle {
     /// JavaScript promise.
     Promise(v8::Global<v8::PromiseResolver>),
@@ -361,32 +362,6 @@ impl JsRuntime {
         let state = self.get_state();
         while state.borrow().pending_events > 0 {
             self.poll_event_loop();
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn execute_script_return_value() {
-        let mut runtime = JsRuntime::new();
-        let value_global = runtime.execute_script("<anon>", "a = 1 + 2").unwrap();
-        {
-            let scope = &mut runtime.handle_scope();
-            let value = value_global.open(scope);
-            assert_eq!(value.integer_value(scope).unwrap(), 3);
-        }
-        let value_global = runtime.execute_script("<anon>", "b = 'foobar'").unwrap();
-        {
-            let scope = &mut runtime.handle_scope();
-            let value = value_global.open(scope);
-            assert!(value.is_string());
-            assert_eq!(
-                value.to_string(scope).unwrap().to_rust_string_lossy(scope),
-                "foobar"
-            );
         }
     }
 }
