@@ -15,6 +15,9 @@ use std::path::Path;
 use std::path::PathBuf;
 use url::Url;
 
+#[cfg(target_os = "windows")]
+use regex::Regex;
+
 // Defines the behavior of a module loader.
 pub trait ModuleLoader {
     fn load(&self, specifier: &str) -> Result<ModuleSource>;
@@ -90,8 +93,18 @@ impl ModuleLoader for FsModuleLoader {
                 .or_else(|_| self.resolve_as_directory(&path))
                 .map(|path| self.clean(path));
         }
+
+        #[cfg(target_os = "windows")]
+        if Regex::new(r"^[a-zA-Z]:\\").unwrap().is_match(specifier) {
+            let path = PathBuf::from(specifier);
+            return self
+                .resolve_as_file(&path)
+                .or_else(|_| self.resolve_as_directory(&path))
+                .map(|path| self.clean(path));
+        }
+
         // 2. Try to resolve specifier as a relative import.
-        let cwd = &Path::new(".");
+        let cwd = &env::current_dir().unwrap();
         let mut base_dir = base.map(|v| Path::new(v).parent().unwrap()).unwrap_or(cwd);
 
         if specifier.starts_with("./") || specifier.starts_with("../") {
@@ -104,14 +117,13 @@ impl ModuleLoader for FsModuleLoader {
                     base_dir = base_dir.parent().unwrap();
                     &specifier[3..]
                 };
-                win_target = t.replace("/", "\\");
+                win_target = t.replace('/', "\\");
                 &*win_target
             } else {
                 specifier
             };
 
-            let path = base_dir.join(target);
-            let path = std::env::current_dir().unwrap().join(path);
+            let path = base_dir.join(target).clean();
 
             return self
                 .resolve_as_file(&path)
@@ -179,10 +191,7 @@ impl ModuleLoader for UrlModuleLoader {
         println!("{} {}", "Downloading".green(), specifier);
 
         // Not in cache, so we'll download it.
-        let source = match reqwest::blocking::get(specifier)
-            .and_then(|response| response.bytes())
-            .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
-        {
+        let source = match ureq::get(specifier).call()?.into_string() {
             Ok(source) => source,
             Err(_) => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
         };
@@ -213,58 +222,48 @@ impl ModuleLoader for CoreModuleLoader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
+    use assert_fs::prelude::*;
+    use path_clean::PathClean;
 
     #[test]
-    fn test_file_import_resolution() {
+    #[cfg(target_os = "unix")]
+    fn test_resolve_file_import() {
         // Create a directory inside of `std::env::temp_dir()`.
-        let temp_dir = tempdir().unwrap();
+        let temp = assert_fs::TempDir::new().unwrap();
 
         let filenames = vec![
-            ("tests/core/", "005_more_imports.js"),
-            ("tests/core/", "006_more_imports.js"),
-            ("tests/", "006_more_imports.js"),
-            ("tests/core/007_more_imports", "index.js"),
+            "./tests/001_file_import.js",
+            "./tests/core/002_file_import.js",
+            "./tests/core/003_file_import.js",
+            "./tests/core/core_2/004_file_import.js",
         ];
 
-        filenames.iter().for_each(|(base, name)| {
-            std::fs::create_dir_all(temp_dir.path().join(base)).unwrap();
-            std::fs::File::create(temp_dir.path().join(base).join(name)).unwrap();
+        filenames.iter().for_each(|filename| {
+            let path = PathBuf::from(filename).clean();
+            let path_file = temp.child(path);
+
+            path_file.touch().unwrap();
         });
 
-        let wrap = |filename: &str| format!("{}", temp_dir.path().join(filename).display());
+        let abs =
+            |filename: &str| format!("{}", temp.child(PathBuf::from(filename).clean()).display());
 
-        // tests = Vec<(Base, Specifier, Expected_Result)>
+        // Vec<(Base, Specifier, Expected_Result)>
         let tests = vec![
             (
-                None,
-                wrap("tests/core/005_more_imports.js"),
-                wrap("tests/core/005_more_imports.js"),
+                Some(abs("./tests/core/002_file_import.js")),
+                "./003_file_import.js",
+                "./tests/core/003_file_import.js",
             ),
             (
-                Some(wrap("tests/core/005_more_imports.js")),
-                "./006_more_imports.js".into(),
-                wrap("tests/core/006_more_imports.js"),
+                Some(abs("./tests/core/002_file_import.js")),
+                "./core_2/004_file_import.js",
+                "./tests/core/core_2/004_file_import.js",
             ),
             (
-                Some(wrap("tests/core/005_more_imports.js")),
-                "./006_more_imports".into(),
-                wrap("tests/core/006_more_imports.js"),
-            ),
-            (
-                Some(wrap("tests/core/005_more_imports.js")),
-                "../006_more_imports.js".into(),
-                wrap("tests/006_more_imports.js"),
-            ),
-            (
-                Some(wrap("tests/core/005_more_imports.js")),
-                "../006_more_imports".into(),
-                wrap("tests/006_more_imports.js"),
-            ),
-            (
-                None,
-                wrap("tests/core/007_more_imports"),
-                wrap("tests/core/007_more_imports/index.js"),
+                Some(abs("./tests/core/002_file_import.js")),
+                "../001_file_import.js",
+                "./tests/001_file_import.js",
             ),
         ];
 
@@ -272,17 +271,77 @@ mod tests {
 
         for (base, specifier, expected) in tests {
             let path = match base {
-                Some(base) => loader.resolve(Some(&base), specifier.as_str()),
-                None => loader.resolve(None, specifier.as_str()),
+                Some(base) => loader.resolve(Some(&base), specifier),
+                None => loader.resolve(None, specifier),
             };
-
             assert!(path.is_ok());
-            assert_eq!(path.unwrap(), expected);
+            assert_eq!(path.unwrap(), abs(expected));
+        }
+
+        // Let's test absolute import resolution (unix only)
+        let path = loader.resolve(None, &abs("./tests/core/002_file_import.js"));
+        let expected = abs("./tests/core/002_file_import.js");
+
+        assert!(path.is_ok());
+        assert_eq!(path.unwrap(), expected);
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_resolve_file_import() {
+        // Create a directory inside of `std::env::temp_dir()`.
+        let temp = assert_fs::TempDir::new().unwrap();
+
+        let filenames = vec![
+            ".\\tests\\001_file_import.js",
+            ".\\tests\\core\\002_file_import.js",
+            ".\\tests\\core\\003_file_import.js",
+            ".\\tests\\core\\core_2\\004_file_import.js",
+        ];
+
+        filenames.iter().for_each(|filename| {
+            let path = PathBuf::from(filename).clean();
+            let path_file = temp.child(path);
+
+            path_file.touch().unwrap();
+        });
+
+        let abs =
+            |filename: &str| format!("{}", temp.child(PathBuf::from(filename).clean()).display());
+
+        // Vec<(Base, Specifier, Expected_Result)>
+        let tests = vec![
+            (
+                Some(abs(".\\tests\\core\\002_file_import.js")),
+                "./003_file_import.js",
+                ".\\tests\\core\\003_file_import.js",
+            ),
+            (
+                Some(abs(".\\tests\\core\\002_file_import.js")),
+                "./core_2/004_file_import.js",
+                ".\\tests\\core\\core_2\\004_file_import.js",
+            ),
+            (
+                Some(abs(".\\tests\\core\\002_file_import.js")),
+                "../001_file_import.js",
+                ".\\tests\\001_file_import.js",
+            ),
+        ];
+
+        let loader = FsModuleLoader::default();
+
+        for (base, specifier, expected) in tests {
+            let path = match base {
+                Some(base) => loader.resolve(Some(&base), specifier),
+                None => loader.resolve(None, specifier),
+            };
+            assert!(path.is_ok());
+            assert_eq!(path.unwrap(), abs(expected));
         }
     }
 
     #[test]
-    fn test_url_import_resolution() {
+    fn test_resolve_url_import() {
         // Tests to run later on.
         let tests = vec![
             (

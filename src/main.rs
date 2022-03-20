@@ -17,6 +17,10 @@ use std::env;
 fn main() {
     // Getting the filename from command-line arguments
     let args: Vec<String> = env::args().collect();
+
+    // Create a new runtime instance.
+    let mut runtime = JsRuntime::new();
+
     // If filename is specified run it as a module, otherwise start the repl.
     if let Some(filename) = args.get(1) {
         // The following code tries to resolve the given filename to an
@@ -26,8 +30,7 @@ fn main() {
             resolve_import(None, filename)
                 .or_else(|_| resolve_import(None, &format!("./{}", filename))),
         );
-        // Create a new runtime instance and run the module.
-        let mut runtime = JsRuntime::new();
+
         let mod_result = runtime.execute_module(&filename, None);
 
         match mod_result {
@@ -38,5 +41,5 @@ fn main() {
         return;
     }
 
-    repl::start();
+    repl::start(runtime);
 }

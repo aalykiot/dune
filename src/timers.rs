@@ -53,7 +53,7 @@ fn create_timeout(
     let repeat = args.get(4).to_rust_string_lossy(scope).as_str() == "true";
 
     // Create a new async handle from the callback.
-    let handle = JsRuntime::ev_register_async_handle(scope, AsyncHandle::Callback(callback));
+    let handle = JsRuntime::ev_set_handle(scope, AsyncHandle::Callback(callback));
 
     let timeout = Timeout {
         id,
@@ -63,7 +63,7 @@ fn create_timeout(
         repeat,
     };
 
-    JsRuntime::ev_register_timeout(scope, timeout);
+    JsRuntime::ev_set_timeout(scope, timeout);
 
     // Return timeout's ID.
     rv.set(v8::Number::new(scope, id as f64).into());
@@ -77,5 +77,5 @@ fn remove_timeout(
 ) {
     // Get the timeout's ID and call the remove method.
     let id = args.get(0).int32_value(scope).unwrap() as usize;
-    JsRuntime::ev_remove_timeout(scope, id);
+    JsRuntime::ev_unset_timeout(scope, id);
 }
