@@ -370,7 +370,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_execute_script_return_value() {
+    fn execute_script_return_value() {
         let mut runtime = JsRuntime::new();
         let value_global = runtime.execute_script("<anon>", "a = 1 + 2").unwrap();
         {
@@ -388,15 +388,5 @@ mod tests {
                 "foobar"
             );
         }
-    }
-
-    #[test]
-    fn syntax_error() {
-        let mut runtime = JsRuntime::new();
-        let src = "hocuspocus(";
-        let r = runtime.execute_script("i.js", src);
-        let e = r.unwrap_err();
-        let js_error = e.downcast::<JsError>().unwrap();
-        assert_eq!(js_error.end_column, Some(11));
     }
 }

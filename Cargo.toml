@@ -25,4 +25,4 @@ ureq = { version = "2.4.0", features = ["charset"] }
 phf = { version = "0.10.1", features = ["macros"] }
 
 [dev-dependencies]
-tempfile = "3.3.0"
+assert_fs = "1.0.7"
