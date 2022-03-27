@@ -88,11 +88,9 @@ impl std::ops::DerefMut for ModuleMap {
 pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath> {
     // Looking at the params to decide the loader.
     let loader: Box<dyn ModuleLoader> = {
-        // Regex to match valid URLs based on Python's URL validation.
-        let url_regex = Regex::new(
-            r"/http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+/gm",
-        )
-        .unwrap();
+        // Regex to match valid URLs based on VB.NET's URL validation.
+        // http://urlregex.com/
+        let url_regex = Regex::new(r"(http(s)?://)?([\w-]+\.)+[\w-]+[.com]+(/[/?%&=]*)?").unwrap();
 
         let is_core_module_import = CORE_MODULES.contains_key(specifier);
         let is_url_import =
