@@ -2,7 +2,21 @@
 
 ![ci workflow](https://github.com/aalykiot/dune/actions/workflows/ci.yml/badge.svg)
 
-A hobby javascript runtime written in **Rust**, based on **V8**, and developed completely for fun and experimentation.
+Dune is a hobby JavaScript and TypeScript runtime written in **Rust**, based on **V8**, and developed completely for fun and experimentation.
+
+## Installation
+
+Clone the repo from GitHub:
+
+```bash
+$ git clone https://github.com/aalykiot/dune.git
+```
+
+Run dune using cargo:
+
+```bash
+$ cd dune/ && cargo run -- <FILE>
+```
 
 ## API
 
@@ -12,7 +26,6 @@ A hobby javascript runtime written in **Rust**, based on **V8**, and developed c
 - `globalThis`: same as `global`.
 - `console`: a subset of the WHATWG console.
 - `TextEncoder` / `TextDecoder`: WHATWG encoding API.
-- <s>`ReadableStream` / `WritableStream`: WHATWG streams API.</s>
 - `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: DOM style timers.
 - `setImmediate` / `clearImmediate`: node.js like immediate timers.
 - `process`: an object that provides info about the current dune process.
@@ -60,12 +73,6 @@ A hobby javascript runtime written in **Rust**, based on **V8**, and developed c
 - `read([size, [offset]])`: reads data from the file.
 - `stat()`: retrieves statistics for the file.
 - `write(String|Uint8Array, [offset])`: writes data to the file.
-
-## Supported platforms
-
-- GNU/Linux
-- MacOS
-- Windows
 
 ## License
 
