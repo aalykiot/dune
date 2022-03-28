@@ -3,15 +3,15 @@ use crate::modules::resolve_import;
 use crate::runtime::JsRuntime;
 use rusty_v8 as v8;
 
-// Called during Module::instantiate_module.
-// https://docs.rs/rusty_v8/latest/rusty_v8/type.ResolveModuleCallback.html
+/// Called during Module::instantiate_module.
+/// https://docs.rs/rusty_v8/latest/rusty_v8/type.ResolveModuleCallback.html
 pub fn module_resolve_cb<'a>(
     context: v8::Local<'a, v8::Context>,
     specifier: v8::Local<'a, v8::String>,
     _: v8::Local<'a, v8::FixedArray>,
     referrer: v8::Local<'a, v8::Module>,
 ) -> Option<v8::Local<'a, v8::Module>> {
-    // Getting a CallbackScope from the given context.
+    // Get `CallbackScope` from context.
     let scope = &mut unsafe { v8::CallbackScope::new(context) };
     let state = JsRuntime::state(scope);
     let state = state.borrow();

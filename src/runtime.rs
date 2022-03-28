@@ -53,7 +53,7 @@ pub struct JsRuntime {
 
 impl JsRuntime {
     pub fn new() -> JsRuntime {
-        // Firing up the v8 engine under the hood.
+        // Fire up the v8 engine.
         static V8_INIT: Once = Once::new();
         V8_INIT.call_once(move || {
             let platform = v8::new_default_platform(0, false).make_shared();
@@ -77,7 +77,7 @@ impl JsRuntime {
             v8::Global::new(scope, context)
         };
 
-        // Storing state inside the v8 isolate slot.
+        // Store state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
             context,
@@ -90,7 +90,7 @@ impl JsRuntime {
 
         let mut runtime = JsRuntime { isolate };
 
-        // Initializing the core environment. (see lib/main.js)
+        // Initialize core environment. (see lib/main.js)
         let main = include_str!("../lib/main.js");
         unwrap_or_exit(runtime.execute_module("dune:environment/main", Some(main)));
 
@@ -103,7 +103,7 @@ impl JsRuntime {
         filename: &str,
         source: &str,
     ) -> Result<v8::Global<v8::Value>, Error> {
-        // Getting a reference to isolate's handle scope.
+        // Get the handle-scope.
         let scope = &mut self.handle_scope();
 
         let origin = create_origin(scope, filename, false);
@@ -212,6 +212,7 @@ impl JsRuntime {
     pub fn context(&mut self) -> v8::Global<v8::Context> {
         let state = self.get_state();
         let state = state.borrow();
+
         state.context.clone()
     }
 }
@@ -223,10 +224,11 @@ impl JsRuntime {
 impl JsRuntime {
     /// Registers an async handle to the event-loop.
     pub fn ev_set_handle(isolate: &v8::Isolate, handle: AsyncHandle) -> String {
-        // We need to get a mut reference to the isolate's state first.
+        // Get a reference to the state.
         let state = Self::state(isolate);
         let mut state = state.borrow_mut();
-        // The key (aka ID) of the handle will be a short UUID value.
+
+        // Create a UUID value as the key.
         let key = nanoid!();
         state.async_handles.insert(key.clone(), handle);
 
@@ -235,16 +237,17 @@ impl JsRuntime {
 
     /// Removes an async handle from the event-loop.
     pub fn ev_unset_handle(isolate: &v8::Isolate, id: &str) {
-        // We need to get a mut reference to the isolate's state first.
+        // Get a reference to the state.
         let state = Self::state(isolate);
         let mut state = state.borrow_mut();
+
         // Remove handle from the hash-map.
         state.async_handles.remove(id);
     }
 
     /// Registers a new timeout to the timers shorted list.
     pub fn ev_set_timeout(isolate: &v8::Isolate, timeout: Timeout) {
-        // We need to get a mut reference to the isolate's state first.
+        // Get a reference to the state.
         let state = Self::state(isolate);
         let mut state = state.borrow_mut();
 
@@ -254,13 +257,13 @@ impl JsRuntime {
 
         state.timers.insert(duration, timeout);
 
-        // Increase the pending events
+        // Increase pending events.
         state.pending_events += 1;
     }
 
     /// Removes a timeout from the event-loop.
     pub fn ev_unset_timeout(isolate: &v8::Isolate, id: usize) {
-        // We need to get a reference to the isolate's state first.
+        // Get a reference to the state.
         let state = Self::state(isolate);
 
         state.borrow_mut().timers_bin.push(id);
@@ -286,10 +289,10 @@ impl JsRuntime {
         let scope = &mut self.handle_scope();
         let undefined = v8::undefined(scope).into();
 
-        // We need to get a pointer to isolate's state.
+        // Get a reference to the runtime's state.
         let state = Self::state(scope);
 
-        // Finding the timeouts we have to process.
+        // Find the timeouts we have to process.
         let timestamps =
             state
                 .borrow()
@@ -343,23 +346,26 @@ impl JsRuntime {
                 Self::ev_set_timeout(scope, timeout);
                 return;
             }
-            // If it's a one-off timer, remove it's handle.
+
+            // Remove handle, if it's a one-off timer.
             Self::ev_unset_handle(scope, &timeout.handle);
         });
 
-        // Clean-up the timers bin.
+        // Clean-up timers bin.
         state.borrow_mut().timers_bin.clear();
     }
 
     /// Runs a single tick of the event-loop.
     pub fn poll_event_loop(&mut self) {
-        // Timers.
+        // Timers phase.
         self.ev_run_timers();
     }
 
     /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
+        // Get runtime's state.
         let state = self.get_state();
+
         while state.borrow().pending_events > 0 {
             self.poll_event_loop();
         }

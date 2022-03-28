@@ -37,6 +37,7 @@ pub fn initialize<'s>(
     arguments.iter().enumerate().for_each(|(i, arg)| {
         let index = i as u32;
         let value = v8::String::new(scope, arg.as_str()).unwrap();
+
         argv.set_index(scope, index, value.into()).unwrap();
     });
 
@@ -54,6 +55,7 @@ pub fn initialize<'s>(
                 Ok(path) => {
                     let path = path.into_os_string().into_string().unwrap();
                     let path = v8::String::new(scope, path.as_str()).unwrap();
+
                     rv.set(path.into());
                 }
                 Err(_) => {
@@ -83,7 +85,7 @@ pub fn initialize<'s>(
         |scope: &mut v8::HandleScope,
          args: v8::FunctionCallbackArguments,
          mut _rv: v8::ReturnValue| {
-            // In case the value is not a valid i32, exit the program with code 0.
+            // Exit the program when value is not valid i32.
             match args.get(0).to_int32(scope) {
                 Some(code) => std::process::exit(code.value() as i32),
                 None => std::process::exit(0),
@@ -99,7 +101,7 @@ pub fn initialize<'s>(
         |scope: &mut v8::HandleScope,
          _args: v8::FunctionCallbackArguments,
          mut rv: v8::ReturnValue| {
-            // Getting HeapStatistics from the v8 isolate.
+            // Get HeapStatistics from v8.
             let mut stats = v8::HeapStatistics::default();
             scope.get_heap_statistics(&mut stats);
 
@@ -128,6 +130,7 @@ pub fn initialize<'s>(
     // `process.version` - the dune version.
     let version = format!("v{}", VERSIONS.get("dune").unwrap());
     let version = v8::String::new(scope, version.as_str()).unwrap();
+
     set_property_to(scope, process, "version", version.into());
 
     // `process.versions` - an object listing the version strings of dune and its dependencies.
@@ -148,21 +151,23 @@ pub fn initialize<'s>(
         |scope: &mut v8::HandleScope,
          args: v8::FunctionCallbackArguments,
          mut rv: v8::ReturnValue| {
-            // Get the requested native binding.
+            // Get requested native binding.
             let request = args.get(0).to_rust_string_lossy(scope);
 
             match BINDINGS.get(request.as_str()) {
-                // If native binding exists, initialize it and return it.
+                // Initialize binding.
                 Some(initializer) => {
                     let binding = initializer(scope);
                     let binding = v8::Local::new(scope, binding);
+
                     rv.set(binding.into());
                 }
-                // Else, throw an exception to JavaScript.
+                // Throw exception.
                 None => {
                     let message = format!("No such module: \"{}\"", request);
                     let message = v8::String::new(scope, &message).unwrap();
                     let exception = v8::Exception::error(scope, message);
+
                     scope.throw_exception(exception);
                 }
             };

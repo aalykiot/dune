@@ -5,8 +5,8 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fmt::Display;
 
-// A simple error type that lets the creator specify both the error message and
-// the error class name.
+/// A simple error type that lets the creator specify both the error message and
+/// the error class name.
 #[derive(Debug)]
 struct CustomError {
     class: &'static str,
@@ -36,7 +36,7 @@ pub fn generic_error(message: impl Into<Cow<'static, str>>) -> Error {
     CustomError::new("Error", message)
 }
 
-// Represents an exception coming from V8.
+/// Represents an exception coming from V8.
 #[derive(PartialEq, Clone)]
 pub struct JsError {
     pub message: String,
@@ -54,11 +54,11 @@ impl JsError {
         scope: &'a mut v8::HandleScope,
         exception: v8::Local<'a, v8::Value>,
     ) -> Self {
-        // Create a new HandleScope so we can create local handles.
+        // Create a new HandleScope.
         let scope = &mut v8::HandleScope::new(scope);
         let message = v8::Exception::create_message(scope, exception);
 
-        // Getting the error type from the exception.
+        // Get error from thrown exception.
         let exception_string = exception
             .to_string(scope)
             .unwrap()
@@ -82,7 +82,7 @@ impl JsError {
 
         let exception: v8::Local<v8::Object> = exception.try_into().unwrap();
 
-        // Access error.stack to ensure that prepareStackTrace() has been called.
+        // Access error.stack to ensure `prepareStackTrace()` has been called.
         let stack = v8::String::new(scope, "stack").unwrap();
         let stack = exception.get(scope, stack.into());
         let stack: Option<v8::Local<v8::String>> = stack.and_then(|s| s.try_into().ok());
@@ -102,10 +102,10 @@ impl JsError {
 
 impl std::error::Error for JsError {}
 
-// Should display the minified version of the error. (used in repl)
 impl Display for JsError {
+    /// Displays a minified version of the error.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Unwrapping values.
+        // Unwrap values.
         let line = self.line_number.unwrap_or_default();
         let column = self.start_column.unwrap_or_default();
         write!(
@@ -120,10 +120,10 @@ impl Display for JsError {
     }
 }
 
-// Should display the full version of the error with stacktrace.
 impl Debug for JsError {
+    /// Displays a full version of the error with stacktrace.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Basic exception information.
+        // Output exception information.
         writeln!(f, "{} {}", "Uncaught".red().bold(), self.message)?;
         writeln!(f, "{}", self.source_line.as_ref().unwrap())?;
 

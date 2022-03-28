@@ -137,11 +137,12 @@ impl Highlighter for LineHighlighter {
             .replace_all(&line, |caps: &Captures<'_>| {
                 // Colorize JavaScript built in primitives.
                 if let Some(cap) = caps.name("identifier") {
-                    // Check if capture is a JavaScript keyword.
+                    // Check capture against the keywords list.
                     if KEYWORDS.contains(cap.as_str()) {
                         return cap.as_str().color(KEYWORD_COLOR).bold().to_string();
                     }
-                    // Special token colorization.
+
+                    // Colorize special tokens.
                     return match cap.as_str() {
                         "true" | "false" | "null" | "Infinity" => {
                             cap.as_str().color(Color::Yellow).to_string()
@@ -150,22 +151,27 @@ impl Highlighter for LineHighlighter {
                         _ => cap.as_str().to_string(),
                     };
                 }
+
                 // Colorize single quoted strings.
                 if let Some(cap) = caps.name("string_single_quote") {
                     return cap.as_str().color(STRING_COLOR).to_string();
                 }
+
                 // Colorize double quoted strings.
                 if let Some(cap) = caps.name("string_double_quote") {
                     return cap.as_str().color(STRING_COLOR).to_string();
                 }
+
                 // Colorize template literals.
                 if let Some(cap) = caps.name("template_literal") {
                     return cap.as_str().color(STRING_COLOR).to_string();
                 }
+
                 // Colorize numbers.
                 if let Some(cap) = caps.name("number") {
                     return cap.as_str().color(NUMBER_COLOR).to_string();
                 }
+
                 // Default.
                 caps[0].to_string()
             })
@@ -227,26 +233,29 @@ pub fn start(mut runtime: JsRuntime) {
                 }
             }
         }
-        // Saving REPL's history before exiting.
+        // Save REPL's history.
         fs::create_dir_all(history_file_path.parent().unwrap()).unwrap();
         editor.save_history(history_file_path).unwrap()
     });
 
     loop {
-        // Check if the REPL sent any new messages.
+        // Check for REPL messages.
         let maybe_message = receiver.try_recv();
-        // If not, poll the event-loop again.
+
+        // Poll the event-loop.
         if maybe_message.is_err() {
             runtime.poll_event_loop();
             continue;
         }
-        // If it did, try execute the given expression, or exit the process.
+
+        // Try execute the given expression, or exit the process.
         match maybe_message.unwrap() {
             ReplMessage::Evaluate(expression) => {
                 match runtime.execute_script("<anonymous>", &expression) {
                     Ok(value) => {
                         let scope = &mut runtime.handle_scope();
                         let value = value.open(scope);
+
                         println!("{}", value.to_rust_string_lossy(scope));
                     }
                     Err(e) => eprintln!("{}", e),

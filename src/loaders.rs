@@ -18,7 +18,7 @@ use url::Url;
 #[cfg(target_os = "windows")]
 use regex::Regex;
 
-// Defines the behavior of a module loader.
+/// Defines the interface of a module loader.
 pub trait ModuleLoader {
     fn load(&self, specifier: &str) -> Result<ModuleSource>;
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath>;
@@ -30,12 +30,12 @@ static EXTENSIONS: &[&str] = &["js", "json"];
 pub struct FsModuleLoader;
 
 impl FsModuleLoader {
-    // Helper method to "clean" messy path strings and convert PathBuf to String.
+    /// Cleans "messy" file-path strings.
     fn clean(&self, path: PathBuf) -> String {
         path.clean().into_os_string().into_string().unwrap()
     }
 
-    // Simple function that checks if import is a JSON file.
+    /// Checks if path is a JSON file
     fn is_json_import(&self, path: &str) -> bool {
         let path = Path::new(path);
         match path.extension() {
@@ -44,17 +44,18 @@ impl FsModuleLoader {
         }
     }
 
-    // Handle JSON imports using v8's built in methods.
+    /// Wraps JSON data into an ES module (using v8's built in objects).
     fn wrap_json(&self, source: &str) -> String {
         format!("export default JSON.parse(`{}`);", source)
     }
 
-    // If import is a file, load it as simple text.
+    /// Resolves import as file.
     fn resolve_as_file(&self, path: &Path) -> Result<PathBuf> {
         // 1. Check if path is already a valid file.
         if path.is_file() {
             return Ok(path.to_path_buf());
         }
+
         // 2. Check if we need to add an extension.
         for ext in EXTENSIONS {
             let path = path.with_extension(ext);
@@ -62,12 +63,15 @@ impl FsModuleLoader {
                 return Ok(path);
             }
         }
+
         // 3. Bail out with an error.
         let path = self.clean(path.to_path_buf());
         let err_message = format!("Module not found \"{}\"", path);
+
         bail!(generic_error(err_message));
     }
-    // If import is a directory, load it using the 'index.[ext]' convention.
+
+    /// Resolves import as directory using the 'index.[ext]' convention.
     fn resolve_as_directory(&self, path: &Path) -> Result<PathBuf> {
         for ext in EXTENSIONS {
             let path = path.join(format!("index.{}", ext));
@@ -75,15 +79,17 @@ impl FsModuleLoader {
                 return Ok(path);
             }
         }
+
         let path = self.clean(path.to_path_buf());
         let err_message = format!("Module not found \"{}\"", path);
+
         bail!(generic_error(err_message));
     }
 }
 
 impl ModuleLoader for FsModuleLoader {
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath> {
-        // 1. Try to resolve specifier as an absolute import.
+        // 1. Try resolve specifier as an absolute import.
         if specifier.starts_with('/') {
             let base_directory = &Path::new("/");
             let path = base_directory.join(specifier);
@@ -97,13 +103,14 @@ impl ModuleLoader for FsModuleLoader {
         #[cfg(target_os = "windows")]
         if Regex::new(r"^[a-zA-Z]:\\").unwrap().is_match(specifier) {
             let path = PathBuf::from(specifier);
+
             return self
                 .resolve_as_file(&path)
                 .or_else(|_| self.resolve_as_directory(&path))
                 .map(|path| self.clean(path));
         }
 
-        // 2. Try to resolve specifier as a relative import.
+        // 2. Try resolve specifier as a relative import.
         let cwd = &env::current_dir().unwrap();
         let mut base_dir = base.map(|v| Path::new(v).parent().unwrap()).unwrap_or(cwd);
 
@@ -135,7 +142,7 @@ impl ModuleLoader for FsModuleLoader {
     }
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
-        // Load source from path.
+        // Load source.
         let source = fs::read_to_string(specifier)?;
         let source = match self.is_json_import(specifier) {
             true => self.wrap_json(source.as_str()),
@@ -147,42 +154,44 @@ impl ModuleLoader for FsModuleLoader {
 }
 
 #[derive(Default)]
-// Support importing URLs because...why not?
+/// Loader supporting URL imports.
 pub struct UrlModuleLoader;
 
 impl ModuleLoader for UrlModuleLoader {
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath> {
-        // 1. Check if the specifier is a valid URL.
+        // 1. Check if specifier is a valid URL.
         if let Ok(url) = Url::parse(specifier) {
             return Ok(url.into());
         }
-        // 2. Check if the caller provided a valid base URL.
+
+        // 2. Check if the requester is a valid URL.
         if let Some(base) = base {
             if let Ok(base) = Url::parse(base) {
                 let options = Url::options();
                 let url = options.base_url(Some(&base));
                 let url = url.parse(specifier)?;
+
                 return Ok(url.as_str().to_string());
             }
         }
 
-        // This error shouldn't be showing up often.
+        // Possibly unreachable error.
         bail!(generic_error("Base is not a valid URL"));
     }
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
-        // Create a .cache directory if it does not exist.
+        // Create a .cache directory.
         let cache_dir = env::current_dir()?.join(".cache");
 
         if fs::create_dir_all(&cache_dir).is_err() {
             bail!(generic_error("Failed to create module caching directory"))
         }
 
-        // Every URL module is hashed into a unique path.
+        // Hash URL using sha1.
         let hash = Sha1::default().digest(specifier.as_bytes()).to_hex();
         let module_path = cache_dir.join(&hash);
 
-        // If the file is already in cache, just load it.
+        // Check cache, and load file.
         if module_path.is_file() {
             let source = fs::read_to_string(&module_path).unwrap();
             return Ok(source);
@@ -190,7 +199,7 @@ impl ModuleLoader for UrlModuleLoader {
 
         println!("{} {}", "Downloading".green(), specifier);
 
-        // Not in cache, so we'll download it.
+        // Download file, save it to cache.
         let source = match ureq::get(specifier).call()?.into_string() {
             Ok(source) => source,
             Err(_) => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
@@ -264,7 +273,7 @@ mod tests {
         let temp = assert_fs::TempDir::new().unwrap();
         setup(&temp);
 
-        // Turns a relative file path into an absolute one.
+        // Transform path into an absolute path.
         let make_absolute =
             |filename: &str| format!("{}", temp.child(PathBuf::from(filename).clean()).display());
 
@@ -302,7 +311,7 @@ mod tests {
         let temp = assert_fs::TempDir::new().unwrap();
         setup(&temp);
 
-        // Turns a relative file path into an absolute one.
+        // Transform path into an absolute path.
         let make_absolute =
             |filename: &str| format!("{}", temp.child(PathBuf::from(filename).clean()).display());
 
@@ -322,7 +331,7 @@ mod tests {
         let temp = assert_fs::TempDir::new().unwrap();
         setup(&temp);
 
-        // Turns a relative file path into an absolute one.
+        // Transform path into an absolute path.
         let make_absolute =
             |filename: &str| format!("{}", temp.child(PathBuf::from(filename).clean()).display());
 
@@ -356,7 +365,7 @@ mod tests {
 
     #[test]
     fn url_import_resolution() {
-        // Tests to run later on.
+        // Group of tests to be run.
         let tests = vec![
             (
                 None,

@@ -11,7 +11,6 @@ use rusty_v8 as v8;
 use std::collections::HashMap;
 use url::Url;
 
-// Registering core modules into a vector.
 lazy_static! {
     pub static ref CORE_MODULES: HashMap<&'static str, &'static str> = {
         let modules = vec![
@@ -24,7 +23,7 @@ lazy_static! {
     };
 }
 
-// Utility to easily create v8 script origins.
+/// Creates v8 script origins.
 pub fn create_origin<'s>(
     scope: &mut v8::HandleScope<'s, ()>,
     name: &str,
@@ -32,6 +31,7 @@ pub fn create_origin<'s>(
 ) -> v8::ScriptOrigin<'s> {
     let name = v8::String::new(scope, name).unwrap();
     let source_map = v8::undefined(scope);
+
     v8::ScriptOrigin::new(
         scope,
         name.into(),
@@ -49,13 +49,14 @@ pub fn create_origin<'s>(
 pub type ModulePath = String;
 pub type ModuleSource = String;
 
-// Points to a module that lives inside v8.
+/// Points to a module that lives inside v8.
 pub type ModuleReference = v8::Global<v8::Module>;
 
-// Holds information about resolved ES modules.
 #[derive(Default)]
+#[allow(dead_code)]
+/// Holds information about resolved ES modules.
 pub struct ModuleMap {
-    // main: Option<ModulePath>,
+    main: Option<ModulePath>,
     map: HashMap<ModulePath, ModuleReference>,
 }
 
@@ -84,9 +85,9 @@ impl std::ops::DerefMut for ModuleMap {
     }
 }
 
-// Finds the right loader, and resolves the import.
+/// Resolves an import using the appropriate loader.
 pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath> {
-    // Looking at the params to decide the loader.
+    // Look the params and choose a loader.
     let loader: Box<dyn ModuleLoader> = {
         // Regex to match valid URLs based on VB.NET's URL validation.
         // http://urlregex.com/
@@ -102,15 +103,17 @@ pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath>
             _ => Box::new(FsModuleLoader),
         }
     };
+
     // Resolve module.
     loader.resolve(base, specifier)
 }
 
-// Finds the right loader, and loads the import.
+/// Loads an import using the appropriate loader.
 pub fn load_import(specifier: &str) -> Result<ModuleSource> {
     // Windows absolute path regex validator.
     let windows_regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
-    // Looking at the params to decide the loader.
+
+    // Look the params and choose a loader.
     let loader: Box<dyn ModuleLoader> = match (
         CORE_MODULES.contains_key(specifier),
         windows_regex.is_match(specifier),
@@ -121,22 +124,23 @@ pub fn load_import(specifier: &str) -> Result<ModuleSource> {
         (_, _, true) => Box::new(UrlModuleLoader),
         _ => Box::new(FsModuleLoader),
     };
+
     // Load module.
     loader.load(specifier)
 }
 
-// It resolves module imports ahead of time (useful for async).
-// https://source.chromium.org/chromium/v8/v8.git/+/51e736ca62bd5c7bfd82488a5587fed31dbf45d5:src/d8.cc;l=741
+/// Resolves module imports ahead of time (useful for async).
+/// https://source.chromium.org/chromium/v8/v8.git/+/51e736ca62bd5c7bfd82488a5587fed31dbf45d5:src/d8.cc;l=741
 pub fn fetch_module_tree<'a>(
     scope: &mut v8::HandleScope<'a>,
     filename: &str,
     source: Option<&str>,
 ) -> Option<v8::Local<'a, v8::Module>> {
-    // Create a script origin for the import.
+    // Create a script origin.
     let origin = create_origin(scope, filename, true);
     let state = JsRuntime::state(scope);
 
-    // Check if source is specified from caller, if not, use a loader.
+    // Find appropriate loader if source is empty.
     let source = match source {
         Some(source) => source.into(),
         None => unwrap_or_exit(load_import(filename)),
@@ -149,7 +153,7 @@ pub fn fetch_module_tree<'a>(
         None => return None,
     };
 
-    // Add new es module to runtime's module map.
+    // Add ES module to map.
     state
         .borrow_mut()
         .modules
@@ -158,15 +162,15 @@ pub fn fetch_module_tree<'a>(
     let requests = module.get_module_requests();
 
     for i in 0..requests.length() {
-        // Getting the import request from the `module_requests` array.
+        // Get import request from the `module_requests` array.
         let request = requests.get(scope, i).unwrap();
         let request = v8::Local::<v8::ModuleRequest>::try_from(request).unwrap();
 
-        // Transforming v8's ModuleRequest into a Rust string.
+        // Transform v8's ModuleRequest into Rust string.
         let specifier = request.get_specifier().to_rust_string_lossy(scope);
         let specifier = unwrap_or_exit(resolve_import(Some(filename), &specifier));
 
-        // Using recursion resolve the rest sub-tree of modules.
+        // Resolve subtree of modules.
         if !state.borrow().modules.contains_key(&specifier) {
             fetch_module_tree(scope, &specifier, None)?;
         }

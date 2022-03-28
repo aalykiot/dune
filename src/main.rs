@@ -15,13 +15,13 @@ use runtime::JsRuntime;
 use std::env;
 
 fn main() {
-    // Getting the filename from command-line arguments
+    // Get filename from the command-line arguments.
     let args: Vec<String> = env::args().collect();
 
-    // Create a new runtime instance.
+    // Create new JS runtime.
     let mut runtime = JsRuntime::new();
 
-    // If filename is specified run it as a module, otherwise start the repl.
+    // Run as ES module, if filename is specified.
     if let Some(filename) = args.get(1) {
         // The following code tries to resolve the given filename to an
         // absolute path. If the first time fails we will append `./` to
@@ -41,5 +41,6 @@ fn main() {
         return;
     }
 
+    // Start REPL.
     repl::start(runtime);
 }

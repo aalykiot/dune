@@ -4,15 +4,17 @@ use std::io;
 use std::io::Write;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
-    // A local object that we'll attach all methods to it.
+    // Create local JS object.
     let target = v8::Object::new(scope);
+
     set_function_to(scope, target, "write", write);
     set_function_to(scope, target, "writeError", write_error);
-    // Return it as a global reference.
+
+    // Return v8 global handle.
     v8::Global::new(scope, target)
 }
 
-// Writes data to the stdout stream.
+/// Writes data to the stdout stream.
 fn write(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _rv: v8::ReturnValue) {
     // Convert string to bytes.
     let content = args.get(0).to_rust_string_lossy(scope);
@@ -22,7 +24,7 @@ fn write(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _rv: 
     io::stdout().flush().unwrap();
 }
 
-// Writes data to the stderr stream.
+/// Writes data to the stderr stream.
 fn write_error(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,

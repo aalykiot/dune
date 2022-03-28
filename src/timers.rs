@@ -13,11 +13,13 @@ pub struct Timeout {
 }
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
-    // A local object that we'll attach all methods to it.
+    // Create local JS object.
     let target = v8::Object::new(scope);
+
     set_function_to(scope, target, "createTimeout", create_timeout);
     set_function_to(scope, target, "removeTimeout", remove_timeout);
-    // Return it as a global reference.
+
+    // Return v8 global handle.
     v8::Global::new(scope, target)
 }
 
@@ -37,7 +39,7 @@ fn create_timeout(
     // Get timer's delay.
     let delay = args.get(2).int32_value(scope).unwrap() as u64;
 
-    // Converting the params argument (Array<Local<Value>>) to a Rust vector.
+    // Convert params argument (Array<Local<Value>>) to Rust vector.
     let params = match v8::Local::<v8::Array>::try_from(args.get(3)) {
         Ok(params) => {
             (0..params.length()).fold(Vec::<v8::Global<v8::Value>>::new(), |mut acc, i| {
@@ -49,10 +51,10 @@ fn create_timeout(
         Err(_) => vec![],
     };
 
-    // Check if this is a recurring timeout.
+    // Check for recurring timeout.
     let repeat = args.get(4).to_rust_string_lossy(scope).as_str() == "true";
 
-    // Create a new async handle from the callback.
+    // Create async handle for the callback.
     let handle = JsRuntime::ev_set_handle(scope, AsyncHandle::Callback(callback));
 
     let timeout = Timeout {
@@ -75,7 +77,7 @@ fn remove_timeout(
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
-    // Get the timeout's ID and call the remove method.
+    // Get timeout's ID, and remove it.
     let id = args.get(0).int32_value(scope).unwrap() as usize;
     JsRuntime::ev_unset_timeout(scope, id);
 }
