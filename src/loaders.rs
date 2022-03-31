@@ -5,7 +5,7 @@ use crate::modules::CORE_MODULES;
 use anyhow::bail;
 use anyhow::Result;
 use colored::*;
-use path_clean::PathClean;
+use path_absolutize::*;
 use sha::sha1::Sha1;
 use sha::utils::Digest;
 use sha::utils::DigestExt;
@@ -14,9 +14,6 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use url::Url;
-
-#[cfg(target_os = "windows")]
-use regex::Regex;
 
 /// Defines the interface of a module loader.
 pub trait ModuleLoader {
@@ -30,14 +27,13 @@ static EXTENSIONS: &[&str] = &["js", "json"];
 pub struct FsModuleLoader;
 
 impl FsModuleLoader {
-    /// Cleans "messy" file-path strings.
-    fn clean(&self, path: PathBuf) -> String {
-        path.clean().into_os_string().into_string().unwrap()
+    /// Transforms PathBuf into String.
+    fn transform(&self, path: PathBuf) -> String {
+        path.into_os_string().into_string().unwrap()
     }
 
     /// Checks if path is a JSON file
-    fn is_json_import(&self, path: &str) -> bool {
-        let path = Path::new(path);
+    fn is_json_import(&self, path: &Path) -> bool {
         match path.extension() {
             Some(value) => value == "json",
             None => false,
@@ -49,93 +45,63 @@ impl FsModuleLoader {
         format!("export default JSON.parse(`{}`);", source)
     }
 
-    /// Resolves import as file.
-    fn resolve_as_file(&self, path: &Path) -> Result<PathBuf> {
+    /// Loads contents from file, and checks for JSON file ext.
+    fn load_source(&self, path: &Path) -> Result<ModuleSource> {
+        let source = fs::read_to_string(path)?;
+        let source = match self.is_json_import(path) {
+            true => self.wrap_json(source.as_str()),
+            false => source,
+        };
+
+        Ok(source)
+    }
+
+    /// Loads import as file.
+    fn load_as_file(&self, path: &Path) -> Result<ModuleSource> {
         // 1. Check if path is already a valid file.
         if path.is_file() {
-            return Ok(path.to_path_buf());
+            return self.load_source(path);
         }
 
         // 2. Check if we need to add an extension.
         for ext in EXTENSIONS {
-            let path = path.with_extension(ext);
+            let path = &path.with_extension(ext);
             if path.is_file() {
-                return Ok(path);
+                return self.load_source(path);
             }
         }
 
         // 3. Bail out with an error.
-        let path = self.clean(path.to_path_buf());
-        let err_message = format!("Module not found \"{}\"", path);
-
+        let err_message = format!("Module not found \"{}\"", path.display());
         bail!(generic_error(err_message));
     }
 
-    /// Resolves import as directory using the 'index.[ext]' convention.
-    fn resolve_as_directory(&self, path: &Path) -> Result<PathBuf> {
+    /// Loads import as directory using the 'index.[ext]' convention.
+    fn load_as_directory(&self, path: &Path) -> Result<ModuleSource> {
         for ext in EXTENSIONS {
-            let path = path.join(format!("index.{}", ext));
+            let path = &path.join(format!("index.{}", ext));
             if path.is_file() {
-                return Ok(path);
+                return self.load_source(path);
             }
         }
-
-        let path = self.clean(path.to_path_buf());
-        let err_message = format!("Module not found \"{}\"", path);
-
+        let err_message = format!("Module not found \"{}\"", path.display());
         bail!(generic_error(err_message));
     }
 }
 
 impl ModuleLoader for FsModuleLoader {
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath> {
-        // 1. Try resolve specifier as an absolute import.
+        // Resolve absolute import.
         if specifier.starts_with('/') {
-            let base_directory = &Path::new("/");
-            let path = base_directory.join(specifier);
-
-            return self
-                .resolve_as_file(&path)
-                .or_else(|_| self.resolve_as_directory(&path))
-                .map(|path| self.clean(path));
+            return Ok(self.transform(Path::new(specifier).absolutize()?.to_path_buf()));
         }
 
-        #[cfg(target_os = "windows")]
-        if Regex::new(r"^[a-zA-Z]:\\").unwrap().is_match(specifier) {
-            let path = PathBuf::from(specifier);
-
-            return self
-                .resolve_as_file(&path)
-                .or_else(|_| self.resolve_as_directory(&path))
-                .map(|path| self.clean(path));
-        }
-
-        // 2. Try resolve specifier as a relative import.
+        // Resolve relative import.
         let cwd = &env::current_dir().unwrap();
-        let mut base_dir = base.map(|v| Path::new(v).parent().unwrap()).unwrap_or(cwd);
+        let base = base.map(|v| Path::new(v).parent().unwrap()).unwrap_or(cwd);
 
         if specifier.starts_with("./") || specifier.starts_with("../") {
-            let win_target;
-            let target = if cfg!(target_os = "windows") {
-                #[allow(clippy::manual_strip)]
-                let t = if specifier.starts_with("./") {
-                    &specifier[2..]
-                } else {
-                    base_dir = base_dir.parent().unwrap();
-                    &specifier[3..]
-                };
-                win_target = t.replace('/', "\\");
-                &*win_target
-            } else {
-                specifier
-            };
-
-            let path = base_dir.join(target).clean();
-
-            return self
-                .resolve_as_file(&path)
-                .or_else(|_| self.resolve_as_directory(&path))
-                .map(|path| self.clean(path));
+            return Ok(self.transform(base.join(specifier).absolutize()?.to_path_buf()));
         }
 
         bail!(generic_error(format!("Module not found \"{}\"", specifier)))
@@ -143,13 +109,19 @@ impl ModuleLoader for FsModuleLoader {
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
         // Load source.
-        let source = fs::read_to_string(specifier)?;
-        let source = match self.is_json_import(specifier) {
-            true => self.wrap_json(source.as_str()),
-            false => source,
-        };
+        let path = Path::new(specifier);
+        let maybe_source = self
+            .load_as_file(&path)
+            .or_else(|_| self.load_as_directory(&path));
 
-        Ok(source)
+        if maybe_source.is_err() {
+            bail!(generic_error(format!(
+                "Module not found \"{}\"",
+                path.with_extension("js").display()
+            )));
+        }
+
+        Ok(maybe_source.unwrap())
     }
 }
 
@@ -231,135 +203,39 @@ impl ModuleLoader for CoreModuleLoader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_fs::prelude::*;
-    use assert_fs::TempDir;
-    use path_clean::PathClean;
-
-    /// Sets up the test environment.
-    #[cfg(target_family = "unix")]
-    fn setup(temp: &TempDir) {
-        let files = vec![
-            "./tests/001_file_import.js",
-            "./tests/core/002_file_import.js",
-            "./tests/core/003_file_import.js",
-            "./tests/core/core_2/004_file_import.js",
-        ];
-        files.iter().for_each(|filename| {
-            let path = PathBuf::from(filename).clean();
-            let path_file = temp.child(path);
-            path_file.touch().unwrap();
-        });
-    }
-
-    /// Sets up the test environment.
-    #[cfg(target_family = "windows")]
-    fn setup(temp: &TempDir) {
-        let files = vec![
-            ".\\tests\\001_file_import.js",
-            ".\\tests\\core\\002_file_import.js",
-            ".\\tests\\core\\003_file_import.js",
-            ".\\tests\\core\\core_2\\004_file_import.js",
-        ];
-        files.iter().for_each(|filename| {
-            let path = PathBuf::from(filename).clean();
-            let path_file = temp.child(path);
-            path_file.touch().unwrap();
-        });
-    }
 
     #[test]
-    #[cfg(target_family = "unix")]
-    fn file_import_resolution_with_relative_path() {
-        let temp = assert_fs::TempDir::new().unwrap();
-        setup(&temp);
-
-        // Transform path into an absolute path.
-        let make_absolute =
-            |filename: &str| format!("{}", temp.child(PathBuf::from(filename).clean()).display());
-
-        // Vec<(Base, Specifier, Expected_Result)>
+    fn test_resolve_local_imports() {
+        // Tests to run later on.
         let tests = vec![
             (
-                "./tests/core/002_file_import.js",
-                "./003_file_import.js",
-                "./tests/core/003_file_import.js",
+                None,
+                "/dev/core/tests/005_more_imports.js",
+                "/dev/core/tests/005_more_imports.js",
             ),
             (
-                "./tests/core/002_file_import.js",
-                "./core_2/004_file_import.js",
-                "./tests/core/core_2/004_file_import.js",
+                Some("/dev/core/tests/005_more_imports.js"),
+                "./006_more_imports.js",
+                "/dev/core/tests/006_more_imports.js",
             ),
             (
-                "./tests/core/002_file_import.js",
-                "../001_file_import.js",
-                "./tests/001_file_import.js",
+                Some("/dev/core/tests/005_more_imports.js"),
+                "../006_more_imports.js",
+                "/dev/core/006_more_imports.js",
+            ),
+            (
+                Some("/dev/core/tests/005_more_imports.js"),
+                "/dev/core/tests/006_more_imports.js",
+                "/dev/core/tests/006_more_imports.js",
             ),
         ];
 
+        // Run tests.
         let loader = FsModuleLoader::default();
 
         for (base, specifier, expected) in tests {
-            let import = loader.resolve(Some(&make_absolute(base)), specifier);
-            assert!(import.is_ok());
-            assert_eq!(import.unwrap(), make_absolute(expected));
-        }
-    }
-
-    #[test]
-    #[cfg(target_family = "unix")]
-    fn file_import_resolution_with_absolute_path() {
-        let temp = assert_fs::TempDir::new().unwrap();
-        setup(&temp);
-
-        // Transform path into an absolute path.
-        let make_absolute =
-            |filename: &str| format!("{}", temp.child(PathBuf::from(filename).clean()).display());
-
-        let loader = FsModuleLoader::default();
-        let import = loader.resolve(None, &make_absolute("./tests/core/002_file_import.js"));
-
-        assert!(import.is_ok());
-        assert_eq!(
-            import.unwrap(),
-            make_absolute("./tests/core/002_file_import.js")
-        );
-    }
-
-    #[test]
-    #[cfg(target_family = "windows")]
-    fn file_import_resolution_with_relative_path() {
-        let temp = assert_fs::TempDir::new().unwrap();
-        setup(&temp);
-
-        // Transform path into an absolute path.
-        let make_absolute =
-            |filename: &str| format!("{}", temp.child(PathBuf::from(filename).clean()).display());
-
-        // Vec<(Base, Specifier, Expected_Result)>
-        let tests = vec![
-            (
-                ".\\tests\\core\\002_file_import.js",
-                "./003_file_import.js",
-                ".\\tests\\core\\003_file_import.js",
-            ),
-            (
-                ".\\tests\\core\\002_file_import.js",
-                "./core_2/004_file_import.js",
-                ".\\tests\\core\\core_2\\004_file_import.js",
-            ),
-            (
-                ".\\tests\\core\\002_file_import.js",
-                "../001_file_import.js",
-                ".\\tests\\001_file_import.js",
-            ),
-        ];
-
-        let loader = FsModuleLoader::default();
-
-        for (base, specifier, expected) in tests {
-            let import = loader.resolve(Some(&make_absolute(base)), specifier);
-            assert!(import.is_ok());
-            assert_eq!(import.unwrap(), make_absolute(expected));
+            let path = loader.resolve(base, specifier).unwrap();
+            assert_eq!(path, expected);
         }
     }
 
