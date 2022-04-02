@@ -91,11 +91,14 @@ pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath>
     let loader: Box<dyn ModuleLoader> = {
         // Regex to match valid URLs based on VB.NET's URL validation.
         // http://urlregex.com/
-        let url_regex = Regex::new(r"(http(s)?://)?([\w-]+\.)+[\w-]+[.com]+(/[/?%&=]*)?").unwrap();
+        lazy_static! {
+            static ref URL_REGEX: Regex =
+                Regex::new(r"(http(s)?://)?([\w-]+\.)+[\w-]+[.com]+(/[/?%&=]*)?").unwrap();
+        }
 
         let is_core_module_import = CORE_MODULES.contains_key(specifier);
         let is_url_import =
-            url_regex.is_match(specifier) || (base.is_some() && url_regex.is_match(base.unwrap()));
+            URL_REGEX.is_match(specifier) || (base.is_some() && URL_REGEX.is_match(base.unwrap()));
 
         match (is_core_module_import, is_url_import) {
             (true, _) => Box::new(CoreModuleLoader),
@@ -111,12 +114,14 @@ pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath>
 /// Loads an import using the appropriate loader.
 pub fn load_import(specifier: &str) -> Result<ModuleSource> {
     // Windows absolute path regex validator.
-    let windows_regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
+    lazy_static! {
+        static ref WINDOWS_REGEX: Regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
+    }
 
     // Look the params and choose a loader.
     let loader: Box<dyn ModuleLoader> = match (
         CORE_MODULES.contains_key(specifier),
-        windows_regex.is_match(specifier),
+        WINDOWS_REGEX.is_match(specifier),
         Url::parse(specifier).is_ok(),
     ) {
         (true, _, _) => Box::new(CoreModuleLoader),

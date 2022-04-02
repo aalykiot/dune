@@ -5,7 +5,9 @@ use crate::modules::CORE_MODULES;
 use anyhow::bail;
 use anyhow::Result;
 use colored::*;
+use lazy_static::lazy_static;
 use path_absolutize::*;
+use regex::Regex;
 use sha::sha1::Sha1;
 use sha::utils::Digest;
 use sha::utils::DigestExt;
@@ -64,10 +66,12 @@ impl FsModuleLoader {
         }
 
         // 2. Check if we need to add an extension.
-        for ext in EXTENSIONS {
-            let path = &path.with_extension(ext);
-            if path.is_file() {
-                return self.load_source(path);
+        if path.extension().is_none() {
+            for ext in EXTENSIONS {
+                let path = &path.with_extension(ext);
+                if path.is_file() {
+                    return self.load_source(path);
+                }
             }
         }
 
@@ -91,8 +95,13 @@ impl FsModuleLoader {
 
 impl ModuleLoader for FsModuleLoader {
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath> {
+        // Windows platform full path regex.
+        lazy_static! {
+            static ref WINDOWS_REGEX: Regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
+        }
+
         // Resolve absolute import.
-        if specifier.starts_with('/') {
+        if specifier.starts_with('/') || WINDOWS_REGEX.is_match(specifier) {
             return Ok(self.transform(Path::new(specifier).absolutize()?.to_path_buf()));
         }
 
@@ -111,13 +120,19 @@ impl ModuleLoader for FsModuleLoader {
         // Load source.
         let path = Path::new(specifier);
         let maybe_source = self
-            .load_as_file(&path)
-            .or_else(|_| self.load_as_directory(&path));
+            .load_as_file(path)
+            .or_else(|_| self.load_as_directory(path));
+
+        // Append default extention (if none specified)
+        let path = match path.extension() {
+            Some(_) => path.into(),
+            None => path.with_extension("js"),
+        };
 
         if maybe_source.is_err() {
             bail!(generic_error(format!(
                 "Module not found \"{}\"",
-                path.with_extension("js").display()
+                path.display()
             )));
         }
 
@@ -235,12 +250,18 @@ mod tests {
 
         for (base, specifier, expected) in tests {
             let path = loader.resolve(base, specifier).unwrap();
+            let expected = if cfg!(target_os = "windows") {
+                String::from(Path::new(expected).absolutize().unwrap().to_str().unwrap())
+            } else {
+                expected.into()
+            };
+
             assert_eq!(path, expected);
         }
     }
 
     #[test]
-    fn url_import_resolution() {
+    fn test_resolve_url_imports() {
         // Group of tests to be run.
         let tests = vec![
             (
