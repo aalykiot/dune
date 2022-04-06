@@ -74,6 +74,34 @@ $ cd dune/ && cargo run -- <FILE>
 - `stat()`: retrieves statistics for the file.
 - `write(String|Uint8Array, [offset])`: writes data to the file.
 
+### Assert
+
+> The assertion API is copied from: https://assert-js.norbert.tech/
+
+- `true(value)`: asserts that value is equal to true.
+- `false(value)`: asserts that value is equal to false.
+- `instanceOf(value, class)`: asserts that value is an instance of specific class.
+- `integer(value)`: asserts that value is valid integer.
+- `number(value)`: asserts that value is valid number (integer, float).
+- `oddNumber(value)`: asserts that value is odd number.
+- `evenNumber(value)`: asserts that value is event number.
+- `greaterThan(value, limit)`: asserts that number is greater than.
+- `greaterThanOrEqual(value, limit)`: asserts that number is greater than or equal.
+- `lessThan(value, limit)`: asserts that number is less than.
+- `lessThanOrEqual(value, limit)`: asserts that number is less than or equal.
+- `string(value)`: asserts that value is valid string.
+- `boolean(value)`: asserts that value is valid boolean.
+- `equal(actual, expected)`: asserts that value is equal to expected value.
+- `objectEqual(actual, expected)`: asserts that value is equal to expected value.
+- `object(value)`: asserts that value is valid object.
+- `hasFunction(name, object)`: asserts that object has function.
+- `hasProperty(name, object)`: asserts that object has property.
+- `isFunction(fn)`: asserts that value is valid function.
+- `array(value)`: asserts that value is valid array.
+- `count(expected, arrayValue)`: asserts that array have specific number of elements.
+- `notEmpty(arrayValue)`: asserts that array is not empty.
+- `throws(fn, error)`: asserts that function throws expected exception.
+
 ## License
 
 This project is licensed under the <a href="./LICENSE.md">MIT</a> license.

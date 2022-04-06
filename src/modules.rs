@@ -18,6 +18,8 @@ lazy_static! {
             ("events", include_str!("../lib/events.js")),
             ("process", include_str!("../lib/process.js")),
             ("timers", include_str!("../lib/timers.js")),
+            ("assert", include_str!("../lib/assert.js")),
+            ("util", include_str!("../lib/util.js")),
         ];
         HashMap::from_iter(modules.into_iter())
     };
