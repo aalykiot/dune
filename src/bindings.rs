@@ -1,3 +1,4 @@
+use crate::file;
 use crate::process;
 use crate::stdio;
 use crate::timers;
@@ -13,6 +14,7 @@ lazy_static! {
         let bindings: Vec<(&'static str, BindingInitFn)> = vec![
             ("stdio", stdio::initialize),
             ("timer_wrap", timers::initialize),
+            ("fs_wrap", file::initialize),
         ];
         HashMap::from_iter(bindings.into_iter())
     };
