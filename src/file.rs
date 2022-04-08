@@ -15,7 +15,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     v8::Global::new(scope, target)
 }
 
-/// Reads the entire contents of a file into an ArrayBuffer.
+/// Reads the entire contents of a file.
 fn read_sync(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
@@ -38,7 +38,7 @@ fn read_sync(
     }
 }
 
-/// Reads a chunk of a file (as bytes) into an ArrayBuffer.
+/// Reads a chunk of a file (as bytes).
 fn read_chunk_sync(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,

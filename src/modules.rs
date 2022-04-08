@@ -20,6 +20,7 @@ lazy_static! {
             ("timers", include_str!("../lib/timers.js")),
             ("assert", include_str!("../lib/assert.js")),
             ("util", include_str!("../lib/util.js")),
+            ("text-encoding", include_str!("../lib/text-encoding.js")),
         ];
         HashMap::from_iter(modules.into_iter())
     };
