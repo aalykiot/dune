@@ -7,7 +7,9 @@ use std::io::SeekFrom;
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
+
     set_function_to(scope, target, "readSync", read_sync);
+    set_function_to(scope, target, "writeSync", write_sync);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
@@ -67,6 +69,37 @@ fn read_sync(
             throw_exception(scope, &e.to_string());
             return;
         }
+    }
+}
+
+/// Writes contents to a file.
+fn write_sync(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    // Get file path.
+    let path = args.get(0).to_rust_string_lossy(scope);
+    // Get data as ArrayBuffer.
+    let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
+
+    // Open file.
+    let mut file = match fs::File::create(path) {
+        Ok(file) => file,
+        Err(e) => {
+            throw_exception(scope, &e.to_string());
+            return;
+        }
+    };
+
+    let mut buffer = vec![0; data.byte_length()];
+
+    data.copy_contents(&mut buffer);
+
+    // Write buffer to file.
+    if let Err(e) = file.write_all(&buffer) {
+        throw_exception(scope, &e.to_string());
+        return;
     }
 }
 
