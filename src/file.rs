@@ -7,39 +7,14 @@ use std::io::SeekFrom;
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
-
     set_function_to(scope, target, "readSync", read_sync);
-    set_function_to(scope, target, "readChunkSync", read_chunk_sync);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
 }
 
-/// Reads the entire contents of a file.
-fn read_sync(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
-    // Get source path.
-    let path = args.get(0).to_rust_string_lossy(scope);
-
-    match fs::read(path) {
-        Ok(buffer) => {
-            // Create new backing store from Vec<u8>.
-            let store = buffer.into_boxed_slice();
-            let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store).make_shared();
-            // Initialize ArrayBuffer.
-            let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
-
-            rv.set(bytes.into());
-        }
-        Err(e) => throw_exception(scope, &e.to_string()),
-    }
-}
-
 /// Reads a chunk of a file (as bytes).
-fn read_chunk_sync(
+fn read_sync(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
