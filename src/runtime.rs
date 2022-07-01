@@ -17,11 +17,11 @@ use std::rc::Rc;
 use std::sync::Once;
 
 /// Completion type of an asynchronous operation.
-pub enum AsyncHandle {
+pub enum JsAsyncHandle {
     // JavaScript callback.
     Callback(v8::Global<v8::Function>, Vec<v8::Global<v8::Value>>),
     // JavaScript promise.
-    Promise(v8::PromiseResolver, Option<v8::Global<v8::Value>>),
+    Promise(v8::Global<v8::PromiseResolver>),
 }
 
 /// The state to be stored per v8 isolate.
@@ -33,7 +33,7 @@ pub struct JsRuntimeState {
     /// A handle to the runtime's event-loop.
     pub handle: LoopHandle,
     /// Holds JS pending async handles scheduled by the event-loop.
-    pub pending_js_tasks: Vec<AsyncHandle>,
+    pub pending_js_tasks: Vec<JsAsyncHandle>,
 }
 
 pub struct JsRuntime {
@@ -191,45 +191,41 @@ impl JsRuntime {
         }
     }
 
-    /// Runs all the pending js tasks.
+    /// Runs all the pending javascript tasks.
     fn run_pending_js_tasks(&mut self) {
-        // Get a handle-scope and a ref to the runtime's state.
+        // Get a handle-scope and a reference to the runtime's state.
         let scope = &mut self.handle_scope();
         let state_rc = Self::state(scope);
 
-        let undefined = v8::undefined(scope).into();
-
-        // Note: The reason we move all the async handles to a separate vector
-        // is because we need to drop the `state` borrow before we start iterating
-        // through all the handles to avoid borrowing panics at runtime.
+        // NOTE: The reason we move all the async handles to a separate vec is because
+        // we need to drop the `state` borrow before we start iterating through all
+        // the handles to avoid borrowing panics at runtime.
         //
         // Example: setTimeout schedules another setTimeout.
         //
-        let tasks: Vec<AsyncHandle> = state_rc
-            .borrow_mut()
-            .pending_js_tasks
-            .drain(..)
-            .map(|handle| handle)
-            .collect();
+        let tasks: Vec<JsAsyncHandle> = state_rc.borrow_mut().pending_js_tasks.drain(..).collect();
+        let undefined = v8::undefined(scope).into();
 
-        tasks.iter().for_each(|handle| match handle {
-            AsyncHandle::Callback(callback, params) => {
-                // Create local v8 handles for the callback and the params.
-                let callback = v8::Local::new(scope, callback);
-                let args: Vec<v8::Local<v8::Value>> = params
-                    .iter()
-                    .map(|arg| v8::Local::new(scope, arg))
-                    .collect();
+        for task in tasks {
+            match task {
+                JsAsyncHandle::Callback(callback, params) => {
+                    // Create local v8 handles for the callback and the params.
+                    let callback = v8::Local::new(scope, callback);
+                    let args: Vec<v8::Local<v8::Value>> = params
+                        .iter()
+                        .map(|arg| v8::Local::new(scope, arg))
+                        .collect();
 
-                // Run callback.
-                callback.call(scope, undefined, args.as_slice());
+                    // Run callback.
+                    callback.call(scope, undefined, &args);
+                }
+                _ => unimplemented!(),
             }
-            _ => unimplemented!(),
-        });
+        }
     }
 }
 
-// == State management specific methods. ==
+// --- State management specific methods. ---
 
 impl JsRuntime {
     /// Returns the runtime state stored in the given isolate.

@@ -1,5 +1,5 @@
 use crate::bindings::set_function_to;
-use crate::runtime::AsyncHandle;
+use crate::runtime::JsAsyncHandle;
 use crate::runtime::JsRuntime;
 use rusty_v8 as v8;
 
@@ -52,7 +52,7 @@ fn create_timeout(
             state_rc
                 .borrow_mut()
                 .pending_js_tasks
-                .push(AsyncHandle::Callback(callback, params));
+                .push(JsAsyncHandle::Callback(callback, params));
         }
     });
 

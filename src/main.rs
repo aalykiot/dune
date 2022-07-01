@@ -25,8 +25,8 @@ fn main() {
 
     // Run as ES module, if filename is specified.
     if let Some(filename) = args.get(1) {
-        // The following code tries to resolve the given filename to an
-        // absolute path. If the first time fails we will append `./` to
+        // NOTE: The following code tries to resolve the given filename
+        // to an absolute path. If the first time fails we will append `./` to
         // it first, and retry the resolution in case the user forgot to specify it.
         let filename = unwrap_or_exit(
             resolve_import(None, filename)
