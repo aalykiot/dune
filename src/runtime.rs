@@ -2,31 +2,26 @@ use crate::bindings;
 use crate::errors::generic_error;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
+use crate::event_loop::EventLoop;
+use crate::event_loop::LoopHandle;
 use crate::hooks::module_resolve_cb;
 use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
 use crate::modules::resolve_import;
 use crate::modules::ModuleMap;
-use crate::timers::Timeout;
 use anyhow::bail;
 use anyhow::Error;
-use nanoid::nanoid;
 use rusty_v8 as v8;
 use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Once;
-use std::time::Duration;
-use std::time::Instant;
 
 /// Completion type of an asynchronous operation.
-#[allow(dead_code)]
 pub enum AsyncHandle {
-    /// JavaScript promise.
-    Promise(v8::Global<v8::PromiseResolver>),
-    /// JavaScript callback.
-    Callback(v8::Global<v8::Function>),
+    // JavaScript callback.
+    Callback(v8::Global<v8::Function>, Vec<v8::Global<v8::Value>>),
+    // JavaScript promise.
+    Promise(v8::PromiseResolver, Option<v8::Global<v8::Value>>),
 }
 
 /// The state to be stored per v8 isolate.
@@ -35,20 +30,19 @@ pub struct JsRuntimeState {
     pub context: v8::Global<v8::Context>,
     /// Holds information about resolved ES modules.
     pub modules: ModuleMap,
-    /// The number of events keeping the event-loop alive.
-    pub(crate) pending_events: usize,
-    /// Holds the timers.
-    pub(crate) timers: BTreeMap<Instant, Timeout>,
-    /// Holds timers that are removed manually by JavaScript.
-    pub(crate) timers_bin: Vec<usize>,
-    /// Holds completion handles for async operations.
-    pub(crate) async_handles: HashMap<String, AsyncHandle>,
+    /// A handle to the runtime's event-loop.
+    pub handle: LoopHandle,
+    /// Holds JS pending async handles scheduled by the event-loop.
+    pub pending_js_tasks: Vec<AsyncHandle>,
 }
 
 pub struct JsRuntime {
     /// A VM instance with its own heap.
     /// https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html
     isolate: v8::OwnedIsolate,
+    /// The event-loop instance that takes care of polling for I/O and scheduling callbacks
+    /// to be run based on different sources of events.
+    pub event_loop: EventLoop,
 }
 
 impl JsRuntime {
@@ -72,23 +66,26 @@ impl JsRuntime {
         isolate.set_capture_stack_trace_for_uncaught_exceptions(true, 10);
 
         let context = {
-            let scope = &mut v8::HandleScope::new(&mut isolate);
+            let scope = &mut v8::HandleScope::new(&mut *isolate);
             let context = bindings::create_new_context(scope);
             v8::Global::new(scope, context)
         };
+
+        let event_loop = EventLoop::new();
 
         // Store state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
             context,
             modules: ModuleMap::default(),
-            pending_events: 0,
-            timers: BTreeMap::new(),
-            timers_bin: vec![],
-            async_handles: HashMap::new(),
+            handle: event_loop.handle(),
+            pending_js_tasks: Vec::new(),
         })));
 
-        let mut runtime = JsRuntime { isolate };
+        let mut runtime = JsRuntime {
+            isolate,
+            event_loop,
+        };
 
         // Initialize core environment. (see lib/main.js)
         let main = include_str!("../lib/main.js");
@@ -131,7 +128,7 @@ impl JsRuntime {
         }
     }
 
-    /// Executes JavaScript ES modules.
+    /// Executes JavaScript code as ES module.
     pub fn execute_module(
         &mut self,
         filename: &str,
@@ -180,11 +177,59 @@ impl JsRuntime {
             )),
         }
     }
+
+    /// Runs a single tick of the event-loop.
+    pub fn poll_event_loop(&mut self) {
+        self.event_loop.poll();
+        self.run_pending_js_tasks();
+    }
+
+    /// Runs the event-loop until no more pending events exists.
+    pub fn run_event_loop(&mut self) {
+        while self.event_loop.has_pending_events() {
+            self.poll_event_loop();
+        }
+    }
+
+    /// Runs all the pending js tasks.
+    fn run_pending_js_tasks(&mut self) {
+        // Get a handle-scope and a ref to the runtime's state.
+        let scope = &mut self.handle_scope();
+        let state_rc = Self::state(scope);
+
+        let undefined = v8::undefined(scope).into();
+
+        // Note: The reason we move all the async handles to a separate vector
+        // is because we need to drop the `state` borrow before we start iterating
+        // through all the handles to avoid borrowing panics at runtime.
+        //
+        // Example: setTimeout schedules another setTimeout.
+        //
+        let tasks: Vec<AsyncHandle> = state_rc
+            .borrow_mut()
+            .pending_js_tasks
+            .drain(..)
+            .map(|handle| handle)
+            .collect();
+
+        tasks.iter().for_each(|handle| match handle {
+            AsyncHandle::Callback(callback, params) => {
+                // Create local v8 handles for the callback and the params.
+                let callback = v8::Local::new(scope, callback);
+                let args: Vec<v8::Local<v8::Value>> = params
+                    .iter()
+                    .map(|arg| v8::Local::new(scope, arg))
+                    .collect();
+
+                // Run callback.
+                callback.call(scope, undefined, args.as_slice());
+            }
+            _ => unimplemented!(),
+        });
+    }
 }
 
-// ----------------------------------------------------
-// State management implementation.
-// ----------------------------------------------------
+// == State management specific methods. ==
 
 impl JsRuntime {
     /// Returns the runtime state stored in the given isolate.
@@ -212,162 +257,6 @@ impl JsRuntime {
     pub fn context(&mut self) -> v8::Global<v8::Context> {
         let state = self.get_state();
         let state = state.borrow();
-
         state.context.clone()
-    }
-}
-
-// ----------------------------------------------------
-// Event-Loop specific methods.
-// ----------------------------------------------------
-
-impl JsRuntime {
-    /// Registers an async handle to the event-loop.
-    pub fn ev_set_handle(isolate: &v8::Isolate, handle: AsyncHandle) -> String {
-        // Get a reference to the state.
-        let state = Self::state(isolate);
-        let mut state = state.borrow_mut();
-
-        // Create a UUID value as the key.
-        let key = nanoid!();
-        state.async_handles.insert(key.clone(), handle);
-
-        key
-    }
-
-    /// Removes an async handle from the event-loop.
-    pub fn ev_unset_handle(isolate: &v8::Isolate, id: &str) {
-        // Get a reference to the state.
-        let state = Self::state(isolate);
-        let mut state = state.borrow_mut();
-
-        // Remove handle from the hash-map.
-        state.async_handles.remove(id);
-    }
-
-    /// Registers a new timeout to the timers shorted list.
-    pub fn ev_set_timeout(isolate: &v8::Isolate, timeout: Timeout) {
-        // Get a reference to the state.
-        let state = Self::state(isolate);
-        let mut state = state.borrow_mut();
-
-        // Calculate the next time the timeout will go OFF!
-        let now = Instant::now();
-        let duration = now + Duration::from_millis(timeout.delay);
-
-        state.timers.insert(duration, timeout);
-
-        // Increase pending events.
-        state.pending_events += 1;
-    }
-
-    /// Removes a timeout from the event-loop.
-    pub fn ev_unset_timeout(isolate: &v8::Isolate, id: usize) {
-        // Get a reference to the state.
-        let state = Self::state(isolate);
-
-        state.borrow_mut().timers_bin.push(id);
-
-        // Find the timestamp of the timeout we want to remove.
-        let timestamp = match state.borrow().timers.iter().find(|(_, t)| t.id == id) {
-            Some((t, _)) => *t,
-            None => return,
-        };
-
-        // Remove timeout from the list.
-        let maybe_timeout = state.borrow_mut().timers.remove(&timestamp);
-
-        if let Some(timeout) = maybe_timeout {
-            Self::ev_unset_handle(isolate, &timeout.handle);
-            state.borrow_mut().pending_events -= 1;
-        }
-    }
-
-    /// Processes all the expired timeouts.
-    fn ev_run_timers(&mut self) {
-        // Get runtime's handle scope.
-        let scope = &mut self.handle_scope();
-        let undefined = v8::undefined(scope).into();
-
-        // Get a reference to the runtime's state.
-        let state = Self::state(scope);
-
-        // Find the timeouts we have to process.
-        let timestamps =
-            state
-                .borrow()
-                .timers
-                .range(..=Instant::now())
-                .fold(vec![], |mut acc, (t, _)| {
-                    acc.push(*t);
-                    acc
-                });
-
-        timestamps.iter().for_each(|key| {
-            // Removing the timeout from the list is an acceptable approach
-            // since if it's an one-off timeout it will be removed anyway and,
-            // if it's a recurring will be rescheduled with a different timestamp key.
-            let timeout = match state.borrow_mut().timers.remove(key) {
-                Some(timeout) => timeout,
-                None => return,
-            };
-
-            // Create a local v8 handle for each argument.
-            let args: Vec<v8::Local<v8::Value>> = timeout
-                .args
-                .iter()
-                .map(|arg| v8::Local::new(scope, arg))
-                .collect();
-
-            // Get timeout's completion handle.
-            let handle = {
-                let state = state.borrow();
-                let handle = state.async_handles.get(&timeout.handle).unwrap();
-                let handle = match &handle {
-                    AsyncHandle::Callback(cb) => cb,
-                    _ => unreachable!(),
-                };
-                handle.clone()
-            };
-
-            let callback = v8::Local::new(scope, handle);
-
-            // Run timeout's callback.
-            callback.call(scope, undefined, args.as_slice());
-
-            // We'll decrement the pending events count for every timeout
-            // and let the `ev_set_timeout` method  later handle the
-            // increments for the recurring ones.
-            state.borrow_mut().pending_events -= 1;
-
-            // The second part of the condition tries to prevent re-setting recurring
-            // timers that unregister themselves while running their callback.
-            if timeout.repeat && !state.borrow().timers_bin.contains(&timeout.id) {
-                Self::ev_set_timeout(scope, timeout);
-                return;
-            }
-
-            // Remove handle, if it's a one-off timer.
-            Self::ev_unset_handle(scope, &timeout.handle);
-        });
-
-        // Clean-up timers bin.
-        state.borrow_mut().timers_bin.clear();
-    }
-
-    /// Runs a single tick of the event-loop.
-    pub fn poll_event_loop(&mut self) {
-        // Timers phase.
-        self.ev_run_timers();
-    }
-
-    /// Runs the event-loop until no more pending events exists.
-    pub fn run_event_loop(&mut self) {
-        // Get runtime's state.
-        let state = self.get_state();
-
-        while state.borrow().pending_events > 0 {
-            self.poll_event_loop();
-        }
     }
 }

@@ -255,7 +255,6 @@ pub fn start(mut runtime: JsRuntime) {
                     Ok(value) => {
                         let scope = &mut runtime.handle_scope();
                         let value = value.open(scope);
-
                         println!("{}", value.to_rust_string_lossy(scope));
                     }
                     Err(e) => eprintln!("{}", e),

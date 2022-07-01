@@ -24,6 +24,7 @@ dirs = "4.0.0"
 path-absolutize = "3.0.12"
 ureq = { version = "2.4.0", features = ["charset"] }
 phf = { version = "0.10.1", features = ["macros"] }
+anycollections = "0.2.0"
 
 [dev-dependencies]
 assert_fs = "1.0.7"

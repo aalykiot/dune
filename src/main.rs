@@ -1,5 +1,6 @@
 mod bindings;
 mod errors;
+mod event_loop;
 mod file;
 mod hooks;
 mod loaders;

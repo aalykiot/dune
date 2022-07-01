@@ -159,7 +159,6 @@ pub fn initialize<'s>(
                 Some(initializer) => {
                     let binding = initializer(scope);
                     let binding = v8::Local::new(scope, binding);
-
                     rv.set(binding.into());
                 }
                 // Throw exception.
@@ -167,7 +166,6 @@ pub fn initialize<'s>(
                     let message = format!("No such module: \"{}\"", request);
                     let message = v8::String::new(scope, &message).unwrap();
                     let exception = v8::Exception::error(scope, message);
-
                     scope.throw_exception(exception);
                 }
             };
