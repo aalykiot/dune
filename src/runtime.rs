@@ -15,13 +15,14 @@ use rusty_v8 as v8;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
+use v8::Local;
 
 /// Completion type of an asynchronous operation.
 pub enum JsAsyncHandle {
     // JavaScript callback.
     Callback(v8::Global<v8::Function>, Vec<v8::Global<v8::Value>>),
     // JavaScript promise.
-    Promise(v8::Global<v8::PromiseResolver>),
+    Promise(v8::Global<v8::PromiseResolver>, v8::Global<v8::Value>, bool),
 }
 
 /// The state to be stored per v8 isolate.
@@ -219,7 +220,17 @@ impl JsRuntime {
                     // Run callback.
                     callback.call(scope, undefined, &args);
                 }
-                _ => unimplemented!(),
+                JsAsyncHandle::Promise(promise, value, is_success) => {
+                    // Create local v8 handles for the promise and the value.
+                    let promise = Local::new(scope, promise);
+                    let value = Local::new(scope, value);
+
+                    if is_success {
+                        promise.resolve(scope, value);
+                    } else {
+                        promise.reject(scope, value);
+                    }
+                }
             }
         }
     }

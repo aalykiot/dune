@@ -65,10 +65,7 @@ fn read_sync(
 
             rv.set(bytes.into());
         }
-        Err(e) => {
-            throw_exception(scope, &e.to_string());
-            return;
-        }
+        Err(e) => throw_exception(scope, &e.to_string()),
     }
 }
 
@@ -99,12 +96,11 @@ fn write_sync(
     // Write buffer to file.
     if let Err(e) = file.write_all(&buffer) {
         throw_exception(scope, &e.to_string());
-        return;
     }
 }
 
 fn throw_exception(scope: &mut v8::HandleScope, message: &str) {
-    let message = v8::String::new(scope, &message).unwrap();
+    let message = v8::String::new(scope, message).unwrap();
     let exception = v8::Exception::error(scope, message);
     scope.throw_exception(exception);
 }

@@ -89,12 +89,7 @@ impl EventLoop {
 
     fn ev_remove_timer(&mut self, index: &Index) {
         self.timers_callbacks.remove(index);
-        self.timers_queue = self
-            .timers_queue
-            .iter()
-            .filter(|(_, v)| *v != index)
-            .map(|(k, v)| (*k, *v))
-            .collect();
+        self.timers_queue.retain(|_, v| *v != *index);
     }
 }
 
