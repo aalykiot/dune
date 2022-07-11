@@ -57,7 +57,8 @@ impl JsRuntime {
 
         let flags = concat!(
             " --harmony-import-assertions",
-            " --harmony-top-level-await false"
+            " --turbo_fast_api_calls",
+            " --no-validate-asm"
         );
         v8::V8::set_flags_from_string(flags);
 
@@ -88,7 +89,7 @@ impl JsRuntime {
         };
 
         // Initialize core environment. (see lib/main.js)
-        let main = include_str!("../lib/main.js");
+        let main = include_str!("./js/main.js");
         unwrap_or_exit(runtime.execute_module("dune:environment/main", Some(main)));
 
         runtime
