@@ -11,11 +11,10 @@ use crate::modules::resolve_import;
 use crate::modules::ModuleMap;
 use anyhow::bail;
 use anyhow::Error;
-use rusty_v8 as v8;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
-use v8::Local;
+use v8;
 
 /// Completion type of an asynchronous operation.
 pub enum JsAsyncHandle {
@@ -222,8 +221,8 @@ impl JsRuntime {
                 }
                 JsAsyncHandle::Promise(promise, value, is_success) => {
                     // Create local v8 handles for the promise and the value.
-                    let promise = Local::new(scope, promise);
-                    let value = Local::new(scope, value);
+                    let promise = v8::Local::new(scope, promise);
+                    let value = v8::Local::new(scope, value);
 
                     if is_success {
                         promise.resolve(scope, value);

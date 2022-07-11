@@ -1,7 +1,7 @@
 use crate::errors::unwrap_or_exit;
 use crate::modules::resolve_import;
 use crate::runtime::JsRuntime;
-use rusty_v8 as v8;
+use v8;
 
 /// Called during Module::instantiate_module.
 /// https://docs.rs/rusty_v8/latest/rusty_v8/type.ResolveModuleCallback.html

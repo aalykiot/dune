@@ -9,9 +9,9 @@ use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
 use crate::bindings::BINDINGS;
 use lazy_static::lazy_static;
-use rusty_v8 as v8;
 use std::collections::HashMap;
 use std::env;
+use v8;
 
 lazy_static! {
     static ref VERSIONS: HashMap<&'static str, &'static str> = {

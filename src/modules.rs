@@ -7,9 +7,9 @@ use crate::runtime::JsRuntime;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use regex::Regex;
-use rusty_v8 as v8;
 use std::collections::HashMap;
 use url::Url;
+use v8;
 
 lazy_static! {
     pub static ref CORE_MODULES: HashMap<&'static str, &'static str> = {

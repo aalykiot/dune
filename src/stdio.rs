@@ -1,7 +1,7 @@
 use crate::bindings::set_function_to;
-use rusty_v8 as v8;
 use std::io;
 use std::io::Write;
+use v8;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
