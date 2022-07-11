@@ -12,10 +12,11 @@ const BUFFER_SIZE = 40 * 1024; // 40KB bytes buffer when reading.
 /**
  * Reads synchronously the entire contents of a file.
  *
- * @param {string} path - the path of the file.
- * @param {string} encoding  - the encoding used when decoding the data.
+ * @param {string} path
+ * @param {string} encoding
  * @returns {string|Uint8Array}
  */
+
 function readFileSync(path, encoding) {
   // Buffer to fill the file bytes into.
   let data = new Uint8Array([]);
@@ -43,10 +44,11 @@ function readFileSync(path, encoding) {
 /**
  * Writes synchronously contents to a file.
  *
- * @param {*} path - the path of the file.
- * @param {string|Uint8Array} data - the data that will be written to the file.
- * @param {string} encoding - the encoding used when encoding the data.
+ * @param {*} path
+ * @param {string|Uint8Array} data
+ * @param {string} encoding
  */
+
 function writeFileSync(path, data, encoding = 'utf8') {
   // Check the data argument type.
   if (!(data instanceof Uint8Array) && typeof data !== 'string') {

@@ -1,9 +1,10 @@
 /**
- * Clones a provided function.
+ * Clones the provided function.
  *
- * @param {Function} fn - the function we want to clone.
+ * @param {Function} fn
  * @returns {Function}
  */
+
 export function cloneFunction(fn) {
   let that = fn;
   let temp = function temporary() {

@@ -8,9 +8,10 @@
 /**
  * Returns a string with as many spaces as the parameter specified.
  *
- * @param {string} amount - the length of the returned string.
+ * @param {string} amount
  * @returns {string}
  */
+
 function pre(amount) {
   return ' '.repeat(amount);
 }
@@ -18,11 +19,13 @@ function pre(amount) {
 /**
  * Transforms a JavaScript object/primitive into a string.
  *
- * @param {*} value - the value we want to stringify.
- * @param {WeakSet} seen - used to identify circular references in objects.
- * @param {number} depth - how deep we are in an object traversal.
- * @returns {string}
+ * @param {*} value
+ * @param {WeakSet} seen
+ * @param {Number} depth
+ * @returns {String}
+ * @public
  */
+
 function stringify(value, seen, depth = 0) {
   switch (typeof value) {
     case 'string':
@@ -49,9 +52,10 @@ function stringify(value, seen, depth = 0) {
 /**
  * Checks if given object is an Array.
  *
- * @param {*} o - the object we need to inspect.
- * @returns {bool}
+ * @param {*} o
+ * @returns {Bool}
  */
+
 function isArray(o) {
   return Array.isArray(o);
 }
@@ -59,11 +63,12 @@ function isArray(o) {
 /**
  * Stringifies JavaScript arrays.
  *
- * @param {*} value - the value we want to stringify.
- * @param {WeakSet} seen - used to identify circular references in objects.
- * @param {number} depth - the depth we're in on object traversal.
- * @returns {string}
+ * @param {*} value
+ * @param {WeakSet} seen
+ * @param {Number} depth
+ * @returns {String}
  */
+
 function stringifyArray(value, seen, depth) {
   const entries = [];
   for (const elem of value) {
@@ -85,9 +90,10 @@ function stringifyArray(value, seen, depth) {
 /**
  * Checks if given object is a TypedArray.
  *
- * @param {*} o - the object we need to inspect.
+ * @param {*} o
  * @returns {bool}
  */
+
 function isTypedArray(o) {
   switch (Object.prototype.toString.call(o)) {
     case '[object Int8Array]':
@@ -108,9 +114,10 @@ function isTypedArray(o) {
 /**
  * Stringifies JavaScript TypedArrays.
  *
- * @param {*} o - the typed-array we need to stringify.
+ * @param {*} o
  * @returns {string}
  */
+
 function stringifyTypedArray(o) {
   const type = Object.prototype.toString
     .call(o)
@@ -122,9 +129,10 @@ function stringifyTypedArray(o) {
 /**
  * Checks if given object is a Date object.
  *
- * @param {*} o - the object we need to inspect.
+ * @param {*} o
  * @returns {bool}
  */
+
 function isDate(o) {
   return Object.prototype.toString.call(o) === '[object Date]';
 }
@@ -132,9 +140,10 @@ function isDate(o) {
 /**
  * Stringifies JavaScript Date objects.
  *
- * @param {*} o the date object we need to stringify.
+ * @param {*} o
  * @returns {string}
  */
+
 function stringifyDate(o) {
   return o.toISOString();
 }
@@ -142,9 +151,10 @@ function stringifyDate(o) {
 /**
  * Checks if given object is a RexExp.
  *
- * @param {*} o - the object we need to inspect.
+ * @param {*} o
  * @returns {bool}
  */
+
 function isRexExp(o) {
   return Object.prototype.toString.call(o) === '[object RegExp]';
 }
@@ -152,9 +162,10 @@ function isRexExp(o) {
 /**
  * Stringifies JavaScript RexExp objects.
  *
- * @param {*} o the regexp object we need to stringify.
+ * @param {*} o
  * @returns {string}
  */
+
 function stringifyRexExp(o) {
   return o.toString();
 }
@@ -162,7 +173,7 @@ function stringifyRexExp(o) {
 /**
  * Checks if given object is an Error object.
  *
- * @param {*} o - the object we need to inspect.
+ * @param {*} o
  * @returns {bool}
  */
 function isError(o) {
@@ -172,9 +183,10 @@ function isError(o) {
 /**
  * Stringifies JavaScript Error objects.
  *
- * @param {*} o the error object we need to stringify.
+ * @param {*} o
  * @returns {string}
  */
+
 function stringifyError(o) {
   return o.stack;
 }
@@ -182,11 +194,12 @@ function stringifyError(o) {
 /**
  * Specifically stringifies JavaScript objects.
  *
- * @param {*} value - the value we want to stringify.
- * @param {WeakSet} seen - used to identify circular references in objects.
- * @param {number} depth - how deep we are in an object traversal.
+ * @param {*} value
+ * @param {WeakSet} seen
+ * @param {number} depth
  * @returns {string}
  */
+
 function stringifyObject(value, seen = new WeakSet(), depth) {
   // Stringify Array.
   if (isArray(value)) {

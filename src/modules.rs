@@ -9,19 +9,18 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::HashMap;
 use url::Url;
-use v8;
 
 lazy_static! {
     pub static ref CORE_MODULES: HashMap<&'static str, &'static str> = {
         let modules = vec![
-            ("console", include_str!("../lib/console.js")),
-            ("events", include_str!("../lib/events.js")),
-            ("process", include_str!("../lib/process.js")),
-            ("timers", include_str!("../lib/timers.js")),
-            ("assert", include_str!("../lib/assert.js")),
-            ("util", include_str!("../lib/util.js")),
-            ("text-encoding", include_str!("../lib/text-encoding.js")),
-            ("fs", include_str!("../lib/fs.js")),
+            ("console", include_str!("./js/console.js")),
+            ("events", include_str!("./js/events.js")),
+            ("process", include_str!("./js/process.js")),
+            ("timers", include_str!("./js/timers.js")),
+            ("assert", include_str!("./js/assert.js")),
+            ("util", include_str!("./js/util.js")),
+            ("text-encoding", include_str!("./js/text-encoding.js")),
+            ("fs", include_str!("./js/fs.js")),
         ];
         HashMap::from_iter(modules.into_iter())
     };

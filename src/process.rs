@@ -11,7 +11,6 @@ use crate::bindings::BINDINGS;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::env;
-use v8;
 
 lazy_static! {
     static ref VERSIONS: HashMap<&'static str, &'static str> = {

@@ -3,7 +3,6 @@ use colored::*;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fmt::Display;
-use v8;
 
 /// A simple error type that lets the creator specify both the error message and
 /// the error class name.

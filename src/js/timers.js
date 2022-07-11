@@ -15,17 +15,19 @@ let nextId = 1;
  *
  * @type {Map<number, number>}
  */
-export const activeTimers = new Map();
+
+const activeTimers = new Map();
 
 /**
- * Sets a timer which executes a function or specified piece of code once the timer expires.
+ * Sets a timer which executes a function or specified piece of code once the
+ * timer expires.
  *
- * @param {Function} callback - a function to be executed after the timer expires.
- * @param {Number} delay - the time, in milliseconds that the timer should wait before the specified function or code is executed.
- * @param {Array|undefined} args - additional arguments which are passed through to the function.
- *
+ * @param {Function} callback
+ * @param {Number} delay
+ * @param {Array|undefined} args
  * @returns {Number}
  */
+
 function setTimeout(callback, delay, ...args) {
   // Coalesce to number or NaN.
   delay *= 1;
@@ -44,10 +46,12 @@ function setTimeout(callback, delay, ...args) {
 }
 
 /**
- * The global clearTimeout() method cancels a timeout previously established by calling setTimeout().
+ * The global clearTimeout() method cancels a timeout previously established
+ * by calling setTimeout().
  *
- * @param {Number} id - the identifier of the timeout you want to cancel.
+ * @param {Number} id
  */
+
 function clearTimeout(id) {
   if (typeof id !== 'number') {
     throw new TypeError(`The "timeout" argument must be of type number.`);
@@ -59,14 +63,15 @@ function clearTimeout(id) {
 }
 
 /**
- * Repeatedly calls a function or executes a code snippet, with a fixed time delay between each call.
+ * Repeatedly calls a function or executes a code snippet, with a fixed time
+ * delay between each call.
  *
- * @param {Function} callback - a function to be executed every delay milliseconds.
- * @param {Number} delay - the time, in milliseconds, the timer should delay in between executions of the specified function or code.
- * @param {Array|undefined} args - additional arguments which are passed through to the function.
- *
+ * @param {Function} callback
+ * @param {Number} delay
+ * @param {Array|undefined} args
  * @returns {Number}
  */
+
 function setInterval(callback, delay, ...args) {
   // Coalesce to number or NaN.
   delay *= 1;
@@ -85,10 +90,12 @@ function setInterval(callback, delay, ...args) {
 }
 
 /**
- * The global clearInterval() method cancels an interval previously established by calling setInterval().
+ * The global clearInterval() method cancels an interval previously established
+ * by calling setInterval().
  *
- * @param {Number} id - the identifier of the interval you want to cancel.
+ * @param {Number} id
  */
+
 function clearInterval(id) {
   clearTimeout(id);
 }
@@ -96,15 +103,14 @@ function clearInterval(id) {
 /**
  * Initializes a timeout or an interval based on the receiving parameters.
  *
- * @param {Function} callback - a function to be executed in a latter time.
- * @param {Number} delay - the time, in milliseconds that the timer should wait before the specified function or code is executed.
- * @param {Array|undefined} args - additional arguments which are passed through to the function.
- *
- * @param {Boolean|undefined} repeat - identifies if the timer is an interval.
- * @param {Number|undefined} prevId - the ID given to the timer in a previous iteration.
- *
+ * @param {Function} callback
+ * @param {Number} delay
+ * @param {Array|undefined} args
+ * @param {Boolean|undefined} repeat
+ * @param {Number|undefined} prevId
  * @returns {Number}
  */
+
 function initializeTimer(callback, delay, args, repeat, prevId) {
   const id = prevId ?? nextId++;
   const task = () => {

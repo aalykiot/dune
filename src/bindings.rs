@@ -4,7 +4,6 @@ use crate::stdio;
 use crate::timers;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
-use v8;
 
 /// Function pointer for the bindings initializers.
 type BindingInitFn = fn(&mut v8::HandleScope<'_>) -> v8::Global<v8::Object>;
