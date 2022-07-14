@@ -1,4 +1,5 @@
 use crate::file;
+use crate::perf_hooks;
 use crate::process;
 use crate::stdio;
 use crate::timers;
@@ -14,6 +15,7 @@ lazy_static! {
             ("stdio", stdio::initialize),
             ("timers", timers::initialize),
             ("fs", file::initialize),
+            ("perf_hooks", perf_hooks::initialize),
         ];
         HashMap::from_iter(bindings.into_iter())
     };

@@ -14,6 +14,9 @@ use anyhow::Error;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
+use std::time::Instant;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 use v8;
 
 /// Completion type of an asynchronous operation.
@@ -34,6 +37,10 @@ pub struct JsRuntimeState {
     pub handle: LoopHandle,
     /// Holds JS pending async handles scheduled by the event-loop.
     pub pending_js_tasks: Vec<JsAsyncHandle>,
+    /// Indicates the start time of the process.
+    pub time: Instant,
+    /// Specifies the timestamp which the current process began in Unix time.
+    pub time_origin: u128,
 }
 
 pub struct JsRuntime {
@@ -74,6 +81,11 @@ impl JsRuntime {
 
         let event_loop = EventLoop::new();
 
+        let time_origin = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+
         // Store state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
@@ -81,6 +93,8 @@ impl JsRuntime {
             modules: ModuleMap::default(),
             handle: event_loop.handle(),
             pending_js_tasks: Vec::new(),
+            time: Instant::now(),
+            time_origin,
         })));
 
         let mut runtime = JsRuntime {

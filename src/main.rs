@@ -5,6 +5,7 @@ mod file;
 mod hooks;
 mod loaders;
 mod modules;
+mod perf_hooks;
 mod process;
 mod repl;
 mod runtime;

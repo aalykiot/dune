@@ -1,6 +1,6 @@
-// File System API
+// File System APIs
 //
-// The File System API enables interacting with the file system in a way modeled
+// The File System APIs enable interacting with the file system in a way modeled
 // on standard POSIX functions.
 //
 // https://nodejs.org/api/fs.html

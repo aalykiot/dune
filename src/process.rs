@@ -1,4 +1,4 @@
-// Process API
+// Process APIs
 //
 // This module contains part of the functions/attributes of the Node.js' process object.
 // https://nodejs.org/dist/latest-v17.x/docs/api/process.html

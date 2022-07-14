@@ -74,6 +74,11 @@ $ cd dune/ && cargo run -- <FILE>
 - `stat()`: retrieves statistics for the file.
 - `write(String|Uint8Array, [offset])`: writes data to the file.
 
+### Performance Measurement
+
+- `timeOrigin`: specifies the millisecond timestamp at which the current process began.
+- `now()`: returns the millisecond timestamp, where 0 represents the start of the current process.
+
 ### Assert
 
 > The assertion API is copied from: https://assert-js.norbert.tech/

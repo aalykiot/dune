@@ -21,6 +21,7 @@ lazy_static! {
             ("util", include_str!("./js/util.js")),
             ("text-encoding", include_str!("./js/text-encoding.js")),
             ("fs", include_str!("./js/fs.js")),
+            ("perf_hooks", include_str!("./js/perf_hooks.js")),
         ];
         HashMap::from_iter(modules.into_iter())
     };
