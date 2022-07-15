@@ -34,7 +34,7 @@ fn now(scope: &mut v8::HandleScope, _args: v8::FunctionCallbackArguments, mut rv
     let state = state_rc.borrow();
 
     // Get elapsed time from the start of the process.
-    let elapsed_time = state.time.elapsed().as_millis() as f64;
+    let elapsed_time = state.startup_moment.elapsed().as_micros() as f64 / 1000.0;
     let elapsed_time = v8::Number::new(scope, elapsed_time);
 
     rv.set(elapsed_time.into());

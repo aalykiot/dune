@@ -38,7 +38,7 @@ pub struct JsRuntimeState {
     /// Holds JS pending async handles scheduled by the event-loop.
     pub pending_js_tasks: Vec<JsAsyncHandle>,
     /// Indicates the start time of the process.
-    pub time: Instant,
+    pub startup_moment: Instant,
     /// Specifies the timestamp which the current process began in Unix time.
     pub time_origin: u128,
 }
@@ -93,7 +93,7 @@ impl JsRuntime {
             modules: ModuleMap::default(),
             handle: event_loop.handle(),
             pending_js_tasks: Vec::new(),
-            time: Instant::now(),
+            startup_moment: Instant::now(),
             time_origin,
         })));
 
