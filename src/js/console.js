@@ -5,6 +5,8 @@
 //
 // https://developer.mozilla.org/en-US/docs/Web/API/console
 
+import { performance } from 'perf_hooks';
+
 /**
  * Returns a string with as many spaces as the parameter specified.
  *
@@ -251,10 +253,15 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
  * Console is a subset implementation of MDN's Console API.
  */
 class Console {
+  // Holds timers initialized by console.
+  // https://developer.mozilla.org/en-US/docs/Web/API/Console/time
+  #timers = new Map();
+
   /**
    * Outputs data to the stdout stream.
    * @param  {...any} args
    */
+
   log(...args) {
     const output = args.map((arg) => stringify(arg)).join(' ');
     process.stdout.write(`${output}\n`);
@@ -268,12 +275,61 @@ class Console {
    *
    * @param  {...any} args
    */
+
   warn(...args) {
     const output = args.map((arg) => stringify(arg)).join(' ');
     process.stderr.write(`WARNING: ${output}\n`);
   }
 
   error = this.warn;
+
+  /**
+   * Starts a timer you can use to track how long an operation takes.
+   *
+   * @param String label
+   */
+
+  time(label = 'default') {
+    if (this.#timers.has(label)) {
+      this.warn(`Timer '${label}' already exists`);
+      return;
+    }
+
+    this.#timers.set(label, performance.now());
+  }
+
+  /**
+   * Logs the current value of a timer that was previously started by calling
+   * console.time() to the console.
+   *
+   * @param String label
+   */
+
+  timeLog(label = 'default') {
+    if (!this.#timers.has(label)) {
+      this.warn(`Timer '${label}' does not exist`);
+      return;
+    }
+
+    const difference = performance.now() - this.#timers.get(label);
+    this.log(`${label}: ${difference} ms`);
+  }
+
+  /**
+   * Stops a timer that was previously started by calling console.time().
+   *
+   * @param String label
+   */
+
+  timeEnd(label = 'default') {
+    if (!this.#timers.has(label)) {
+      this.warn(`Timer '${label}' does not exist`);
+      return;
+    }
+
+    this.timeLog(label);
+    this.#timers.delete(label);
+  }
 }
 
 export { Console };
