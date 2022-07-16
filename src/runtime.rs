@@ -193,15 +193,15 @@ impl JsRuntime {
     }
 
     /// Runs a single tick of the event-loop.
-    pub fn poll_event_loop(&mut self) {
-        self.event_loop.poll();
+    pub fn tick_event_loop(&mut self) {
+        self.event_loop.tick();
         self.run_pending_js_tasks();
     }
 
     /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
         while self.event_loop.has_pending_events() {
-            self.poll_event_loop();
+            self.tick_event_loop();
         }
     }
 

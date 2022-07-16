@@ -9,7 +9,8 @@ name = "dune"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-v8 = "0.45.0"
+v8 = "0.46.0"
+threadpool = "1.8.1"
 anyhow = "1.0.52"
 colored = "2.0.0"
 path-clean = "0.1.0"

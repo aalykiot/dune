@@ -197,6 +197,7 @@ static CLI_HISTORY: &str = ".dune_history";
 pub fn start(mut runtime: JsRuntime) {
     // Create a channel for thread communication.
     let (sender, receiver) = mpsc::channel::<ReplMessage>();
+    let handle = runtime.event_loop.interrupt_handle();
 
     // Spawn the REPL thread.
     thread::spawn(move || {
@@ -232,6 +233,8 @@ pub fn start(mut runtime: JsRuntime) {
                     break;
                 }
             }
+            // Interrupt event-loop if it's blocked in the poll phase.
+            handle.interrupt();
         }
         // Save REPL's history.
         fs::create_dir_all(history_file_path.parent().unwrap()).unwrap();
@@ -244,7 +247,7 @@ pub fn start(mut runtime: JsRuntime) {
 
         // Poll the event-loop.
         if maybe_message.is_err() {
-            runtime.poll_event_loop();
+            runtime.tick_event_loop();
             continue;
         }
 
