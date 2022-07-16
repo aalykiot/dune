@@ -1,5 +1,4 @@
 use crate::bindings::set_function_to;
-use crate::runtime::JsAsyncHandle;
 use crate::runtime::JsRuntime;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
@@ -39,21 +38,28 @@ fn create_timeout(
     };
 
     let state_rc = JsRuntime::state(scope);
-    let state = state_rc.borrow();
 
-    // Schedule a new timer to the event-loop.
-    let id = state.handle.timer(millis, {
+    let timer_cb = {
         let state_rc = state_rc.clone();
         move || {
-            let callback = callback.clone();
-            let params = params.clone();
+            let js_task = Box::new(move |scope: &mut v8::HandleScope| {
+                let undefined = v8::undefined(scope).into();
+                let callback = v8::Local::new(scope, callback);
+                let args: Vec<v8::Local<v8::Value>> = params
+                    .iter()
+                    .map(|arg| v8::Local::new(scope, arg))
+                    .collect();
 
-            state_rc
-                .borrow_mut()
-                .pending_js_tasks
-                .push(JsAsyncHandle::Callback(callback, params));
+                callback.call(scope, undefined, &args);
+            });
+
+            state_rc.borrow_mut().pending_js_tasks.push(js_task);
         }
-    });
+    };
+
+    // Schedule a new timer to the event-loop.
+    let state = state_rc.borrow();
+    let id = state.handle.timer(millis, timer_cb);
 
     // Return timeout's internal id.
     rv.set(v8::Number::new(scope, id as f64).into());

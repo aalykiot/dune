@@ -18,13 +18,8 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-/// Completion type of an asynchronous operation.
-pub enum JsAsyncHandle {
-    // JavaScript callback.
-    Callback(v8::Global<v8::Function>, Vec<v8::Global<v8::Value>>),
-    // JavaScript promise.
-    Promise(v8::Global<v8::PromiseResolver>, v8::Global<v8::Value>, bool),
-}
+/// A closure representing an asynchronous JS operation that is completed.
+pub type JsAsyncHandle = Box<dyn FnOnce(&mut v8::HandleScope)>;
 
 /// The state to be stored per v8 isolate.
 pub struct JsRuntimeState {
@@ -217,35 +212,13 @@ impl JsRuntime {
         //
         // Example: setTimeout schedules another setTimeout.
         //
-        let tasks: Vec<JsAsyncHandle> = state_rc.borrow_mut().pending_js_tasks.drain(..).collect();
-        let undefined = v8::undefined(scope).into();
+        let mut tasks: Vec<JsAsyncHandle> =
+            state_rc.borrow_mut().pending_js_tasks.drain(..).collect();
 
-        for task in tasks {
-            match task {
-                JsAsyncHandle::Callback(callback, params) => {
-                    // Create local v8 handles for the callback and the params.
-                    let callback = v8::Local::new(scope, callback);
-                    let args: Vec<v8::Local<v8::Value>> = params
-                        .iter()
-                        .map(|arg| v8::Local::new(scope, arg))
-                        .collect();
-
-                    // Run callback.
-                    callback.call(scope, undefined, &args);
-                }
-                JsAsyncHandle::Promise(promise, value, is_success) => {
-                    // Create local v8 handles for the promise and the value.
-                    let promise = v8::Local::new(scope, promise);
-                    let value = v8::Local::new(scope, value);
-
-                    if is_success {
-                        promise.resolve(scope, value);
-                    } else {
-                        promise.reject(scope, value);
-                    }
-                }
-            }
-        }
+        // Run all pending javascript tasks.
+        tasks.drain(..).for_each(|task| {
+            (task)(scope);
+        });
     }
 }
 

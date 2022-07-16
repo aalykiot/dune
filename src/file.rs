@@ -1,7 +1,10 @@
 use crate::bindings::set_function_to;
 use crate::bindings::throw_exception;
+use crate::event_loop::TaskResult;
+use crate::runtime::JsRuntime;
 use anyhow::bail;
 use anyhow::Result;
+use rmp_serde;
 use std::fs;
 use std::io::prelude::*;
 use std::io::SeekFrom;
@@ -11,11 +14,102 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
+    set_function_to(scope, target, "read", read);
     set_function_to(scope, target, "readSync", read_sync);
+    set_function_to(scope, target, "write", write);
     set_function_to(scope, target, "writeSync", write_sync);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
+}
+
+/// Reads asynchronously a chunk of a file (as bytes).
+fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+    // Get source path.
+    let path = args.get(0).to_rust_string_lossy(scope);
+
+    // Get chunk size and byte offset.
+    let size = args.get(1).to_integer(scope).unwrap().value();
+    let offset = args.get(2).to_integer(scope).unwrap().value();
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    // The actual async task.
+    let task = move || -> TaskResult {
+        match read_file_op(path, size, offset) {
+            Ok(result) => Some(Ok(rmp_serde::to_vec(&result).unwrap())),
+            Err(e) => Some(Result::Err(e)),
+        }
+    };
+
+    // The callback that will run after the above task completes.
+    let task_cb = {
+        let promise = v8::Global::new(scope, promise_resolver);
+        let state_rc = state_rc.clone();
+
+        move |maybe_result: TaskResult| {
+            // Get a mut reference to runtime's state.
+            let mut state = state_rc.borrow_mut();
+
+            let result = maybe_result.unwrap();
+
+            if let Err(e) = result {
+                let js_task = move |scope: &mut v8::HandleScope| {
+                    let message = v8::String::new(scope, &e.to_string()).unwrap();
+                    let exception = v8::Exception::error(scope, message);
+
+                    // Reject the promise on failure.
+                    promise.open(scope).reject(scope, exception.into());
+                };
+
+                state.pending_js_tasks.push(Box::new(js_task));
+                return;
+            };
+
+            // Otherwise, resolve the promise passing the result.
+
+            let result = result.unwrap();
+
+            let js_task = move |scope: &mut v8::HandleScope| {
+                // Decompress message-pack binary into actual rust types.
+                let (n, mut buffer): (usize, Vec<u8>) = rmp_serde::from_slice(&result).unwrap();
+
+                // We reached the end of the file.
+                if n == 0 {
+                    // Create an empty ArrayBuffer and return it to JavaScript.
+                    let store = v8::ArrayBuffer::new_backing_store(scope, 0).make_shared();
+                    let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
+
+                    promise.open(scope).resolve(scope, bytes.into());
+                }
+
+                // Resize buffer given bytes read.
+                buffer.resize(n, 0);
+
+                // Create ArrayBuffer's backing store from Vec<u8>.
+                let store = buffer.into_boxed_slice();
+                let store =
+                    v8::ArrayBuffer::new_backing_store_from_boxed_slice(store).make_shared();
+
+                // Initialize ArrayBuffer.
+                let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
+
+                promise.open(scope).resolve(scope, bytes.into()).unwrap();
+            };
+
+            state.pending_js_tasks.push(Box::new(js_task));
+        }
+    };
+
+    // Spawn the async task using the event-loop.
+    state.handle.spawn(task, Some(task_cb));
+
+    rv.set(promise.into());
 }
 
 /// Reads a chunk of a file (as bytes).
@@ -59,6 +153,86 @@ fn read_sync(
             throw_exception(scope, &e.to_string());
         }
     }
+}
+
+// Writes asynchronously contents to a file.
+fn write(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get file path.
+    let path = args.get(0).to_rust_string_lossy(scope);
+
+    // Get data as ArrayBuffer.
+    let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
+
+    let mut buffer = vec![0; data.byte_length()];
+    data.copy_contents(&mut buffer);
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    // The actual async task.
+    let task = move || match write_file_op(path, &buffer) {
+        Ok(_) => None,
+        Err(e) => Some(Result::Err(e)),
+    };
+
+    // The callback that will run after the above task completes.
+    let task_cb = {
+        let promise = v8::Global::new(scope, promise_resolver);
+        let state_rc = state_rc.clone();
+
+        move |maybe_result: TaskResult| {
+            // Get a mut reference to the runtime's state.
+            let mut state = state_rc.borrow_mut();
+
+            // If the `task_result` is None it means everything is fine.
+            if maybe_result.is_none() {
+                let js_task = move |scope: &mut v8::HandleScope| {
+                    let undefined = v8::undefined(scope);
+                    promise
+                        .open(scope)
+                        .resolve(scope, undefined.into())
+                        .unwrap();
+                };
+
+                state.pending_js_tasks.push(Box::new(js_task));
+                return;
+            }
+
+            // Something went wrong.
+            let result = maybe_result.unwrap();
+
+            if let Err(e) = result {
+                let js_task = move |scope: &mut v8::HandleScope| {
+                    let message = v8::String::new(scope, &e.to_string()).unwrap();
+                    let exception = v8::Exception::error(scope, message);
+                    // Reject the promise on failure.
+                    promise.open(scope).reject(scope, exception.into());
+                };
+
+                state.pending_js_tasks.push(Box::new(js_task));
+                return;
+            }
+
+            // Note: The result from the `write_file_op` should be None or some Error.
+            // Based on that assumption we should never reach this part of the
+            // function thus we use the unreachable! macro.
+
+            unreachable!();
+        }
+    };
+
+    // Spawn the async task using the event-loop.
+    state.handle.spawn(task, Some(task_cb));
+
+    rv.set(promise.into());
 }
 
 /// Writes contents to a file.
