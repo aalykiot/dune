@@ -4,7 +4,6 @@ use crate::event_loop::TaskResult;
 use crate::runtime::JsRuntime;
 use anyhow::bail;
 use anyhow::Result;
-use rmp_serde;
 use std::fs;
 use std::io::prelude::*;
 use std::io::SeekFrom;
@@ -40,11 +39,9 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || -> TaskResult {
-        match read_file_op(path, size, offset) {
-            Ok(result) => Some(Ok(rmp_serde::to_vec(&result).unwrap())),
-            Err(e) => Some(Result::Err(e)),
-        }
+    let task = move || match read_file_op(path, size, offset) {
+        Ok(result) => Some(Ok(rmp_serde::to_vec(&result).unwrap())),
+        Err(e) => Some(Result::Err(e)),
     };
 
     // The callback that will run after the above task completes.
@@ -64,7 +61,7 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
                     let exception = v8::Exception::error(scope, message);
 
                     // Reject the promise on failure.
-                    promise.open(scope).reject(scope, exception.into());
+                    promise.open(scope).reject(scope, exception);
                 };
 
                 state.pending_js_tasks.push(Box::new(js_task));
@@ -214,7 +211,7 @@ fn write(
                     let message = v8::String::new(scope, &e.to_string()).unwrap();
                     let exception = v8::Exception::error(scope, message);
                     // Reject the promise on failure.
-                    promise.open(scope).reject(scope, exception.into());
+                    promise.open(scope).reject(scope, exception);
                 };
 
                 state.pending_js_tasks.push(Box::new(js_task));
@@ -286,7 +283,7 @@ fn write_file_op<P: AsRef<Path>>(path: P, buffer: &[u8]) -> Result<()> {
     };
 
     // Write buffer to file.
-    if let Err(e) = file.write_all(&buffer) {
+    if let Err(e) = file.write_all(buffer) {
         bail!(e);
     }
 
