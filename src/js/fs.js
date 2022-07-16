@@ -47,9 +47,9 @@ async function __readFile(path, data = new Uint8Array([])) {
 /**
  * Reads synchronously the entire contents of a file.
  *
- * @param {string} path
- * @param {string} encoding
- * @returns {string|Uint8Array}
+ * @param {String} path
+ * @param {String} encoding
+ * @returns {String|Uint8Array}
  */
 
 function readFileSync(path, encoding) {
@@ -82,9 +82,9 @@ function readFileSync(path, encoding) {
 /**
  * Writes asynchronously contents to a file.
  *
- * @param {*} path
- * @param {string|Uint8Array} data
- * @param {string} encoding
+ * @param {String} path
+ * @param {String|Uint8Array} data
+ * @param {String} encoding
  */
 
 async function writeFile(path, data, encoding = 'utf8') {
@@ -104,9 +104,9 @@ async function writeFile(path, data, encoding = 'utf8') {
 /**
  * Writes synchronously contents to a file.
  *
- * @param {*} path
- * @param {string|Uint8Array} data
- * @param {string} encoding
+ * @param {String} path
+ * @param {String|Uint8Array} data
+ * @param {String} encoding
  */
 
 function writeFileSync(path, data, encoding = 'utf8') {
@@ -123,4 +123,55 @@ function writeFileSync(path, data, encoding = 'utf8') {
   );
 }
 
-export default { readFile, readFileSync, writeFile, writeFileSync };
+/**
+ * Copies asynchronously a file from the source path to destination path.
+ *
+ * @param {String} path
+ * @param {String|Uint8Array} data
+ * @param {String} encoding
+ */
+
+async function copyFile(source, destination) {
+  // Check the source argument type.
+  if (typeof source !== 'string') {
+    throw new TypeError(`The "source" argument must be of type string.`);
+  }
+
+  // Check the source argument type.
+  if (typeof destination !== 'string') {
+    throw new TypeError(`The "destination" argument must be of type string.`);
+  }
+
+  return writeFile(destination, await readFile(source));
+}
+
+/**
+ * Copies synchronously a file from the source path to destination path.
+ *
+ * @param {String} path
+ * @param {String|Uint8Array} data
+ * @param {String} encoding
+ */
+
+function copyFileSync(source, destination) {
+  // Check the source argument type.
+  if (typeof source !== 'string') {
+    throw new TypeError(`The "source" argument must be of type string.`);
+  }
+
+  // Check the source argument type.
+  if (typeof destination !== 'string') {
+    throw new TypeError(`The "destination" argument must be of type string.`);
+  }
+
+  return writeFileSync(destination, readFileSync(source));
+}
+
+export default {
+  readFile,
+  readFileSync,
+  writeFile,
+  writeFileSync,
+  copyFile,
+  copyFileSync,
+};
