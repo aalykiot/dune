@@ -5,11 +5,11 @@
 //
 // https://developer.mozilla.org/en-US/docs/Web/API/console
 
-import { performance } from "perf_hooks";
+import { performance } from 'perf_hooks';
 
 // Returns a string with as many spaces as the parameter specified.
 function pre(amount) {
-  return " ".repeat(amount);
+  return ' '.repeat(amount);
 }
 
 /**
@@ -24,24 +24,24 @@ function pre(amount) {
 
 function stringify(value, seen, depth = 0) {
   switch (typeof value) {
-    case "string":
+    case 'string':
       return depth > 0 ? `"${value}"` : value;
-    case "number":
-    case "undefined":
-    case "boolean":
-    case "symbol":
+    case 'number':
+    case 'undefined':
+    case 'boolean':
+    case 'symbol':
       return String(value);
-    case "bigint": {
-      return String(value) + "n";
+    case 'bigint': {
+      return String(value) + 'n';
     }
-    case "object":
-      return !value ? "null" : stringifyObject(value, seen, ++depth);
-    case "function":
+    case 'object':
+      return !value ? 'null' : stringifyObject(value, seen, ++depth);
+    case 'function':
       return !value.name
-        ? "[Function (anonymous)]"
+        ? '[Function (anonymous)]'
         : `[Function: ${value.name}]`;
     default:
-      return "[Unknown]";
+      return '[Unknown]';
   }
 }
 
@@ -56,27 +56,27 @@ function stringifyArray(arr, seen, depth) {
   }
 
   // Multiline formatting.
-  if (entries.join("").length > 50) {
-    const start = "[\n";
+  if (entries.join('').length > 50) {
+    const start = '[\n';
     const end = `\n${pre((depth - 1) * 2)}]`;
     const entriesPretty = entries.map((v) => `${pre(depth * 2)}${v}`);
-    return `${start}${entriesPretty.join(",\n")}${end}`;
+    return `${start}${entriesPretty.join(',\n')}${end}`;
   }
 
   // Inline formatting.
-  return entries.length > 0 ? `[ ${entries.join(", ")} ]` : `[]`;
+  return entries.length > 0 ? `[ ${entries.join(', ')} ]` : `[]`;
 }
 
 function isTypedArray(value) {
   switch (Object.prototype.toString.call(value)) {
-    case "[object Int8Array]":
-    case "[object Uint8Array]":
-    case "[object Uint8ClampedArray]":
-    case "[object Uint16Array]":
-    case "[object Int32Array]":
-    case "[object Uint32Array]":
-    case "[object Float32Array]":
-    case "[object Float64Array]":
+    case '[object Int8Array]':
+    case '[object Uint8Array]':
+    case '[object Uint8ClampedArray]':
+    case '[object Uint16Array]':
+    case '[object Int32Array]':
+    case '[object Uint32Array]':
+    case '[object Float32Array]':
+    case '[object Float64Array]':
       return true;
     default:
       return false;
@@ -84,17 +84,17 @@ function isTypedArray(value) {
 }
 
 function stringifyTypedArray(arr) {
-  const pretty = arr.toString().split(",").join(", ");
+  const pretty = arr.toString().split(',').join(', ');
   const type = Object.prototype.toString
     .call(arr)
-    .replace("[object ", "")
-    .replace("]", "");
+    .replace('[object ', '')
+    .replace(']', '');
 
   return `${type}(${arr.length}) [ ${pretty} ]`;
 }
 
 function isDate(value) {
-  return Object.prototype.toString.call(value) === "[object Date]";
+  return Object.prototype.toString.call(value) === '[object Date]';
 }
 
 function stringifyDate(date) {
@@ -102,7 +102,7 @@ function stringifyDate(date) {
 }
 
 function isRexExp(value) {
-  return Object.prototype.toString.call(value) === "[object RegExp]";
+  return Object.prototype.toString.call(value) === '[object RegExp]';
 }
 
 function stringifyRexExp(exp) {
@@ -110,7 +110,7 @@ function stringifyRexExp(exp) {
 }
 
 function isError(value) {
-  return Object.prototype.toString.call(value) === "[object Error]";
+  return Object.prototype.toString.call(value) === '[object Error]';
 }
 
 function stringifyError(error) {
@@ -163,15 +163,15 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
   }
 
   // Apply multi-line formatting on long properties.
-  if (entries.map((v) => v.trim()).join("").length > 50) {
-    const start = "{\n";
+  if (entries.map((v) => v.trim()).join('').length > 50) {
+    const start = '{\n';
     const end = `\n${pre((depth - 1) * 2)}}`;
-    return `${start}${entries.join(",\n")}${end}`;
+    return `${start}${entries.join(',\n')}${end}`;
   }
 
   // Inline formatting.
   const entriesPretty = entries.map((v) => v.trim());
-  return entries.length > 0 ? `{ ${entriesPretty.join(", ")} }` : `{}`;
+  return entries.length > 0 ? `{ ${entriesPretty.join(', ')} }` : `{}`;
 }
 
 /**
@@ -189,7 +189,7 @@ class Console {
    */
 
   log(...args) {
-    const output = args.map((arg) => stringify(arg)).join(" ");
+    const output = args.map((arg) => stringify(arg)).join(' ');
     process.stdout.write(`${output}\n`);
   }
 
@@ -203,7 +203,7 @@ class Console {
    */
 
   warn(...args) {
-    const output = args.map((arg) => stringify(arg)).join(" ");
+    const output = args.map((arg) => stringify(arg)).join(' ');
     process.stderr.write(`WARNING: ${output}\n`);
   }
 
@@ -215,9 +215,9 @@ class Console {
 
   clear() {
     try {
-      process.binding("stdio").clear();
+      process.binding('stdio').clear();
     } catch (e) {
-      this.warn("This environment does not support console clearing");
+      this.warn('This environment does not support console clearing');
     }
   }
 
@@ -227,7 +227,7 @@ class Console {
    * @param String label
    */
 
-  time(label = "default") {
+  time(label = 'default') {
     if (this.#timers.has(label)) {
       this.warn(`Timer '${label}' already exists`);
       return;
@@ -243,7 +243,7 @@ class Console {
    * @param String label
    */
 
-  timeLog(label = "default") {
+  timeLog(label = 'default') {
     if (!this.#timers.has(label)) {
       this.warn(`Timer '${label}' does not exist`);
       return;
@@ -259,7 +259,7 @@ class Console {
    * @param String label
    */
 
-  timeEnd(label = "default") {
+  timeEnd(label = 'default') {
     if (!this.#timers.has(label)) {
       this.warn(`Timer '${label}' does not exist`);
       return;

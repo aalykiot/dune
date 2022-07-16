@@ -44,10 +44,10 @@ Object.defineProperty(process, 'stdout', {
     return {
       write(value) {
         binding.write(value);
-      }
+      },
     };
   },
-  configurable: true
+  configurable: true,
 });
 
 // Setting up the STDERR stream.
@@ -65,10 +65,10 @@ Object.defineProperty(process, 'stderr', {
     return {
       write(value) {
         binding.writeError(value);
-      }
+      },
     };
   },
-  configurable: true
+  configurable: true,
 });
 
 makeGlobal('console', new Console());
