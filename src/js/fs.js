@@ -22,7 +22,7 @@ function readFileSync(path, encoding) {
   let data = new Uint8Array([]);
 
   // Read bytes until EOF.
-  while (true) {
+  for (;;) {
     const bytes = binding.readSync(path, BUFFER_SIZE, data.length + 1);
     const bytes_u8 = new Uint8Array(bytes);
     // Check EOF.

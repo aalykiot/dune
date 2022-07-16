@@ -1,0 +1,28 @@
+{
+  "name": "dune",
+  "version": "0.1.0",
+  "description": "Dune is a hobby JavaScript and TypeScript runtime written in **Rust**, based on **V8**, and developed completely for fun and experimentation.",
+  "main": "src/js/main.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "test"
+  },
+  "scripts": {
+    "lint": "eslint ./src/js/**/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aalykiot/dune.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/aalykiot/dune/issues"
+  },
+  "homepage": "https://github.com/aalykiot/dune#readme",
+  "devDependencies": {
+    "eslint": "^8.19.0"
+  }
+}

@@ -1,9 +1,4 @@
-/**
- * Clones the provided function.
- *
- * @param {Function} fn
- * @returns {Function}
- */
+/* eslint-disable no-prototype-builtins */
 
 export function cloneFunction(fn) {
   let that = fn;

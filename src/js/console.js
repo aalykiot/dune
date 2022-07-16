@@ -72,7 +72,6 @@ function isTypedArray(value) {
     case '[object Int8Array]':
     case '[object Uint8Array]':
     case '[object Uint8ClampedArray]':
-    case '[object Uint8ClampedArray]':
     case '[object Uint16Array]':
     case '[object Int32Array]':
     case '[object Uint32Array]':
