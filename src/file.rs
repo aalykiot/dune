@@ -1,4 +1,5 @@
 use crate::bindings::set_function_to;
+use crate::bindings::throw_exception;
 use std::fs;
 use std::io::prelude::*;
 use std::io::SeekFrom;
@@ -96,10 +97,4 @@ fn write_sync(
     if let Err(e) = file.write_all(&buffer) {
         throw_exception(scope, &e.to_string());
     }
-}
-
-fn throw_exception(scope: &mut v8::HandleScope, message: &str) {
-    let message = v8::String::new(scope, message).unwrap();
-    let exception = v8::Exception::error(scope, message);
-    scope.throw_exception(exception);
 }

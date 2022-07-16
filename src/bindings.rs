@@ -103,3 +103,10 @@ pub fn create_object_under<'s>(
 
     value
 }
+
+/// Useful utility to throw v8 exceptions.
+pub fn throw_exception(scope: &mut v8::HandleScope, message: &str) {
+    let message = v8::String::new(scope, message).unwrap();
+    let exception = v8::Exception::error(scope, message);
+    scope.throw_exception(exception);
+}
