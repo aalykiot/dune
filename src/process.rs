@@ -8,6 +8,7 @@ use crate::bindings::set_constant_to;
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
 use crate::bindings::BINDINGS;
+use crate::JsRuntime;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::env;
@@ -125,6 +126,26 @@ pub fn initialize<'s>(
     // `process.platform` - a string identifying the operating system platform.
     let platform = v8::String::new(scope, env::consts::OS).unwrap();
     set_property_to(scope, process, "platform", platform.into());
+
+    // `process.uptime()` - a number describing the amount of time (in seconds) the process is running.
+    set_function_to(
+        scope,
+        process,
+        "uptime",
+        |scope: &mut v8::HandleScope,
+         _args: v8::FunctionCallbackArguments,
+         mut rv: v8::ReturnValue| {
+            // Get access to runtime's state.
+            let state_rc = JsRuntime::state(scope);
+            let state = state_rc.borrow();
+
+            // Calculate uptime duration in seconds with millis precision.
+            let uptime = state.startup_moment.elapsed().as_millis() as f64 / 1000.0;
+            let uptime = v8::Number::new(scope, uptime);
+
+            rv.set(uptime.into());
+        },
+    );
 
     // `process.version` - the dune version.
     let version = format!("v{}", VERSIONS.get("dune").unwrap());
