@@ -8,17 +8,11 @@ globalThis.global = globalThis;
 global.GLOBAL = globalThis;
 global.root = globalThis;
 
-/**
- * Registers a value to global scope.
- *
- * @param {String} name
- * @param {*} value
- */
 function makeGlobal(name, value) {
   globalThis[name] = value;
 }
 
-// Adding a caching layer to `process.binding` so we don't
+// Note: adding a caching layer to `process.binding` allow us to not
 // cross the JavaScript to Rust bridge every time we need native methods.
 
 let cache = new Map();
@@ -77,15 +71,12 @@ Object.defineProperty(process, 'stderr', {
   configurable: true
 });
 
-// Console.
 makeGlobal('console', new Console());
 
-// Timers.
 makeGlobal('setTimeout', setTimeout);
 makeGlobal('setInterval', setInterval);
 makeGlobal('clearTimeout', clearTimeout);
 makeGlobal('clearInterval', clearInterval);
 
-// Encoders.
 makeGlobal('TextEncoder', TextEncoder);
 makeGlobal('TextDecoder', TextDecoder);

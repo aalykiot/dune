@@ -7,13 +7,7 @@
 
 import { performance } from 'perf_hooks';
 
-/**
- * Returns a string with as many spaces as the parameter specified.
- *
- * @param {string} amount
- * @returns {string}
- */
-
+// Returns a string with as many spaces as the parameter specified.
 function pre(amount) {
   return ' '.repeat(amount);
 }
@@ -51,29 +45,13 @@ function stringify(value, seen, depth = 0) {
   }
 }
 
-/**
- * Checks if given object is an Array.
- *
- * @param {*} o
- * @returns {Bool}
- */
-
-function isArray(o) {
-  return Array.isArray(o);
+function isArray(value) {
+  return Array.isArray(value);
 }
 
-/**
- * Stringifies JavaScript arrays.
- *
- * @param {*} value
- * @param {WeakSet} seen
- * @param {Number} depth
- * @returns {String}
- */
-
-function stringifyArray(value, seen, depth) {
+function stringifyArray(arr, seen, depth) {
   const entries = [];
-  for (const elem of value) {
+  for (const elem of arr) {
     entries.push(stringify(elem, seen, depth));
   }
 
@@ -89,15 +67,8 @@ function stringifyArray(value, seen, depth) {
   return entries.length > 0 ? `[ ${entries.join(', ')} ]` : `[]`;
 }
 
-/**
- * Checks if given object is a TypedArray.
- *
- * @param {*} o
- * @returns {bool}
- */
-
-function isTypedArray(o) {
-  switch (Object.prototype.toString.call(o)) {
+function isTypedArray(value) {
+  switch (Object.prototype.toString.call(value)) {
     case '[object Int8Array]':
     case '[object Uint8Array]':
     case '[object Uint8ClampedArray]':
@@ -113,84 +84,38 @@ function isTypedArray(o) {
   }
 }
 
-/**
- * Stringifies JavaScript TypedArrays.
- *
- * @param {*} o
- * @returns {string}
- */
-
-function stringifyTypedArray(o) {
+function stringifyTypedArray(arr) {
+  const pretty = arr.toString().split(',').join(', ');
   const type = Object.prototype.toString
-    .call(o)
+    .call(arr)
     .replace('[object ', '')
     .replace(']', '');
-  return `${type}(${o.length}) [ ${o.toString().split(',').join(', ')} ]`;
+
+  return `${type}(${arr.length}) [ ${pretty} ]`;
 }
 
-/**
- * Checks if given object is a Date object.
- *
- * @param {*} o
- * @returns {bool}
- */
-
-function isDate(o) {
-  return Object.prototype.toString.call(o) === '[object Date]';
+function isDate(value) {
+  return Object.prototype.toString.call(value) === '[object Date]';
 }
 
-/**
- * Stringifies JavaScript Date objects.
- *
- * @param {*} o
- * @returns {string}
- */
-
-function stringifyDate(o) {
-  return o.toISOString();
+function stringifyDate(date) {
+  return date.toISOString();
 }
 
-/**
- * Checks if given object is a RexExp.
- *
- * @param {*} o
- * @returns {bool}
- */
-
-function isRexExp(o) {
-  return Object.prototype.toString.call(o) === '[object RegExp]';
+function isRexExp(value) {
+  return Object.prototype.toString.call(value) === '[object RegExp]';
 }
 
-/**
- * Stringifies JavaScript RexExp objects.
- *
- * @param {*} o
- * @returns {string}
- */
-
-function stringifyRexExp(o) {
-  return o.toString();
+function stringifyRexExp(exp) {
+  return exp.toString();
 }
 
-/**
- * Checks if given object is an Error object.
- *
- * @param {*} o
- * @returns {bool}
- */
-function isError(o) {
-  return Object.prototype.toString.call(o) === '[object Error]';
+function isError(value) {
+  return Object.prototype.toString.call(value) === '[object Error]';
 }
 
-/**
- * Stringifies JavaScript Error objects.
- *
- * @param {*} o
- * @returns {string}
- */
-
-function stringifyError(o) {
-  return o.stack;
+function stringifyError(error) {
+  return error.stack;
 }
 
 /**
@@ -203,23 +128,24 @@ function stringifyError(o) {
  */
 
 function stringifyObject(value, seen = new WeakSet(), depth) {
-  // Stringify Array.
+  // We have to check the type of the value parameter to decide which stringify
+  // transformer we should use.
   if (isArray(value)) {
     return stringifyArray(value, seen, depth);
   }
-  // Stringify TypedArray.
+
   if (isTypedArray(value)) {
     return stringifyTypedArray(value);
   }
-  // Stringify Date.
+
   if (isDate(value)) {
     return stringifyDate(value);
   }
-  // Stringify RegExp.
+
   if (isRexExp(value)) {
     return stringifyRexExp(value);
   }
-  // Stringify Errors.
+
   if (isError(value)) {
     return stringifyError(value);
   }
@@ -259,6 +185,7 @@ class Console {
 
   /**
    * Outputs data to the stdout stream.
+   *
    * @param  {...any} args
    */
 
