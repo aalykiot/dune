@@ -2,18 +2,17 @@
   "root": true,
   "extends": "eslint:recommended",
   "env": {
-    "es6": true
+    "es6": true,
+    "shared-node-browser": true
   },
   "parserOptions": {
     "sourceType": "module",
     "ecmaVersion": 2022
   },
   "globals": {
-    "globalThis": "readonly",
     "global": "readonly",
-    "process": true,
-    "TextEncoder": true,
-    "TextDecoder": true
+    "globalThis": "readonly",
+    "process": true
   },
   "rules": {}
 }
