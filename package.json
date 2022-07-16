@@ -1,13 +1,8 @@
 {
   "name": "dune",
   "version": "0.1.0",
-  "description": "Dune is a hobby JavaScript and TypeScript runtime written in **Rust**, based on **V8**, and developed completely for fun and experimentation.",
+  "description": "Dune is a hobby JavaScript and TypeScript runtime.",
   "main": "src/js/main.js",
-  "directories": {
-    "doc": "docs",
-    "example": "examples",
-    "test": "test"
-  },
   "scripts": {
     "lint": "eslint ./src/js/**/*.js"
   },
