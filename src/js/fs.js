@@ -17,7 +17,7 @@ const BUFFER_SIZE = 40 * 1024; // 40KB bytes buffer when reading.
  * @returns {Promise<String|Uint8Array>}
  */
 
-async function readFile(path, options = {}) {
+export async function readFile(path, options = {}) {
   // Read the entire contents of a file.
   const data = await __readFile(path);
   const encoding = typeof options === 'string' ? options : options.encoding;
@@ -53,7 +53,7 @@ async function __readFile(path, data = new Uint8Array([])) {
  * @returns {String|Uint8Array}
  */
 
-function readFileSync(path, options = {}) {
+export function readFileSync(path, options = {}) {
   // Buffer to fill the file bytes into.
   let data = new Uint8Array([]);
   const encoding = typeof options === 'string' ? options : options.encoding;
@@ -89,7 +89,7 @@ function readFileSync(path, options = {}) {
  * @param {String} encoding
  */
 
-async function writeFile(path, data, options = {}) {
+export async function writeFile(path, data, options = {}) {
   // Check the data argument type.
   if (!(data instanceof Uint8Array) && typeof data !== 'string') {
     throw new TypeError(
@@ -117,7 +117,7 @@ async function writeFile(path, data, options = {}) {
  * @param {String} encoding
  */
 
-function writeFileSync(path, data, options = {}) {
+export function writeFileSync(path, data, options = {}) {
   // Check the data argument type.
   if (!(data instanceof Uint8Array) && typeof data !== 'string') {
     throw new TypeError(
@@ -145,7 +145,7 @@ function writeFileSync(path, data, options = {}) {
  * @param {String} encoding
  */
 
-async function copyFile(source, destination) {
+export async function copyFile(source, destination) {
   // Check the source argument type.
   if (typeof source !== 'string') {
     throw new TypeError(`The "source" argument must be of type string.`);
@@ -167,7 +167,7 @@ async function copyFile(source, destination) {
  * @param {String} encoding
  */
 
-function copyFileSync(source, destination) {
+export function copyFileSync(source, destination) {
   // Check the source argument type.
   if (typeof source !== 'string') {
     throw new TypeError(`The "source" argument must be of type string.`);
