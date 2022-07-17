@@ -17,9 +17,10 @@ const BUFFER_SIZE = 40 * 1024; // 40KB bytes buffer when reading.
  * @returns {Promise<String|Uint8Array>}
  */
 
-async function readFile(path, encoding) {
+async function readFile(path, options = {}) {
   // Read the entire contents of a file.
   const data = await __readFile(path);
+  const encoding = typeof options === 'string' ? options : options.encoding;
 
   // Decode given an encoder.
   if (encoding) {
@@ -52,9 +53,10 @@ async function __readFile(path, data = new Uint8Array([])) {
  * @returns {String|Uint8Array}
  */
 
-function readFileSync(path, encoding) {
+function readFileSync(path, options = {}) {
   // Buffer to fill the file bytes into.
   let data = new Uint8Array([]);
+  const encoding = typeof options === 'string' ? options : options.encoding;
 
   // Read bytes until EOF.
   for (;;) {
@@ -87,13 +89,19 @@ function readFileSync(path, encoding) {
  * @param {String} encoding
  */
 
-async function writeFile(path, data, encoding = 'utf8') {
+async function writeFile(path, data, options = {}) {
   // Check the data argument type.
   if (!(data instanceof Uint8Array) && typeof data !== 'string') {
     throw new TypeError(
       `The "data" argument must be of type string or Uint8Array.`
     );
   }
+
+  let encoding = typeof options === 'string' ? options : options.encoding;
+
+  // Default to utf-8 encoding.
+  if (!encoding) encoding = 'utf-8';
+
   // Write asynchronously buffer to file.
   return binding.write(
     path,
@@ -109,13 +117,19 @@ async function writeFile(path, data, encoding = 'utf8') {
  * @param {String} encoding
  */
 
-function writeFileSync(path, data, encoding = 'utf8') {
+function writeFileSync(path, data, options = {}) {
   // Check the data argument type.
   if (!(data instanceof Uint8Array) && typeof data !== 'string') {
     throw new TypeError(
       `The "data" argument must be of type string or Uint8Array.`
     );
   }
+
+  let encoding = typeof options === 'string' ? options : options.encoding;
+
+  // Default to utf-8 encoding.
+  if (!encoding) encoding = 'utf-8';
+
   // Write buffer to file.
   binding.writeSync(
     path,
@@ -137,7 +151,7 @@ async function copyFile(source, destination) {
     throw new TypeError(`The "source" argument must be of type string.`);
   }
 
-  // Check the source argument type.
+  // Check the destination argument type.
   if (typeof destination !== 'string') {
     throw new TypeError(`The "destination" argument must be of type string.`);
   }
@@ -159,7 +173,7 @@ function copyFileSync(source, destination) {
     throw new TypeError(`The "source" argument must be of type string.`);
   }
 
-  // Check the source argument type.
+  // Check the destination argument type.
   if (typeof destination !== 'string') {
     throw new TypeError(`The "destination" argument must be of type string.`);
   }
