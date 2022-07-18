@@ -5,7 +5,10 @@
 //
 // https://developer.mozilla.org/en-US/docs/Web/API/console
 
+/* eslint-disable no-control-regex */
+
 import { performance } from 'perf_hooks';
+import { green, yellow, cyan, bright_black } from 'colors';
 
 // Returns a string with as many spaces as the parameter specified.
 function pre(amount) {
@@ -13,33 +16,33 @@ function pre(amount) {
 }
 
 /**
- * Transforms a JavaScript object/primitive into a string.
+ * Stringifies almost all JavaScript built-in types.
  *
  * @param {*} value
  * @param {WeakSet} seen
- * @param {Number} depth
- * @returns {String}
- * @public
+ * @param {number} depth
+ * @returns {string}
  */
 
 function stringify(value, seen, depth = 0) {
   switch (typeof value) {
     case 'string':
-      return depth > 0 ? `"${value}"` : value;
+      return depth > 0 ? green(`"${value}"`) : value;
     case 'number':
-    case 'undefined':
     case 'boolean':
+      return yellow(String(value));
+    case 'undefined':
+      return bright_black(String(value));
     case 'symbol':
-      return String(value);
-    case 'bigint': {
-      return String(value) + 'n';
-    }
+      return green(String(value));
+    case 'bigint':
+      return yellow(String(value) + 'n');
     case 'object':
       return !value ? 'null' : stringifyObject(value, seen, ++depth);
     case 'function':
       return !value.name
-        ? '[Function (anonymous)]'
-        : `[Function: ${value.name}]`;
+        ? cyan('[Function (anonymous)]')
+        : cyan(`[Function: ${value.name}]`);
     default:
       return '[Unknown]';
   }
@@ -50,6 +53,10 @@ function isArray(value) {
 }
 
 function stringifyArray(arr, seen, depth) {
+  // Checks if all the elements in the array have the same type.
+  const firstElementType = typeof arr[0];
+  const isUniform = arr.every((elem) => typeof elem === firstElementType);
+
   const entries = [];
   for (const elem of arr) {
     entries.push(stringify(elem, seen, depth));
@@ -59,8 +66,8 @@ function stringifyArray(arr, seen, depth) {
   if (entries.join('').length > 50) {
     const start = '[\n';
     const end = `\n${pre((depth - 1) * 2)}]`;
-    const entriesPretty = entries.map((v) => `${pre(depth * 2)}${v}`);
-    return `${start}${entriesPretty.join(',\n')}${end}`;
+    const entriesPretty = prettifyArray(entries, depth, isUniform);
+    return `${start}${entriesPretty}${end}`;
   }
 
   // Inline formatting.
@@ -83,12 +90,80 @@ function isTypedArray(value) {
   }
 }
 
-function stringifyTypedArray(arr) {
-  const pretty = arr.toString().split(',').join(', ');
+function prettifyArray(arr, depth = 0, isUniform) {
+  // Remove the color characters so we can calculate the AVG and MAX correctly.
+  const uncolored = arr.map(
+    (elem) => elem.replace(/\u001b\[[0-9;]*m/g, '').length
+  );
+
+  const maxElementLength = Math.max(...uncolored);
+  const avgElementLength = uncolored.reduce((a, b) => a + b) / uncolored.length;
+
+  // Calculate the grid size (trying to make perfect squares and minimizing empty space)
+  // or max out at 12xN;
+  const maxElementsPerRow = Math.min(
+    Math.max(
+      Math.floor((Math.sqrt(arr.length) * avgElementLength) / maxElementLength),
+      1
+    ),
+    12
+  );
+
+  // Tries to align the columns.
+  const alignColumn = (elem, i) => {
+    const length = elem.replace(/\u001b\[[0-9;]*m/g, '').length;
+    const shift = maxElementLength - length;
+    if (isUniform) {
+      return i === arr.length - 1
+        ? pre(shift) + elem
+        : pre(shift) + elem + ', ';
+    } else {
+      return i === arr.length - 1
+        ? elem + pre(shift)
+        : elem + ', ' + pre(shift);
+    }
+  };
+
+  // Creates rows of length `maxElementsPerRow`.
+  const groupRows = (acc, elem, i) => {
+    if (acc.atRow === maxElementsPerRow || i === 0) {
+      acc.list.push([elem]);
+      acc.atRow = 0;
+    } else {
+      acc.list[acc.list.length - 1].push(elem);
+      acc.atRow++;
+    }
+    return acc;
+  };
+
+  // Indents row based on the depth we're currently in.
+  const indentRow = (row) => pre(depth * 2) + row.join('');
+
+  let output = arr.map(alignColumn);
+
+  output = output.reduce(groupRows, { atRow: 0, list: [] });
+  output = output.list.map(indentRow).join('\n');
+
+  return output;
+}
+
+function stringifyTypedArray(arr, depth = 0) {
+  // Colorize internal values.
+  let pretty = arr
+    .toString()
+    .split(',')
+    .map((elem) => yellow(elem));
+
+  // Get typed-array's specific type.
   const type = Object.prototype.toString
     .call(arr)
     .replace('[object ', '')
     .replace(']', '');
+
+  if (pretty.length > 50) {
+    pretty = prettifyArray(pretty, depth, true);
+    return `${type}(${arr.length}) [\n${pretty}\n${pre((depth - 1) * 2)}]`;
+  }
 
   return `${type}(${arr.length}) [ ${pretty} ]`;
 }
@@ -134,7 +209,7 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
   }
 
   if (isTypedArray(value)) {
-    return stringifyTypedArray(value);
+    return stringifyTypedArray(value, depth);
   }
 
   if (isDate(value)) {
