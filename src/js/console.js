@@ -165,7 +165,7 @@ function stringifyTypedArray(arr, depth = 0) {
     return `${type}(${arr.length}) [\n${pretty}\n${pre((depth - 1) * 2)}]`;
   }
 
-  return `${type}(${arr.length}) [ ${pretty} ]`;
+  return `${type}(${arr.length}) [ ${pretty.join(', ')} ]`;
 }
 
 function isDate(value) {
