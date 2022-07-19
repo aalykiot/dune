@@ -1,4 +1,5 @@
 use crate::bindings::set_function_to;
+use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
@@ -10,6 +11,25 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
+}
+
+struct TimerFuture {
+    callback: v8::Global<v8::Function>,
+    params: Vec<v8::Global<v8::Value>>,
+}
+
+impl JsFuture for TimerFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        let undefined = v8::undefined(scope).into();
+        let callback = v8::Local::new(scope, self.callback.clone());
+        let args: Vec<v8::Local<v8::Value>> = self
+            .params
+            .iter()
+            .map(|arg| v8::Local::new(scope, arg))
+            .collect();
+
+        callback.call(scope, undefined, &args);
+    }
 }
 
 /// Schedules a new timeout to the event-loop.
@@ -42,18 +62,8 @@ fn create_timeout(
     let timer_cb = {
         let state_rc = state_rc.clone();
         move || {
-            let js_task = Box::new(move |scope: &mut v8::HandleScope| {
-                let undefined = v8::undefined(scope).into();
-                let callback = v8::Local::new(scope, callback);
-                let args: Vec<v8::Local<v8::Value>> = params
-                    .iter()
-                    .map(|arg| v8::Local::new(scope, arg))
-                    .collect();
-
-                callback.call(scope, undefined, &args);
-            });
-
-            state_rc.borrow_mut().pending_js_tasks.push(js_task);
+            let future = TimerFuture { callback, params };
+            state_rc.borrow_mut().pending_futures.push(Box::new(future));
         }
     };
 

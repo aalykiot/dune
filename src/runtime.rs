@@ -18,8 +18,11 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-/// A closure representing an asynchronous JS operation that is completed.
-pub type JsAsyncHandle = Box<dyn FnOnce(&mut v8::HandleScope)>;
+/// Defines an abstract interface for something that should run in respond
+/// to an async task, scheduled prevously and is now completed.
+pub trait JsFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope);
+}
 
 /// The state to be stored per v8 isolate.
 pub struct JsRuntimeState {
@@ -29,8 +32,8 @@ pub struct JsRuntimeState {
     pub modules: ModuleMap,
     /// A handle to the runtime's event-loop.
     pub handle: LoopHandle,
-    /// Holds JS pending async handles scheduled by the event-loop.
-    pub pending_js_tasks: Vec<JsAsyncHandle>,
+    /// Holds JS pending futures scheduled by the event-loop.
+    pub pending_futures: Vec<Box<dyn JsFuture>>,
     /// Indicates the start time of the process.
     pub startup_moment: Instant,
     /// Specifies the timestamp which the current process began in Unix time.
@@ -41,8 +44,7 @@ pub struct JsRuntime {
     /// A VM instance with its own heap.
     /// https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html
     isolate: v8::OwnedIsolate,
-    /// The event-loop instance that takes care of polling for I/O and scheduling callbacks
-    /// to be run based on different sources of events.
+    /// The event-loop instance that takes care of polling for I/O.
     pub event_loop: EventLoop,
 }
 
@@ -86,7 +88,7 @@ impl JsRuntime {
             context,
             modules: ModuleMap::default(),
             handle: event_loop.handle(),
-            pending_js_tasks: Vec::new(),
+            pending_futures: Vec::new(),
             startup_moment: Instant::now(),
             time_origin,
         })));
@@ -190,7 +192,7 @@ impl JsRuntime {
     /// Runs a single tick of the event-loop.
     pub fn tick_event_loop(&mut self) {
         self.event_loop.tick();
-        self.run_pending_js_tasks();
+        self.run_pending_futures();
     }
 
     /// Runs the event-loop until no more pending events exists.
@@ -201,28 +203,29 @@ impl JsRuntime {
     }
 
     /// Runs all the pending javascript tasks.
-    fn run_pending_js_tasks(&mut self) {
+    fn run_pending_futures(&mut self) {
         // Get a handle-scope and a reference to the runtime's state.
         let scope = &mut self.handle_scope();
         let state_rc = Self::state(scope);
 
-        // NOTE: The reason we move all the async handles to a separate vec is because
+        // NOTE: The reason we move all the js futures to a separate vec is because
         // we need to drop the `state` borrow before we start iterating through all
-        // the handles to avoid borrowing panics at runtime.
+        // to them to avoid borrowing panics at runtime.
         //
         // Example: setTimeout schedules another setTimeout.
         //
-        let mut tasks: Vec<JsAsyncHandle> =
-            state_rc.borrow_mut().pending_js_tasks.drain(..).collect();
+        let futures: Vec<Box<dyn JsFuture>> =
+            state_rc.borrow_mut().pending_futures.drain(..).collect();
 
-        // Run all pending javascript tasks.
-        tasks.drain(..).for_each(|task| {
-            (task)(scope);
-        });
+        // Run all pending js tasks.
+        for mut future in futures {
+            future.run(scope);
+        }
     }
 }
 
-// --- State management specific methods. ---
+// State management specific methods.
+// https://github.com/lmt-swallow/puppy-browser/blob/main/src/javascript/runtime.rs
 
 impl JsRuntime {
     /// Returns the runtime state stored in the given isolate.
