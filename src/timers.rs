@@ -64,11 +64,13 @@ fn create_timeout(
     let timer_cb = {
         let state_rc = state_rc.clone();
         move || {
+            let mut state = state_rc.borrow_mut();
             let future = TimerFuture {
                 callback: Rc::clone(&callback),
                 params: Rc::clone(&params),
             };
-            state_rc.borrow_mut().pending_futures.push(Box::new(future));
+            state.pending_futures.push(Box::new(future));
+            state.check_and_interrupt();
         }
     };
 

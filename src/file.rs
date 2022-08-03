@@ -109,6 +109,7 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
                 maybe_result,
             };
             state.pending_futures.push(Box::new(future));
+            state.check_and_interrupt();
         }
     };
 
@@ -239,6 +240,7 @@ fn write(
                 maybe_result,
             };
             state.pending_futures.push(Box::new(fs_write_handle));
+            state.check_and_interrupt();
         }
     };
 

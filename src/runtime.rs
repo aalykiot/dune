@@ -4,6 +4,7 @@ use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::event_loop::EventLoop;
 use crate::event_loop::LoopHandle;
+use crate::event_loop::LoopInterruptHandle;
 use crate::hooks::module_resolve_cb;
 use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
@@ -11,6 +12,7 @@ use crate::modules::resolve_import;
 use crate::modules::ModuleMap;
 use anyhow::bail;
 use anyhow::Error;
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
@@ -18,8 +20,8 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-/// Defines an abstract interface for something that should run in respond
-/// to an async task, scheduled prevously and is now completed.
+/// An abstract interface for something that should run in respond to an
+/// async task, scheduled previously and is now completed.
 pub trait JsFuture {
     fn run(&mut self, scope: &mut v8::HandleScope);
 }
@@ -38,6 +40,19 @@ pub struct JsRuntimeState {
     pub startup_moment: Instant,
     /// Specifies the timestamp which the current process began in Unix time.
     pub time_origin: u128,
+    /// Specifies if an event-loop interrupt event is pending.
+    pub will_interrupt: Cell<bool>,
+    /// An interrupt handle for the event-loop.
+    pub waker: LoopInterruptHandle,
+}
+
+impl JsRuntimeState {
+    /// Sends an interrupt event to the event-loop if no other interrupt event is pending.
+    pub fn check_and_interrupt(&self) {
+        if !self.will_interrupt.get() {
+            self.waker.interrupt();
+        }
+    }
 }
 
 pub struct JsRuntime {
@@ -91,6 +106,8 @@ impl JsRuntime {
             pending_futures: Vec::new(),
             startup_moment: Instant::now(),
             time_origin,
+            will_interrupt: Cell::new(false),
+            waker: event_loop.interrupt_handle(),
         })));
 
         let mut runtime = JsRuntime {
@@ -199,6 +216,7 @@ impl JsRuntime {
     pub fn run_event_loop(&mut self) {
         while self.event_loop.has_pending_events() {
             self.tick_event_loop();
+            self.get_state().borrow().will_interrupt.set(false);
         }
     }
 
@@ -210,10 +228,8 @@ impl JsRuntime {
 
         // NOTE: The reason we move all the js futures to a separate vec is because
         // we need to drop the `state` borrow before we start iterating through all
-        // to them to avoid borrowing panics at runtime.
-        //
-        // Example: setTimeout schedules another setTimeout.
-        //
+        // of them to avoid borrowing panics at runtime.
+
         let futures: Vec<Box<dyn JsFuture>> =
             state_rc.borrow_mut().pending_futures.drain(..).collect();
 

@@ -209,7 +209,6 @@ impl EventLoop {
         self.thread_pool.execute(move || {
             let result = (task)();
             let notifier = notifier.lock().unwrap();
-
             notifier.send(Event::ThreadPool(index, result)).unwrap();
         });
 
