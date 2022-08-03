@@ -1,4 +1,8 @@
 use anyhow::Result;
+use downcast_rs::impl_downcast;
+use downcast_rs::Downcast;
+use std::any::type_name;
+use std::borrow::Cow;
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -14,14 +18,34 @@ type Index = u32;
 
 pub type TaskResult = Option<Result<Vec<u8>>>;
 
+/// All objects that are tracked by the event-loop should implement the `Resource` trait.
+pub trait Resource: Downcast + 'static {
+    /// Returns a string representation of the resource.
+    fn name(&self) -> Cow<str> {
+        type_name::<Self>().into()
+    }
+}
+
+impl_downcast!(Resource);
+
+struct TimerWrap {
+    cb: Box<dyn FnMut() + 'static>,
+    expires_at: Duration,
+    repeat: bool,
+}
+
+impl Resource for TimerWrap {}
+
+struct TaskWrap {
+    inner: Option<Box<dyn FnOnce(TaskResult) + 'static>>,
+}
+
+impl Resource for TaskWrap {}
+
 enum Action {
-    NewTimer(Index, Duration, Box<dyn FnOnce()>),
+    NewTimer(Index, TimerWrap),
     RemoveTimer(Index),
-    SpawnTask(
-        Index,
-        Box<dyn FnOnce() -> TaskResult + Send>,
-        Option<Box<dyn FnOnce(TaskResult)>>,
-    ),
+    SpawnTask(Index, Box<dyn FnOnce() -> TaskResult + Send>, TaskWrap),
 }
 
 enum Event {
@@ -31,13 +55,12 @@ enum Event {
 
 pub struct EventLoop {
     index: Rc<Cell<Index>>,
-    timer_callbacks: HashMap<Index, Box<dyn FnOnce()>>,
+    resources: HashMap<Index, Box<dyn Resource>>,
     timer_queue: BTreeMap<Instant, Index>,
     action_queue: mpsc::Receiver<Action>,
     action_queue_empty: Rc<Cell<bool>>,
     action_dispatcher: Rc<mpsc::Sender<Action>>,
     thread_pool: ThreadPool,
-    task_callbacks: HashMap<Index, Box<dyn FnOnce(TaskResult)>>,
     event_dispatcher: Arc<Mutex<mpsc::Sender<Event>>>,
     event_queue: mpsc::Receiver<Event>,
     pending_tasks: u32,
@@ -50,13 +73,12 @@ impl EventLoop {
 
         EventLoop {
             index: Rc::new(Cell::new(1)),
-            timer_callbacks: HashMap::new(),
+            resources: HashMap::new(),
             timer_queue: BTreeMap::new(),
             action_queue,
             action_queue_empty: Rc::new(Cell::new(true)),
             action_dispatcher: Rc::new(action_dispatcher),
             thread_pool: ThreadPool::new(4),
-            task_callbacks: HashMap::new(),
             event_dispatcher: Arc::new(Mutex::new(event_dispatcher)),
             event_queue,
             pending_tasks: 0,
@@ -78,7 +100,7 @@ impl EventLoop {
     }
 
     pub fn has_pending_events(&self) -> bool {
-        !(self.timer_queue.is_empty() && self.action_queue_empty.get() && self.pending_tasks == 0)
+        !(self.resources.is_empty() && self.action_queue_empty.get())
     }
 
     pub fn tick(&mut self) {
@@ -90,28 +112,44 @@ impl EventLoop {
     fn prepare(&mut self) {
         while let Ok(action) = self.action_queue.try_recv() {
             match action {
-                Action::NewTimer(index, delay, cb) => self.ev_new_timer(index, delay, cb),
+                Action::NewTimer(index, timer) => self.ev_new_timer(index, timer),
                 Action::RemoveTimer(index) => self.ev_remove_timer(&index),
-                Action::SpawnTask(index, task, task_cb) => self.ev_spawn_task(index, task, task_cb),
+                Action::SpawnTask(index, task, t_wrap) => self.ev_spawn_task(index, task, t_wrap),
             };
         }
         self.action_queue_empty.set(true);
     }
 
     fn run_timers(&mut self) {
+        // Note: We use this intermediate vector so we don't have Rust complaining
+        // about holding multiple references.
         let timers_to_remove: Vec<Instant> = self
             .timer_queue
             .range(..Instant::now())
             .map(|(k, _)| *k)
             .collect();
 
-        timers_to_remove.iter().for_each(|key| {
-            let index = match self.timer_queue.remove(key) {
-                Some(index) => index,
-                None => return,
-            };
-            if let Some(callback) = self.timer_callbacks.remove(&index) {
-                (callback)();
+        let indexes: Vec<Index> = timers_to_remove
+            .iter()
+            .filter_map(|instant| self.timer_queue.remove(instant))
+            .collect();
+
+        indexes.iter().for_each(|index| {
+            if let Some(timer) = self
+                .resources
+                .get_mut(index)
+                .map(|resource| resource.downcast_mut::<TimerWrap>().unwrap())
+            {
+                // Run timer's callback.
+                (timer.cb)();
+
+                // If the timer is repeatable reschedule him, otherwise drop him.
+                if timer.repeat {
+                    let time_key = Instant::now() + timer.expires_at;
+                    self.timer_queue.insert(time_key, *index);
+                } else {
+                    self.resources.remove(index);
+                }
             }
         });
 
@@ -138,19 +176,21 @@ impl EventLoop {
     }
 
     fn run_task_callback(&mut self, index: Index, result: TaskResult) {
-        if let Some(cb) = self.task_callbacks.remove(&index) {
-            (cb)(result);
+        if let Some(mut resource) = self.resources.remove(&index) {
+            let task_wrap = resource.downcast_mut::<TaskWrap>().unwrap();
+            let callback = task_wrap.inner.take().unwrap();
+            (callback)(result);
         }
     }
 
-    fn ev_new_timer(&mut self, index: Index, delay: Duration, cb: Box<dyn FnOnce()>) {
-        let time_key = Instant::now() + delay;
-        self.timer_callbacks.insert(index, cb);
+    fn ev_new_timer(&mut self, index: Index, timer: TimerWrap) {
+        let time_key = Instant::now() + timer.expires_at;
+        self.resources.insert(index, Box::new(timer));
         self.timer_queue.insert(time_key, index);
     }
 
     fn ev_remove_timer(&mut self, index: &Index) {
-        self.timer_callbacks.remove(index);
+        self.resources.remove(index);
         self.timer_queue.retain(|_, v| *v != *index);
     }
 
@@ -158,12 +198,12 @@ impl EventLoop {
         &mut self,
         index: Index,
         task: Box<dyn FnOnce() -> TaskResult + Send>,
-        task_cb: Option<Box<dyn FnOnce(TaskResult)>>,
+        task_wrap: TaskWrap,
     ) {
         let notifier = self.event_dispatcher.clone();
 
-        if let Some(cb) = task_cb {
-            self.task_callbacks.insert(index, cb);
+        if task_wrap.inner.is_some() {
+            self.resources.insert(index, Box::new(task_wrap));
         }
 
         self.thread_pool.execute(move || {
@@ -199,17 +239,20 @@ impl LoopHandle {
     }
 
     /// Schedules a new timer to the event-loop.
-    pub fn timer<F>(&self, delay: u64, cb: F) -> Index
+    pub fn timer<F>(&self, delay: u64, repeat: bool, cb: F) -> Index
     where
-        F: FnOnce() + 'static,
+        F: FnMut() + 'static,
     {
         let index = self.index();
         let expires_at = Duration::from_millis(delay);
 
-        self.actions
-            .send(Action::NewTimer(index, expires_at, Box::new(cb)))
-            .unwrap();
+        let timer = TimerWrap {
+            cb: Box::new(cb),
+            expires_at,
+            repeat,
+        };
 
+        self.actions.send(Action::NewTimer(index, timer)).unwrap();
         self.actions_queue_empty.set(false);
 
         index
@@ -236,8 +279,10 @@ impl LoopHandle {
             None => None,
         };
 
+        let task_wrap = TaskWrap { inner: task_cb };
+
         self.actions
-            .send(Action::SpawnTask(index, Box::new(task), task_cb))
+            .send(Action::SpawnTask(index, Box::new(task), task_wrap))
             .unwrap();
 
         self.actions_queue_empty.set(false);

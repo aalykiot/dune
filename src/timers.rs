@@ -1,6 +1,7 @@
 use crate::bindings::set_function_to;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
+use std::rc::Rc;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
@@ -14,14 +15,14 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 }
 
 struct TimerFuture {
-    callback: v8::Global<v8::Function>,
-    params: Vec<v8::Global<v8::Value>>,
+    callback: Rc<v8::Global<v8::Function>>,
+    params: Rc<Vec<v8::Global<v8::Value>>>,
 }
 
 impl JsFuture for TimerFuture {
     fn run(&mut self, scope: &mut v8::HandleScope) {
         let undefined = v8::undefined(scope).into();
-        let callback = v8::Local::new(scope, self.callback.clone());
+        let callback = v8::Local::new(scope, (*self.callback).clone());
         let args: Vec<v8::Local<v8::Value>> = self
             .params
             .iter()
@@ -40,7 +41,7 @@ fn create_timeout(
 ) {
     // Get timer's callback.
     let callback = v8::Local::<v8::Function>::try_from(args.get(0)).unwrap();
-    let callback = v8::Global::new(scope, callback);
+    let callback = Rc::new(v8::Global::new(scope, callback));
 
     // Get timer's expiration time in millis.
     let millis = args.get(1).int32_value(scope).unwrap() as u64;
@@ -58,18 +59,22 @@ fn create_timeout(
     };
 
     let state_rc = JsRuntime::state(scope);
+    let params = Rc::new(params);
 
     let timer_cb = {
         let state_rc = state_rc.clone();
         move || {
-            let future = TimerFuture { callback, params };
+            let future = TimerFuture {
+                callback: Rc::clone(&callback),
+                params: Rc::clone(&params),
+            };
             state_rc.borrow_mut().pending_futures.push(Box::new(future));
         }
     };
 
     // Schedule a new timer to the event-loop.
     let state = state_rc.borrow();
-    let id = state.handle.timer(millis, timer_cb);
+    let id = state.handle.timer(millis, false, timer_cb);
 
     // Return timeout's internal id.
     rv.set(v8::Number::new(scope, id as f64).into());

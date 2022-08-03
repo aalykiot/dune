@@ -28,6 +28,7 @@ url = "2.2.2"
 clearscreen = "1.0.10"
 serde = { version = "1.0.136", features = ["derive"] }
 rmp-serde = "1.0.0"
+downcast-rs = { version = "1.2.0", default-features = false }
 
 [dev-dependencies]
 assert_fs = "1.0.7"
