@@ -29,6 +29,12 @@ clearscreen = "1.0.10"
 serde = { version = "1.0.136", features = ["derive"] }
 rmp-serde = "1.0.0"
 downcast-rs = { version = "1.2.0", default-features = false }
+swc_common = { version = "0.26.0", features = ["tty-emitter"] }
+swc_ecma_codegen = "0.120.2"
+swc_ecma_parser = "0.116.0"
+swc_ecma_transforms_base = "0.102.1"
+swc_ecma_transforms_typescript = "0.143.0"
+swc_ecma_visit = "0.75.0"
 
 [dev-dependencies]
 assert_fs = "1.0.7"

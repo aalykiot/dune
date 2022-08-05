@@ -11,6 +11,7 @@ mod repl;
 mod runtime;
 mod stdio;
 mod timers;
+mod typescript;
 
 use errors::unwrap_or_exit;
 use modules::resolve_import;

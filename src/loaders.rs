@@ -2,6 +2,7 @@ use crate::errors::generic_error;
 use crate::modules::ModulePath;
 use crate::modules::ModuleSource;
 use crate::modules::CORE_MODULES;
+use crate::typescript;
 use anyhow::bail;
 use anyhow::Result;
 use colored::*;
@@ -23,7 +24,7 @@ pub trait ModuleLoader {
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath>;
 }
 
-static EXTENSIONS: &[&str] = &["js", "json"];
+static EXTENSIONS: &[&str] = &["js", "ts", "tsx", "json"];
 
 #[derive(Default)]
 pub struct FsModuleLoader;
@@ -34,7 +35,7 @@ impl FsModuleLoader {
         path.into_os_string().into_string().unwrap()
     }
 
-    /// Checks if path is a JSON file
+    /// Checks if path is a JSON file.
     fn is_json_import(&self, path: &Path) -> bool {
         match path.extension() {
             Some(value) => value == "json",
@@ -47,7 +48,7 @@ impl FsModuleLoader {
         format!("export default JSON.parse(`{}`);", source)
     }
 
-    /// Loads contents from file, and checks for JSON file ext.
+    /// Loads contents from a file.
     fn load_source(&self, path: &Path) -> Result<ModuleSource> {
         let source = fs::read_to_string(path)?;
         let source = match self.is_json_import(path) {
@@ -123,20 +124,28 @@ impl ModuleLoader for FsModuleLoader {
             .load_as_file(path)
             .or_else(|_| self.load_as_directory(path));
 
-        // Append default extention (if none specified)
+        // Append default extension (if none specified).
         let path = match path.extension() {
             Some(_) => path.into(),
             None => path.with_extension("js"),
         };
 
-        if maybe_source.is_err() {
-            bail!(generic_error(format!(
+        let source = match maybe_source {
+            Ok(source) => source,
+            Err(_) => bail!(generic_error(format!(
                 "Module not found \"{}\"",
                 path.display()
-            )));
-        }
+            ))),
+        };
 
-        Ok(maybe_source.unwrap())
+        let path_extension = path.extension().unwrap();
+
+        // Check if it's a TypeScript import.
+        match path_extension == "ts" || path_extension == "tsx" {
+            true => typescript::transpile(path.to_str(), &source)
+                .map_err(|e| generic_error(e.to_string())),
+            false => Ok(source),
+        }
     }
 }
 
@@ -186,10 +195,16 @@ impl ModuleLoader for UrlModuleLoader {
 
         println!("{} {}", "Downloading".green(), specifier);
 
-        // Download file, save it to cache.
+        // Download file and, save it to cache.
         let source = match ureq::get(specifier).call()?.into_string() {
             Ok(source) => source,
             Err(_) => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
+        };
+
+        // Check if it's a TypeScript import.
+        let source = match specifier.ends_with(".ts") || specifier.ends_with(".tsx") {
+            true => typescript::transpile(Some(specifier), &source)?,
+            false => source,
         };
 
         fs::write(&module_path, &source)?;
