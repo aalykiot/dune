@@ -1,4 +1,7 @@
+use crate::bindings::get_internal_ref;
+use crate::bindings::set_constant_to;
 use crate::bindings::set_function_to;
+use crate::bindings::set_internal_ref;
 use crate::bindings::throw_exception;
 use crate::event_loop::TaskResult;
 use crate::runtime::JsFuture;
@@ -6,14 +9,23 @@ use crate::runtime::JsRuntime;
 use anyhow::bail;
 use anyhow::Result;
 use std::fs;
+use std::fs::File;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::path::Path;
+
+#[cfg(target_family = "unix")]
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+
+#[cfg(target_family = "windows")]
+use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
+    set_function_to(scope, target, "open", open);
+    set_function_to(scope, target, "openSync", open_sync);
     set_function_to(scope, target, "read", read);
     set_function_to(scope, target, "readSync", read_sync);
     set_function_to(scope, target, "write", write);
@@ -21,6 +33,119 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
+}
+
+/// Describes what will run after the async open_file_op completes.
+struct FsOpenFuture {
+    promise: v8::Global<v8::PromiseResolver>,
+    maybe_result: TaskResult,
+}
+
+impl JsFuture for FsOpenFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        let result = self.maybe_result.take().unwrap();
+
+        // Handle when something goes wrong with opening the file.
+        if let Err(e) = result {
+            let message = v8::String::new(scope, &e.to_string()).unwrap();
+            let exception = v8::Exception::error(scope, message);
+            // Reject the promise on failure.
+            self.promise.open(scope).reject(scope, exception);
+            return;
+        }
+
+        // Otherwise, get the result and deserialize it.
+        let result = result.unwrap();
+
+        let file_ptr: usize = bincode::deserialize(&result).unwrap();
+
+        // Get a file from the raw file-descriptor.
+        let file = get_file_reference(file_ptr);
+        let file_wrap = v8::ObjectTemplate::new(scope);
+
+        // Allocate space for the wrapped Rust type.
+        file_wrap.set_internal_field_count(1);
+
+        let file_wrap = file_wrap.new_instance(scope).unwrap();
+        let fd = v8::Number::new(scope, file_ptr as f64);
+
+        set_constant_to(scope, file_wrap, "fd", fd.into());
+        set_internal_ref(scope, file_wrap, 0, file);
+
+        self.promise
+            .open(scope)
+            .resolve(scope, file_wrap.into())
+            .unwrap();
+    }
+}
+
+/// Opens a file asynchronously.
+fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+    // Get file path.
+    let path = args.get(0).to_rust_string_lossy(scope);
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    // The actual async task.
+    let task = move || match open_file_op(path) {
+        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+        Err(e) => Some(Result::Err(e)),
+    };
+
+    // The callback that will run after the above task completes.
+    let task_cb = {
+        let promise = v8::Global::new(scope, promise_resolver);
+        let state_rc = state_rc.clone();
+
+        move |maybe_result: TaskResult| {
+            let mut state = state_rc.borrow_mut();
+            let future = FsOpenFuture {
+                promise,
+                maybe_result,
+            };
+            state.pending_futures.push(Box::new(future));
+            state.check_and_interrupt();
+        }
+    };
+
+    // Spawn the async task using the event-loop.
+    state.handle.spawn(task, Some(task_cb));
+
+    rv.set(promise.into());
+}
+
+/// Opens a file synchronously.
+fn open_sync(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get file path.
+    let path = args.get(0).to_rust_string_lossy(scope);
+
+    match open_file_op(path) {
+        Ok(file_ptr) => {
+            // Get a file from the raw file-descriptor.
+            let file = get_file_reference(file_ptr);
+            let fd = v8::Number::new(scope, file_ptr as f64);
+
+            // Create local JS object.
+            let file_wrap = v8::Object::new(scope);
+
+            set_constant_to(scope, file_wrap, "fd", fd.into());
+            set_internal_ref(scope, file_wrap, 0, file);
+
+            rv.set(file_wrap.into());
+        }
+        Err(e) => {
+            throw_exception(scope, &e.to_string());
+        }
+    }
 }
 
 /// Describes what will run after the async read_file_op completes.
@@ -77,8 +202,11 @@ impl JsFuture for FsReadFuture {
 
 /// Reads asynchronously a chunk of a file (as bytes).
 fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
-    // Get source path.
-    let path = args.get(0).to_rust_string_lossy(scope);
+    // Get the file_wrap object.
+    let file_wrap = args.get(0).to_object(scope).unwrap();
+
+    let file = get_internal_ref::<File>(scope, file_wrap, 0);
+    let mut file = file.try_clone().unwrap();
 
     // Get chunk size and byte offset.
     let size = args.get(1).to_integer(scope).unwrap().value();
@@ -92,7 +220,7 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || match read_file_op(path, size, offset) {
+    let task = move || match read_file_op(&mut file, size, offset) {
         Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
@@ -125,14 +253,17 @@ fn read_sync(
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
-    // Get source path.
-    let path = args.get(0).to_rust_string_lossy(scope);
+    // Get the file_wrap object.
+    let file_wrap = args.get(0).to_object(scope).unwrap();
+
+    let file = get_internal_ref::<File>(scope, file_wrap, 0);
+    let mut file = file.try_clone().unwrap();
 
     // Get chunk size and byte offset.
     let size = args.get(1).to_integer(scope).unwrap().value();
     let offset = args.get(2).to_integer(scope).unwrap().value();
 
-    match read_file_op(path, size, offset) {
+    match read_file_op(&mut file, size, offset) {
         Ok((n, mut buffer)) => {
             // We reached the end of the file.
             if n == 0 {
@@ -205,8 +336,11 @@ fn write(
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
-    // Get file path.
-    let path = args.get(0).to_rust_string_lossy(scope);
+    // Get the file_wrap object.
+    let file_wrap = args.get(0).to_object(scope).unwrap();
+
+    let file = get_internal_ref::<File>(scope, file_wrap, 0);
+    let mut file = file.try_clone().unwrap();
 
     // Get data as ArrayBuffer.
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
@@ -222,7 +356,7 @@ fn write(
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || match write_file_op(path, &buffer) {
+    let task = move || match write_file_op(&mut file, &buffer) {
         Ok(_) => None,
         Err(e) => Some(Result::Err(e)),
     };
@@ -256,8 +390,11 @@ fn write_sync(
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
-    // Get file path.
-    let path = args.get(0).to_rust_string_lossy(scope);
+    // Get the file_wrap object.
+    let file_wrap = args.get(0).to_object(scope).unwrap();
+
+    let file = get_internal_ref::<File>(scope, file_wrap, 0);
+    let mut file = file.try_clone().unwrap();
 
     // Get data as ArrayBuffer.
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
@@ -265,19 +402,45 @@ fn write_sync(
     let mut buffer = vec![0; data.byte_length()];
     data.copy_contents(&mut buffer);
 
-    if let Err(e) = write_file_op(path, &buffer) {
+    if let Err(e) = write_file_op(&mut file, &buffer) {
         throw_exception(scope, &e.to_string());
     }
 }
 
-/// Pure rust implementation of reading a chunk from a file.
-fn read_file_op<P: AsRef<Path>>(path: P, size: i64, offset: i64) -> Result<(usize, Vec<u8>)> {
-    // Try open requested file.
-    let mut file = match fs::File::open(path) {
-        Ok(file) => file,
-        Err(e) => bail!(e),
-    };
+#[cfg(target_family = "unix")]
+fn get_file_reference(fd: usize) -> File {
+    unsafe { fs::File::from_raw_fd(fd as RawFd) }
+}
 
+#[cfg(target_family = "windows")]
+fn get_file_reference(handle: usize) -> File {
+    unsafe { fs::File::from_raw_handle(handle as RawHandle) }
+}
+
+#[cfg(target_family = "unix")]
+/// Pure rust implementation of opening a file.
+fn open_file_op<P: AsRef<Path>>(path: P) -> Result<usize> {
+    // Note: The reason we leak the wrapped file handle is to prevent rust
+    // from dropping the handle (a.k.a close the file) when current scope ends.
+    match fs::File::open(path) {
+        Ok(file) => Ok(Box::leak(Box::new(file)).as_raw_fd() as usize),
+        Err(e) => bail!(e),
+    }
+}
+
+#[cfg(target_family = "windows")]
+/// Pure rust implementation of opening a file.
+fn open_file_op<P: AsRef<Path>>(path: P) -> Result<usize> {
+    // Note: The reason we leak the wrapped file handle is to prevent rust
+    // from dropping the handle (a.k.a close the file) when current scope ends.
+    match fs::File::open(path) {
+        Ok(file) => Ok(Box::leak(Box::new(file)).as_raw_handle() as usize),
+        Err(e) => bail!(e),
+    }
+}
+
+/// Pure rust implementation of reading a chunk from a file.
+fn read_file_op(file: &mut File, size: i64, offset: i64) -> Result<(usize, Vec<u8>)> {
     // Move file cursor to requested position.
     if let Err(e) = file.seek(SeekFrom::Start(offset as u64)) {
         bail!(e);
@@ -293,17 +456,10 @@ fn read_file_op<P: AsRef<Path>>(path: P, size: i64, offset: i64) -> Result<(usiz
 }
 
 /// Pure rust implementation of writing bytes to a file.
-fn write_file_op<P: AsRef<Path>>(path: P, buffer: &[u8]) -> Result<()> {
-    // Try open file.
-    let mut file = match fs::File::create(path) {
-        Ok(file) => file,
-        Err(e) => bail!(e),
-    };
-
+fn write_file_op(file: &mut File, buffer: &[u8]) -> Result<()> {
     // Write buffer to file.
     if let Err(e) = file.write_all(buffer) {
         bail!(e);
     }
-
     Ok(())
 }

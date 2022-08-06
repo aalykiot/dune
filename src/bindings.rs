@@ -5,6 +5,7 @@ use crate::stdio;
 use crate::timers;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
+use std::ffi::c_void;
 
 /// Function pointer for the bindings initializers.
 type BindingInitFn = fn(&mut v8::HandleScope<'_>) -> v8::Global<v8::Object>;
@@ -102,6 +103,33 @@ pub fn create_object_under<'s>(
     target.set(scope, key.into(), value.into());
 
     value
+}
+
+/// Stores a Rust type inside a v8 object.
+pub fn set_internal_ref<'s, T>(
+    scope: &mut v8::HandleScope<'s>,
+    target: v8::Local<v8::Object>,
+    index: usize,
+    data: T,
+) {
+    let boxed_ref = Box::new(data);
+    let addr = Box::leak(boxed_ref) as *mut T as *mut c_void;
+    let v8_ext = v8::External::new(scope, addr);
+
+    target.set_internal_field(index, v8_ext.into());
+}
+
+/// Gets a previously stored Rust type from a v8 object.
+pub fn get_internal_ref<'s, T>(
+    scope: &mut v8::HandleScope<'s>,
+    source: v8::Local<v8::Object>,
+    index: usize,
+) -> &'s mut T {
+    let v8_ref = source.get_internal_field(scope, index).unwrap();
+    let stored_item = unsafe { v8::Local::<v8::External>::cast(v8_ref) };
+    let stored_item = stored_item.value() as *mut T;
+
+    unsafe { &mut *stored_item }
 }
 
 /// Useful utility to throw v8 exceptions.
