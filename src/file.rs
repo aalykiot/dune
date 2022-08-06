@@ -46,7 +46,7 @@ impl JsFuture for FsReadFuture {
         let result = result.unwrap();
 
         // Decompress message-pack binary into actual rust types.
-        let (n, mut buffer): (usize, Vec<u8>) = rmp_serde::from_slice(&result).unwrap();
+        let (n, mut buffer): (usize, Vec<u8>) = bincode::deserialize(&result).unwrap();
 
         // We reached the end of the file.
         if n == 0 {
@@ -93,7 +93,7 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
 
     // The actual async task.
     let task = move || match read_file_op(path, size, offset) {
-        Ok(result) => Some(Ok(rmp_serde::to_vec(&result).unwrap())),
+        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
 
