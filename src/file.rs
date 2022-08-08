@@ -26,6 +26,8 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 
     set_function_to(scope, target, "open", open);
     set_function_to(scope, target, "openSync", open_sync);
+    set_function_to(scope, target, "close", close);
+    set_function_to(scope, target, "closeSync", close_sync);
     set_function_to(scope, target, "read", read);
     set_function_to(scope, target, "readSync", read_sync);
     set_function_to(scope, target, "write", write);
@@ -57,24 +59,22 @@ impl JsFuture for FsOpenFuture {
         // Otherwise, get the result and deserialize it.
         let result = result.unwrap();
 
+        // Deserialize bytes into a file-descriptor.
         let file_ptr: usize = bincode::deserialize(&result).unwrap();
-
-        // Get a file from the raw file-descriptor.
-        let file = get_file_reference(file_ptr);
-        let file_wrap = v8::ObjectTemplate::new(scope);
+        let file_wrapper = v8::ObjectTemplate::new(scope);
 
         // Allocate space for the wrapped Rust type.
-        file_wrap.set_internal_field_count(1);
+        file_wrapper.set_internal_field_count(1);
 
-        let file_wrap = file_wrap.new_instance(scope).unwrap();
+        let file_wrapper = file_wrapper.new_instance(scope).unwrap();
         let fd = v8::Number::new(scope, file_ptr as f64);
 
-        set_constant_to(scope, file_wrap, "fd", fd.into());
-        set_internal_ref(scope, file_wrap, 0, file);
+        set_constant_to(scope, file_wrapper, "fd", fd.into());
+        set_internal_ref(scope, file_wrapper, 0, Some(file_ptr));
 
         self.promise
             .open(scope)
-            .resolve(scope, file_wrap.into())
+            .resolve(scope, file_wrapper.into())
             .unwrap();
     }
 }
@@ -130,17 +130,18 @@ fn open_sync(
 
     match open_file_op(path) {
         Ok(file_ptr) => {
-            // Get a file from the raw file-descriptor.
-            let file = get_file_reference(file_ptr);
+            let file = v8::ObjectTemplate::new(scope);
+
+            // Allocate space for the wrapped Rust type.
+            file.set_internal_field_count(1);
+
+            let file_wrapper = file.new_instance(scope).unwrap();
             let fd = v8::Number::new(scope, file_ptr as f64);
 
-            // Create local JS object.
-            let file_wrap = v8::Object::new(scope);
+            set_constant_to(scope, file_wrapper, "fd", fd.into());
+            set_internal_ref(scope, file_wrapper, 0, Some(file_ptr));
 
-            set_constant_to(scope, file_wrap, "fd", fd.into());
-            set_internal_ref(scope, file_wrap, 0, file);
-
-            rv.set(file_wrap.into());
+            rv.set(file_wrapper.into());
         }
         Err(e) => {
             throw_exception(scope, &e.to_string());
@@ -200,13 +201,67 @@ impl JsFuture for FsReadFuture {
     }
 }
 
+/// Closes a file asynchronously.
+fn close(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get the file_wrap object.
+    let file_wrap = args.get(0).to_object(scope).unwrap();
+    let file_ptr = get_internal_ref::<Option<usize>>(scope, file_wrap, 0);
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    if let Some(ptr) = file_ptr {
+        let undefined = v8::undefined(scope);
+        let file = get_file_reference(*ptr);
+
+        // Note: By creating a file reference and immediately dropping it will
+        // make rust to close the file.
+        drop(file);
+        set_internal_ref(scope, file_wrap, 0, None::<usize>);
+
+        promise_resolver.resolve(scope, undefined.into());
+        rv.set(promise.into());
+        return;
+    }
+
+    let message = v8::String::new(scope, "File is closed.").unwrap();
+    let exception = v8::Exception::error(scope, message);
+
+    promise_resolver.reject(scope, exception);
+    rv.set(promise.into());
+}
+
+/// Closes a file synchronously.
+fn close_sync(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    // Get the file_wrap object.
+    let file_wrap = args.get(0).to_object(scope).unwrap();
+
+    if let Some(file_ptr) = get_internal_ref::<Option<usize>>(scope, file_wrap, 0) {
+        // Note: By creating a file reference and immediately dropping it will
+        // make rust to close the file.
+        let file = get_file_reference(*file_ptr);
+
+        drop(file);
+        set_internal_ref(scope, file_wrap, 0, None::<usize>);
+        return;
+    }
+
+    throw_exception(scope, "File is closed.");
+}
+
 /// Reads asynchronously a chunk of a file (as bytes).
 fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
-
-    let file = get_internal_ref::<File>(scope, file_wrap, 0);
-    let mut file = file.try_clone().unwrap();
 
     // Get chunk size and byte offset.
     let size = args.get(1).to_integer(scope).unwrap().value();
@@ -215,6 +270,21 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     // Create a promise resolver and extract the actual promise.
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
     let promise = promise_resolver.get_promise(scope);
+
+    let file = get_internal_ref::<Option<usize>>(scope, file_wrap, 0);
+
+    // Check if the file is already closed, otherwise create a file reference.
+    let mut file = match file {
+        Some(ptr) => get_file_reference(*ptr),
+        None => {
+            let message = v8::String::new(scope, "File is closed.").unwrap();
+            let exception = v8::Exception::error(scope, message);
+            // Reject the promise.
+            promise_resolver.reject(scope, exception);
+            rv.set(promise.into());
+            return;
+        }
+    };
 
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
@@ -255,9 +325,16 @@ fn read_sync(
 ) {
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
+    let file = get_internal_ref::<Option<usize>>(scope, file_wrap, 0);
 
-    let file = get_internal_ref::<File>(scope, file_wrap, 0);
-    let mut file = file.try_clone().unwrap();
+    // Check if the file is already closed, otherwise create a file reference.
+    let mut file = match file {
+        Some(ptr) => get_file_reference(*ptr),
+        None => {
+            throw_exception(scope, "File is closed.");
+            return;
+        }
+    };
 
     // Get chunk size and byte offset.
     let size = args.get(1).to_integer(scope).unwrap().value();
@@ -339,9 +416,6 @@ fn write(
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
 
-    let file = get_internal_ref::<File>(scope, file_wrap, 0);
-    let mut file = file.try_clone().unwrap();
-
     // Get data as ArrayBuffer.
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
 
@@ -351,6 +425,21 @@ fn write(
     // Create a promise resolver and extract the actual promise.
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
     let promise = promise_resolver.get_promise(scope);
+
+    let file = get_internal_ref::<Option<usize>>(scope, file_wrap, 0);
+
+    // Check if the file is already closed, otherwise create a file reference.
+    let mut file = match file {
+        Some(ptr) => get_file_reference(*ptr),
+        None => {
+            let message = v8::String::new(scope, "File is closed.").unwrap();
+            let exception = v8::Exception::error(scope, message);
+            // Reject the promise.
+            promise_resolver.reject(scope, exception);
+            rv.set(promise.into());
+            return;
+        }
+    };
 
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
@@ -392,9 +481,16 @@ fn write_sync(
 ) {
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
+    let file = get_internal_ref::<Option<usize>>(scope, file_wrap, 0);
 
-    let file = get_internal_ref::<File>(scope, file_wrap, 0);
-    let mut file = file.try_clone().unwrap();
+    // Check if the file is already closed, otherwise create a file reference.
+    let mut file = match file {
+        Some(ptr) => get_file_reference(*ptr),
+        None => {
+            throw_exception(scope, "File is closed.");
+            return;
+        }
+    };
 
     // Get data as ArrayBuffer.
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
