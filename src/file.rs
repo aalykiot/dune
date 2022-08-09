@@ -62,6 +62,8 @@ impl JsFuture for FsOpenFuture {
 
         // Deserialize bytes into a file-descriptor.
         let file_ptr: usize = bincode::deserialize(&result).unwrap();
+        let file = get_file_reference(file_ptr);
+
         let file_wrapper = v8::ObjectTemplate::new(scope);
 
         // Allocate space for the wrapped Rust type.
@@ -71,7 +73,7 @@ impl JsFuture for FsOpenFuture {
         let fd = v8::Number::new(scope, file_ptr as f64);
 
         set_constant_to(scope, file_wrapper, "fd", fd.into());
-        set_internal_ref(scope, file_wrapper, 0, Some(file_ptr));
+        set_internal_ref(scope, file_wrapper, 0, Some(file));
 
         self.promise
             .open(scope)
@@ -137,16 +139,17 @@ fn open_sync(
 
     match open_file_op(path, flags) {
         Ok(file_ptr) => {
-            let file = v8::ObjectTemplate::new(scope);
+            let file = get_file_reference(file_ptr);
+            let file_wrapper = v8::ObjectTemplate::new(scope);
 
             // Allocate space for the wrapped Rust type.
-            file.set_internal_field_count(1);
+            file_wrapper.set_internal_field_count(1);
 
-            let file_wrapper = file.new_instance(scope).unwrap();
+            let file_wrapper = file_wrapper.new_instance(scope).unwrap();
             let fd = v8::Number::new(scope, file_ptr as f64);
 
             set_constant_to(scope, file_wrapper, "fd", fd.into());
-            set_internal_ref(scope, file_wrapper, 0, Some(file_ptr));
+            set_internal_ref(scope, file_wrapper, 0, Some(file));
 
             rv.set(file_wrapper.into());
         }
@@ -164,23 +167,20 @@ fn close(
 ) {
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
-    let file_ptr = get_internal_ref::<Option<usize>>(scope, file_wrap, 0);
 
     // Create a promise resolver and extract the actual promise.
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
     let promise = promise_resolver.get_promise(scope);
 
-    if let Some(ptr) = file_ptr {
-        let undefined = v8::undefined(scope);
-        let file = get_file_reference(*ptr);
-
-        // Note: By creating a file reference and immediately dropping it will
-        // make rust to close the file.
+    if let Some(file) = get_internal_ref::<Option<File>>(scope, file_wrap, 0).take() {
+        // Note: By taking the file reference out of the option and immediately dropping
+        // it will make rust to close the file.
         drop(file);
-        set_internal_ref(scope, file_wrap, 0, None::<usize>);
 
-        promise_resolver.resolve(scope, undefined.into());
+        let success = v8::Boolean::new(scope, true);
+        promise_resolver.resolve(scope, success.into());
         rv.set(promise.into());
+
         return;
     }
 
@@ -200,14 +200,10 @@ fn close_sync(
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
 
-    if let Some(file_ptr) = get_internal_ref::<Option<usize>>(scope, file_wrap, 0) {
-        // Note: By creating a file reference and immediately dropping it will
-        // make rust to close the file.
-        let file = get_file_reference(*file_ptr);
-
-        drop(file);
-        set_internal_ref(scope, file_wrap, 0, None::<usize>);
-        return;
+    if let Some(file) = get_internal_ref::<Option<File>>(scope, file_wrap, 0).take() {
+        // Note: By taking the file reference out of the option and immediately dropping
+        // it will make rust to close the file.
+        return drop(file);
     }
 
     throw_exception(scope, "File is closed.");
@@ -278,11 +274,9 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
     let promise = promise_resolver.get_promise(scope);
 
-    let file = get_internal_ref::<Option<usize>>(scope, file_wrap, 0);
-
     // Check if the file is already closed, otherwise create a file reference.
-    let mut file = match file {
-        Some(ptr) => get_file_reference(*ptr),
+    let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
+        Some(file) => file.try_clone().unwrap(),
         None => {
             let message = v8::String::new(scope, "File is closed.").unwrap();
             let exception = v8::Exception::error(scope, message);
@@ -332,11 +326,10 @@ fn read_sync(
 ) {
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
-    let file = get_internal_ref::<Option<usize>>(scope, file_wrap, 0);
 
     // Check if the file is already closed, otherwise create a file reference.
-    let mut file = match file {
-        Some(ptr) => get_file_reference(*ptr),
+    let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
+        Some(file) => file.try_clone().unwrap(),
         None => {
             throw_exception(scope, "File is closed.");
             return;
@@ -433,11 +426,9 @@ fn write(
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
     let promise = promise_resolver.get_promise(scope);
 
-    let file = get_internal_ref::<Option<usize>>(scope, file_wrap, 0);
-
     // Check if the file is already closed, otherwise create a file reference.
-    let mut file = match file {
-        Some(ptr) => get_file_reference(*ptr),
+    let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
+        Some(file) => file.try_clone().unwrap(),
         None => {
             let message = v8::String::new(scope, "File is closed.").unwrap();
             let exception = v8::Exception::error(scope, message);
@@ -488,11 +479,10 @@ fn write_sync(
 ) {
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
-    let file = get_internal_ref::<Option<usize>>(scope, file_wrap, 0);
 
     // Check if the file is already closed, otherwise create a file reference.
-    let mut file = match file {
-        Some(ptr) => get_file_reference(*ptr),
+    let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
+        Some(file) => file.try_clone().unwrap(),
         None => {
             throw_exception(scope, "File is closed.");
             return;
