@@ -10,6 +10,7 @@ use anyhow::bail;
 use anyhow::Result;
 use std::fs;
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::path::Path;
@@ -84,6 +85,9 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     // Get file path.
     let path = args.get(0).to_rust_string_lossy(scope);
 
+    // Get flags which can be used to configure how a file is opened.
+    let flags = args.get(1).to_rust_string_lossy(scope);
+
     // Create a promise resolver and extract the actual promise.
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
     let promise = promise_resolver.get_promise(scope);
@@ -92,7 +96,7 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || match open_file_op(path) {
+    let task = move || match open_file_op(path, flags) {
         Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
@@ -128,7 +132,10 @@ fn open_sync(
     // Get file path.
     let path = args.get(0).to_rust_string_lossy(scope);
 
-    match open_file_op(path) {
+    // Get flags which can be used to configure how a file is opened.
+    let flags = args.get(1).to_rust_string_lossy(scope);
+
+    match open_file_op(path, flags) {
         Ok(file_ptr) => {
             let file = v8::ObjectTemplate::new(scope);
 
@@ -146,58 +153,6 @@ fn open_sync(
         Err(e) => {
             throw_exception(scope, &e.to_string());
         }
-    }
-}
-
-/// Describes what will run after the async read_file_op completes.
-struct FsReadFuture {
-    promise: v8::Global<v8::PromiseResolver>,
-    maybe_result: TaskResult,
-}
-
-impl JsFuture for FsReadFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
-        let result = self.maybe_result.take().unwrap();
-
-        // Handle when something goes wrong with reading.
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
-            self.promise.open(scope).reject(scope, exception);
-            return;
-        }
-
-        // Otherwise, resolve the promise passing the result.
-        let result = result.unwrap();
-
-        // Decompress message-pack binary into actual rust types.
-        let (n, mut buffer): (usize, Vec<u8>) = bincode::deserialize(&result).unwrap();
-
-        // We reached the end of the file.
-        if n == 0 {
-            // Create an empty ArrayBuffer and return it to JavaScript.
-            let store = v8::ArrayBuffer::new_backing_store(scope, 0).make_shared();
-            let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
-
-            self.promise.open(scope).resolve(scope, bytes.into());
-            return;
-        }
-
-        // Resize buffer given bytes read.
-        buffer.resize(n, 0);
-
-        // Create ArrayBuffer's backing store from Vec<u8>.
-        let store = buffer.into_boxed_slice();
-        let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store).make_shared();
-
-        // Initialize ArrayBuffer.
-        let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
-
-        self.promise
-            .open(scope)
-            .resolve(scope, bytes.into())
-            .unwrap();
     }
 }
 
@@ -256,6 +211,58 @@ fn close_sync(
     }
 
     throw_exception(scope, "File is closed.");
+}
+
+/// Describes what will run after the async read_file_op completes.
+struct FsReadFuture {
+    promise: v8::Global<v8::PromiseResolver>,
+    maybe_result: TaskResult,
+}
+
+impl JsFuture for FsReadFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        let result = self.maybe_result.take().unwrap();
+
+        // Handle when something goes wrong with reading.
+        if let Err(e) = result {
+            let message = v8::String::new(scope, &e.to_string()).unwrap();
+            let exception = v8::Exception::error(scope, message);
+            // Reject the promise on failure.
+            self.promise.open(scope).reject(scope, exception);
+            return;
+        }
+
+        // Otherwise, resolve the promise passing the result.
+        let result = result.unwrap();
+
+        // Decompress message-pack binary into actual rust types.
+        let (n, mut buffer): (usize, Vec<u8>) = bincode::deserialize(&result).unwrap();
+
+        // We reached the end of the file.
+        if n == 0 {
+            // Create an empty ArrayBuffer and return it to JavaScript.
+            let store = v8::ArrayBuffer::new_backing_store(scope, 0).make_shared();
+            let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
+
+            self.promise.open(scope).resolve(scope, bytes.into());
+            return;
+        }
+
+        // Resize buffer given bytes read.
+        buffer.resize(n, 0);
+
+        // Create ArrayBuffer's backing store from Vec<u8>.
+        let store = buffer.into_boxed_slice();
+        let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store).make_shared();
+
+        // Initialize ArrayBuffer.
+        let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
+
+        self.promise
+            .open(scope)
+            .resolve(scope, bytes.into())
+            .unwrap();
+    }
 }
 
 /// Reads asynchronously a chunk of a file (as bytes).
@@ -515,10 +522,22 @@ fn get_file_reference(handle: usize) -> File {
 
 #[cfg(target_family = "unix")]
 /// Pure rust implementation of opening a file.
-fn open_file_op<P: AsRef<Path>>(path: P) -> Result<usize> {
+fn open_file_op<P: AsRef<Path>>(path: P, flags: String) -> Result<usize> {
+    // Options and flags which can be used to configure how a file is opened.
+    let read = flags == "r" || flags == "r+" || flags == "w+" || flags == "a+";
+    let write = flags == "r+" || flags == "w" || flags == "w+";
+    let truncate = flags == "w+";
+    let append = flags == "a" || flags == "a+";
+
     // Note: The reason we leak the wrapped file handle is to prevent rust
     // from dropping the handle (a.k.a close the file) when current scope ends.
-    match fs::File::open(path) {
+    match OpenOptions::new()
+        .read(read)
+        .write(write)
+        .append(append)
+        .truncate(truncate)
+        .open(path)
+    {
         Ok(file) => Ok(Box::leak(Box::new(file)).as_raw_fd() as usize),
         Err(e) => bail!(e),
     }
@@ -526,10 +545,22 @@ fn open_file_op<P: AsRef<Path>>(path: P) -> Result<usize> {
 
 #[cfg(target_family = "windows")]
 /// Pure rust implementation of opening a file.
-fn open_file_op<P: AsRef<Path>>(path: P) -> Result<usize> {
+fn open_file_op<P: AsRef<Path>>(path: P, flags: String) -> Result<usize> {
+    // Options and flags which can be used to configure how a file is opened.
+    let read = flags == "r" || flags == "r+" || flags == "w+" || flags == "a+";
+    let write = flags == "r+" || flags == "w" || flags == "w+";
+    let truncate = flags == "w+";
+    let append = flags == "a" || flags == "a+";
+
     // Note: The reason we leak the wrapped file handle is to prevent rust
     // from dropping the handle (a.k.a close the file) when current scope ends.
-    match fs::File::open(path) {
+    match OpenOptions::new()
+        .read(read)
+        .write(write)
+        .append(append)
+        .truncate(truncate)
+        .open(path)
+    {
         Ok(file) => Ok(Box::leak(Box::new(file)).as_raw_handle() as usize),
         Err(e) => bail!(e),
     }
