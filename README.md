@@ -64,9 +64,9 @@ $ cd dune/ && cargo run -- <FILE>
 - [x] `copyFile(src, dest)`: copies `src` to `dest`.
 - [ ] `createReadStream(path, [options])`: creates a readable IO stream.
 - [ ] `createWriteStream(path, [options])`: creates a writable IO stream.
-- [ ] `open(path, [flags, [mode]])`: asynchronous file open.
+- [x] `open(path, [mode])`: asynchronous file open.
 - [ ] `mkdir(path)`: creates a directory.
-- [x] `readFile(path)`: reads the entire contents of a file.
+- [x] `readFile(path, [options])`: reads the entire contents of a file.
 - [ ] `rmdir(path)`: deletes a directory (must be empty).
 - [ ] `rm(path, [options])`: removes files and directories.
 - [ ] `stat(path)`: retrieves statistics for the file.
@@ -74,13 +74,13 @@ $ cd dune/ && cargo run -- <FILE>
 
 ### File
 
-- [ ] `fd`: the numeric file descriptor.
-- [ ] `close()`: closes the file.
+- [x] `fd`: the numeric file descriptor.
+- [x] `close()`: closes the file.
 - [ ] `createReadStream()`: creates a readable IO stream.
 - [ ] `createWriteStream()`: creates a writable IO stream.
-- [ ] `read([size, [offset]])`: reads data from the file.
+- [x] `read([size, [offset]])`: reads data from the file.
 - [ ] `stat()`: retrieves statistics for the file.
-- [ ] `write(String|Uint8Array, [offset])`: writes data to the file.
+- [x] `write(String|Uint8Array, [offset])`: writes data to the file.
 
 ### Net
 

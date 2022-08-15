@@ -10,6 +10,256 @@ const binding = process.binding('fs');
 const BUFFER_SIZE = 40 * 1024; // 40KB bytes buffer when reading.
 
 /**
+ * A File object is an object wrapper for a numeric file descriptor.
+ */
+export class File {
+  /**
+   * Creates a new File instance given a file path.
+   *
+   * @param {String} path
+   * @param {String} [mode]
+   * @returns {File}
+   */
+  constructor(path, mode) {
+    // Check if the path argument is a valid type.
+    if (typeof path !== 'string') {
+      throw new TypeError(`The "path" argument must be of type string.`);
+    }
+
+    this._handle = null;
+    this.path = path;
+    this.mode = mode;
+    this.fd = null;
+  }
+
+  /**
+   * Asynchronously opens the file.
+   *
+   * @param {string} mode
+   */
+  async open(mode = 'r') {
+    // Check if the file is already open.
+    if (this._handle) {
+      throw new Error(`The file is already open with fd: ${this.fd}`);
+    }
+
+    this._handle = await binding.open(this.path, this.mode || mode);
+    this.fd = this._handle.fd;
+  }
+
+  /**
+   * Synchronously opens the file.
+   *
+   * @param {string} mode
+   */
+  openSync(mode = 'r') {
+    // Check if the file is already open.
+    if (this._handle) {
+      throw new Error(`The file is already open with fd: ${this.fd}`);
+    }
+
+    this._handle = binding.openSync(this.path, this.mode || mode);
+    this.fd = this._handle.fd;
+  }
+
+  /**
+   * Reads asynchronously some bytes from the file.
+   *
+   * @param {*} size
+   * @param {*} offset
+   * @returns {Promise<Uint8Array>}
+   */
+  async read(size = BUFFER_SIZE, offset = 0) {
+    // Check if the file is open.
+    if (!this._handle) {
+      throw new Error('The file is not open.');
+    }
+
+    const bytes = await binding.read(this._handle, size, offset);
+    const bytes_u8 = new Uint8Array(bytes);
+
+    return bytes_u8;
+  }
+
+  /**
+   * Reads synchronously some bytes from the file.
+   *
+   * @param {*} size
+   * @param {*} offset
+   * @returns {Uint8Array}
+   */
+  readSync(size = BUFFER_SIZE, offset = 0) {
+    // Check if the file is open.
+    if (!this._handle) {
+      throw new Error('The file is not open.');
+    }
+
+    const bytes = binding.readSync(this._handle, size, offset);
+    const bytes_u8 = new Uint8Array(bytes);
+
+    return bytes_u8;
+  }
+
+  /**
+   * Writes asynchronously a binary buffer to the file.
+   *
+   * @param {Uint8Array} data
+   */
+  async write(data) {
+    // Check the data argument type.
+    if (!(data instanceof Uint8Array)) {
+      throw new TypeError(`The "data" argument must be of type Uint8Array.`);
+    }
+
+    // Check if the file is open.
+    if (!this._handle) {
+      throw new Error('The file is not open.');
+    }
+
+    return binding.write(this._handle, data);
+  }
+
+  /**
+   * Writes synchronously a binary buffer to the file.
+   *
+   * @param {Uint8Array} data
+   */
+  writeSync(data) {
+    // Check the data argument type.
+    if (!(data instanceof Uint8Array)) {
+      throw new TypeError(`The "data" argument must be of type Uint8Array.`);
+    }
+
+    // Check if the file is open.
+    if (!this._handle) {
+      throw new Error('The file is not open.');
+    }
+
+    binding.writeSync(this._handle, data);
+  }
+
+  /**
+   * Closes the file asynchronously.
+   */
+  async close() {
+    // Check if the file is already closed.
+    if (!this._handle) {
+      throw new Error('The file is not open.');
+    }
+
+    await binding.close(this._handle);
+
+    // Reset file object's attributes.
+    this._handle = null;
+    this.fd = null;
+  }
+
+  /**
+   * Closes the file synchronously.
+   */
+  closeSync() {
+    // Check if the file is already closed.
+    if (!this._handle) {
+      throw new Error('The file is not open.');
+    }
+
+    binding.closeSync(this._handle);
+
+    // Reset file object's attributes.
+    this._handle = null;
+    this.fd = null;
+  }
+
+  /**
+   * The File objects should be asynchronously iterable.
+   */
+  [Symbol.asyncIterator]() {
+    return {
+      handle: this._handle,
+      offset: 0,
+
+      async next() {
+        // Try read some bytes from the file.
+        const bytes = await binding.read(this.handle, BUFFER_SIZE, this.offset);
+        const bytes_u8 = new Uint8Array(bytes);
+
+        // Update offset.
+        this.offset += bytes_u8.length;
+
+        return {
+          done: bytes_u8.length === 0,
+          value: bytes_u8,
+        };
+      },
+    };
+  }
+
+  /**
+   * The File objects should be iterable.
+   */
+  [Symbol.iterator]() {
+    return {
+      handle: this._handle,
+      offset: 0,
+
+      next() {
+        // Try read some bytes from the file.
+        const bytes = binding.readSync(this.handle, BUFFER_SIZE, this.offset);
+        const bytes_u8 = new Uint8Array(bytes);
+
+        // Update offset.
+        this.offset += bytes_u8.length;
+
+        return {
+          done: bytes_u8.length === 0,
+          value: bytes_u8,
+        };
+      },
+    };
+  }
+}
+
+/**
+ * Asynchronously opens a file.
+ *
+ * @param {String} path
+ * @param {String} mode
+ * @returns {Promise<File>}
+ */
+export async function open(path, mode = 'r') {
+  // Check the data argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  // Create a new file instance.
+  const file = new File(path, mode);
+  await file.open();
+
+  return file;
+}
+
+/**
+ * Synchronously opens a file.
+ *
+ * @param {String} path
+ * @param {String} mode
+ * @returns {File}
+ */
+export function openSync(path, mode = 'r') {
+  // Check the data argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  // Create a new file instance.
+  const file = new File(path, mode);
+  file.openSync();
+
+  return file;
+}
+
+/**
  * Reads asynchronously the entire contents of a file.
  *
  * @param {String} path
@@ -18,31 +268,29 @@ const BUFFER_SIZE = 40 * 1024; // 40KB bytes buffer when reading.
  */
 
 export async function readFile(path, options = {}) {
-  // Read the entire contents of a file.
-  const data = await __readFile(path);
-  const encoding = typeof options === 'string' ? options : options.encoding;
+  // Create a new file instance.
+  const file = new File(path, 'r');
+  await file.open();
+
+  // Buffer to fill the file bytes into.
+  let data = new Uint8Array([]);
+
+  // Note: Since the file object is async iterable will read the entire contents
+  // of the file using the for-await loop.
+  for await (let chunk of file) {
+    data = new Uint8Array([...data, ...chunk]);
+  }
+
+  await file.close();
 
   // Decode given an encoder.
+  const encoding = typeof options === 'string' ? options : options.encoding;
+
   if (encoding) {
     return new TextDecoder(encoding).decode(data);
   }
 
   return data;
-}
-
-async function __readFile(path, data = new Uint8Array([])) {
-  // Try read some bytes from the file.
-  const offset = data.length === 0 ? 0 : data.length + 1;
-  const bytes = await binding.read(path, BUFFER_SIZE, offset);
-  const bytes_u8 = new Uint8Array(bytes);
-
-  // Check EOF.
-  if (bytes_u8.length === 0) {
-    return data;
-  }
-
-  // Recursively read more bytes.
-  return __readFile(path, new Uint8Array([...data, ...bytes_u8]));
 }
 
 /**
@@ -54,26 +302,24 @@ async function __readFile(path, data = new Uint8Array([])) {
  */
 
 export function readFileSync(path, options = {}) {
+  // Create a new file instance.
+  const file = new File(path, 'r');
+  file.openSync();
+
   // Buffer to fill the file bytes into.
   let data = new Uint8Array([]);
-  const encoding = typeof options === 'string' ? options : options.encoding;
 
-  // Read bytes until EOF.
-  for (;;) {
-    const offset = data.length === 0 ? 0 : data.length + 1;
-    const bytes = binding.readSync(path, BUFFER_SIZE, offset);
-    const bytes_u8 = new Uint8Array(bytes);
-
-    // Check EOF.
-    if (bytes_u8.length === 0) {
-      break;
-    }
-
-    // Append bytes to data.
-    data = new Uint8Array([...data, ...bytes_u8]);
+  // Note: Since the file object is iterable will read the entire contents
+  // of the file using the for-of loop.
+  for (let chunk of file) {
+    data = new Uint8Array([...data, ...chunk]);
   }
 
+  file.closeSync();
+
   // Decode given an encoder.
+  const encoding = typeof options === 'string' ? options : options.encoding;
+
   if (encoding) {
     return new TextDecoder(encoding).decode(data);
   }
@@ -102,11 +348,13 @@ export async function writeFile(path, data, options = {}) {
   // Default to utf-8 encoding.
   if (!encoding) encoding = 'utf-8';
 
-  // Write asynchronously buffer to file.
-  return binding.write(
-    path,
-    data instanceof Uint8Array ? data : new TextEncoder(encoding).encode(data)
-  );
+  // Create a file instance.
+  const file = new File(path, 'w');
+
+  // Open file, write data, and close it.
+  await file.open();
+  await file.write(data);
+  await file.close();
 }
 
 /**
@@ -130,11 +378,13 @@ export function writeFileSync(path, data, options = {}) {
   // Default to utf-8 encoding.
   if (!encoding) encoding = 'utf-8';
 
-  // Write buffer to file.
-  binding.writeSync(
-    path,
-    data instanceof Uint8Array ? data : new TextEncoder(encoding).encode(data)
-  );
+  // Create a file instance.
+  const file = new File(path, 'w');
+
+  // Open file, write data, and close it.
+  file.openSync();
+  file.writeSync(data);
+  file.closeSync();
 }
 
 /**
@@ -182,6 +432,9 @@ export function copyFileSync(source, destination) {
 }
 
 export default {
+  File,
+  open,
+  openSync,
   readFile,
   readFileSync,
   writeFile,
