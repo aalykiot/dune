@@ -516,6 +516,7 @@ fn open_file_op<P: AsRef<Path>>(path: P, flags: String) -> Result<usize> {
     // Options and flags which can be used to configure how a file is opened.
     let read = flags == "r" || flags == "r+" || flags == "w+" || flags == "a+";
     let write = flags == "r+" || flags == "w" || flags == "w+";
+    let create = flags == "w" || flags == "w+" || flags == "a" || flags == "a+";
     let truncate = flags == "w+";
     let append = flags == "a" || flags == "a+";
 
@@ -524,33 +525,14 @@ fn open_file_op<P: AsRef<Path>>(path: P, flags: String) -> Result<usize> {
     match OpenOptions::new()
         .read(read)
         .write(write)
+        .create(create)
         .append(append)
         .truncate(truncate)
         .open(path)
     {
+        #[cfg(target_family = "unix")]
         Ok(file) => Ok(Box::leak(Box::new(file)).as_raw_fd() as usize),
-        Err(e) => bail!(e),
-    }
-}
-
-#[cfg(target_family = "windows")]
-/// Pure rust implementation of opening a file.
-fn open_file_op<P: AsRef<Path>>(path: P, flags: String) -> Result<usize> {
-    // Options and flags which can be used to configure how a file is opened.
-    let read = flags == "r" || flags == "r+" || flags == "w+" || flags == "a+";
-    let write = flags == "r+" || flags == "w" || flags == "w+";
-    let truncate = flags == "w+";
-    let append = flags == "a" || flags == "a+";
-
-    // Note: The reason we leak the wrapped file handle is to prevent rust
-    // from dropping the handle (a.k.a close the file) when current scope ends.
-    match OpenOptions::new()
-        .read(read)
-        .write(write)
-        .append(append)
-        .truncate(truncate)
-        .open(path)
-    {
+        #[cfg(target_family = "windows")]
         Ok(file) => Ok(Box::leak(Box::new(file)).as_raw_handle() as usize),
         Err(e) => bail!(e),
     }

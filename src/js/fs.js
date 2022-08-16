@@ -350,10 +350,11 @@ export async function writeFile(path, data, options = {}) {
 
   // Create a file instance.
   const file = new File(path, 'w');
+  const data_u8 = new TextEncoder(encoding).encode(data);
 
   // Open file, write data, and close it.
   await file.open();
-  await file.write(data);
+  await file.write(data_u8);
   await file.close();
 }
 
@@ -380,10 +381,11 @@ export function writeFileSync(path, data, options = {}) {
 
   // Create a file instance.
   const file = new File(path, 'w');
+  const data_u8 = new TextEncoder(encoding).encode(data);
 
   // Open file, write data, and close it.
   file.openSync();
-  file.writeSync(data);
+  file.writeSync(data_u8);
   file.closeSync();
 }
 
