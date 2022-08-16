@@ -27,7 +27,7 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 
 #[derive(Default, Debug, Serialize, Deserialize)]
-/// A FileStatistics object provides information about a file.
+/// Struct that provides information about a file.
 struct FileStatistics {
     size: u64,
     access_time: Option<Duration>,
@@ -262,7 +262,7 @@ impl JsFuture for FsReadFuture {
         // Otherwise, resolve the promise passing the result.
         let result = result.unwrap();
 
-        // Decompress message-pack binary into actual rust types.
+        // Deserialize bincode binary into actual rust types.
         let (n, mut buffer): (usize, Vec<u8>) = bincode::deserialize(&result).unwrap();
 
         // We reached the end of the file.
@@ -800,9 +800,9 @@ fn create_v8_stats_object<'a>(
     };
 
     set_property_to(scope, target, "size", size.into());
-    set_property_to(scope, target, "atimeMs", access_time.into());
-    set_property_to(scope, target, "mtimeMs", modified_time.into());
-    set_property_to(scope, target, "birthtimeMs", birth_time.into());
+    set_property_to(scope, target, "atimeMs", access_time);
+    set_property_to(scope, target, "mtimeMs", modified_time);
+    set_property_to(scope, target, "birthtimeMs", birth_time);
 
     let is_file = v8::Boolean::new(scope, stats.is_file);
     let is_directory = v8::Boolean::new(scope, stats.is_directory);
@@ -874,23 +874,18 @@ fn create_v8_stats_object<'a>(
         None => undefined.into(),
     };
 
-    set_property_to(scope, target, "isSocket", is_socket.into());
-    set_property_to(scope, target, "isFIFO", is_fifo.into());
-    set_property_to(scope, target, "isBlockDevice", is_block_device.into());
-    set_property_to(scope, target, "blocks", blocks.into());
-    set_property_to(scope, target, "blksize", block_size.into());
-    set_property_to(scope, target, "mode", mode.into());
-    set_property_to(scope, target, "dev", device.into());
-    set_property_to(scope, target, "gid", group_id.into());
-    set_property_to(scope, target, "inode", inode.into());
-    set_property_to(scope, target, "nlink", hard_links.into());
-    set_property_to(scope, target, "rdev", rdev.into());
-    set_property_to(
-        scope,
-        target,
-        "isCharacterDevice",
-        is_character_device.into(),
-    );
+    set_property_to(scope, target, "isSocket", is_socket);
+    set_property_to(scope, target, "isFIFO", is_fifo);
+    set_property_to(scope, target, "isBlockDevice", is_block_device);
+    set_property_to(scope, target, "isCharacterDevice", is_character_device);
+    set_property_to(scope, target, "blocks", blocks);
+    set_property_to(scope, target, "blksize", block_size);
+    set_property_to(scope, target, "mode", mode);
+    set_property_to(scope, target, "dev", device);
+    set_property_to(scope, target, "gid", group_id);
+    set_property_to(scope, target, "inode", inode);
+    set_property_to(scope, target, "nlink", hard_links);
+    set_property_to(scope, target, "rdev", rdev);
 
     target
 }
