@@ -69,7 +69,7 @@ $ cd dune/ && cargo run -- <FILE>
 - [x] `readFile(path, [options])`: reads the entire contents of a file.
 - [ ] `rmdir(path)`: deletes a directory (must be empty).
 - [ ] `rm(path, [options])`: removes files and directories.
-- [ ] `stat(path)`: retrieves statistics for the file.
+- [x] `stat(path)`: retrieves statistics for the file.
 - [x] `writeFile(String|Uint8Array , data, [options])`: writes data to the file, replacing the file if it already exists.
 
 ### File
@@ -79,7 +79,7 @@ $ cd dune/ && cargo run -- <FILE>
 - [ ] `createReadStream()`: creates a readable IO stream.
 - [ ] `createWriteStream()`: creates a writable IO stream.
 - [x] `read([size, [offset]])`: reads data from the file.
-- [ ] `stat()`: retrieves statistics for the file.
+- [x] `stat()`: retrieves statistics for the file.
 - [x] `write(String|Uint8Array, [offset])`: writes data to the file.
 
 ### Net

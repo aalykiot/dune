@@ -139,6 +139,30 @@ export class File {
   }
 
   /**
+   * Retrieves asynchronously statistics for the file.
+   */
+  async stat() {
+    // Check if the file is already closed.
+    if (!this._handle) {
+      throw new Error('The file is not open.');
+    }
+
+    return binding.stat(this._handle);
+  }
+
+  /**
+   * Retrieves synchronously statistics for the file.
+   */
+  statSync() {
+    // Check if the file is already closed.
+    if (!this._handle) {
+      throw new Error('The file is not open.');
+    }
+
+    return binding.statSync(this._handle);
+  }
+
+  /**
    * Closes the file asynchronously.
    */
   async close() {
@@ -433,6 +457,48 @@ export function copyFileSync(source, destination) {
   return writeFileSync(destination, readFileSync(source));
 }
 
+/**
+ * Retrieves asynchronously statistics for the file.
+ *
+ * @param {String} path
+ */
+export async function stat(path) {
+  // Check the data argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  // Create a new file instance.
+  const file = new File(path, 'r');
+  await file.open();
+
+  const stats = await file.stat();
+  await file.close();
+
+  return stats;
+}
+
+/**
+ * Retrieves synchronously statistics for the file.
+ *
+ * @param {String} path
+ */
+export function statSync(path) {
+  // Check the data argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  // Create a new file instance.
+  const file = new File(path, 'r');
+  file.openSync();
+
+  const stats = file.statSync();
+  file.closeSync();
+
+  return stats;
+}
+
 export default {
   File,
   open,
@@ -443,4 +509,6 @@ export default {
   writeFileSync,
   copyFile,
   copyFileSync,
+  stat,
+  statSync,
 };

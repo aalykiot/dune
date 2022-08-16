@@ -34,6 +34,7 @@ swc_ecma_parser = "0.116.0"
 swc_ecma_transforms_base = "0.102.1"
 swc_ecma_transforms_typescript = "0.143.0"
 swc_ecma_visit = "0.75.0"
+serde = { version = "1.0.142", features = ["derive"] }
 
 [dev-dependencies]
 assert_fs = "1.0.7"

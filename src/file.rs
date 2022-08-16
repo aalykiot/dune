@@ -2,24 +2,53 @@ use crate::bindings::get_internal_ref;
 use crate::bindings::set_constant_to;
 use crate::bindings::set_function_to;
 use crate::bindings::set_internal_ref;
+use crate::bindings::set_property_to;
 use crate::bindings::throw_exception;
 use crate::event_loop::TaskResult;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::bail;
 use anyhow::Result;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::path::Path;
+use std::time::Duration;
+use std::time::UNIX_EPOCH;
 
 #[cfg(target_family = "unix")]
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
 #[cfg(target_family = "windows")]
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
+
+#[derive(Default, Debug, Serialize, Deserialize)]
+/// A FileStatistics object provides information about a file.
+struct FileStatistics {
+    size: u64,
+    access_time: Option<Duration>,
+    modified_time: Option<Duration>,
+    birth_time: Option<Duration>,
+    is_directory: bool,
+    is_file: bool,
+    is_symbolic_link: bool,
+    is_socket: Option<bool>,
+    is_fifo: Option<bool>,
+    is_block_device: Option<bool>,
+    is_character_device: Option<bool>,
+    blocks: Option<u64>,
+    block_size: Option<u64>,
+    mode: Option<u32>,
+    device: Option<u64>,
+    group_id: Option<u32>,
+    inode: Option<u64>,
+    hard_links: Option<u64>,
+    rdev: Option<u64>,
+}
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
@@ -33,6 +62,8 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "readSync", read_sync);
     set_function_to(scope, target, "write", write);
     set_function_to(scope, target, "writeSync", write_sync);
+    set_function_to(scope, target, "stat", stat);
+    set_function_to(scope, target, "statSync", stat_sync);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
@@ -500,6 +531,115 @@ fn write_sync(
     }
 }
 
+/// Describes what will run after the async stats_op completes.
+struct FsStatFuture {
+    promise: v8::Global<v8::PromiseResolver>,
+    maybe_result: TaskResult,
+}
+
+impl JsFuture for FsStatFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        // Unwrap the result.
+        let result = self.maybe_result.take().unwrap();
+
+        // Something went wrong while getting the file's stats.
+        if let Err(e) = result {
+            let message = v8::String::new(scope, &e.to_string()).unwrap();
+            let exception = v8::Exception::error(scope, message);
+            // Reject the promise on failure.
+            self.promise.open(scope).reject(scope, exception);
+            return;
+        }
+
+        // Otherwise, resolve the promise passing the result.
+        let result = result.unwrap();
+
+        // Deserialize bincode binary into actual rust types.
+        let stats: FileStatistics = bincode::deserialize(&result).unwrap();
+        let stats = create_v8_stats_object(scope, stats);
+
+        self.promise
+            .open(scope)
+            .resolve(scope, stats.into())
+            .unwrap();
+    }
+}
+
+/// Get's asynchronously file statistics.
+fn stat(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+    // Get the file_wrap object.
+    let file_wrap = args.get(0).to_object(scope).unwrap();
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    // Check if the file is already closed, otherwise create a file reference.
+    let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
+        Some(file) => file.try_clone().unwrap(),
+        None => {
+            let message = v8::String::new(scope, "File is closed.").unwrap();
+            let exception = v8::Exception::error(scope, message);
+            // Reject the promise.
+            promise_resolver.reject(scope, exception);
+            rv.set(promise.into());
+            return;
+        }
+    };
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    let task = move || match stats_op(&mut file) {
+        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+        Err(e) => Some(Result::Err(e)),
+    };
+
+    let task_cb = {
+        let promise = v8::Global::new(scope, promise_resolver);
+        let state_rc = state_rc.clone();
+
+        move |maybe_result: TaskResult| {
+            let mut state = state_rc.borrow_mut();
+            let future = FsStatFuture {
+                promise,
+                maybe_result,
+            };
+            state.pending_futures.push(Box::new(future));
+            state.check_and_interrupt();
+        }
+    };
+
+    // Spawn the async task using the event-loop.
+    state.handle.spawn(task, Some(task_cb));
+
+    rv.set(promise.into());
+}
+
+/// Get's file statistics.
+fn stat_sync(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get the file_wrap object.
+    let file_wrap = args.get(0).to_object(scope).unwrap();
+
+    // Check if the file is already closed, otherwise create a file reference.
+    let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
+        Some(file) => file.try_clone().unwrap(),
+        None => {
+            throw_exception(scope, "File is closed.");
+            return;
+        }
+    };
+
+    match stats_op(&mut file) {
+        Ok(stats) => rv.set(create_v8_stats_object(scope, stats).into()),
+        Err(e) => throw_exception(scope, &e.to_string()),
+    };
+}
+
 #[cfg(target_family = "unix")]
 fn get_file_reference(fd: usize) -> File {
     unsafe { fs::File::from_raw_fd(fd as RawFd) }
@@ -561,4 +701,196 @@ fn write_file_op(file: &mut File, buffer: &[u8]) -> Result<()> {
         bail!(e);
     }
     Ok(())
+}
+
+/// Pure rust implementation of getting file statistics.
+fn stats_op(file: &mut File) -> Result<FileStatistics> {
+    // Try get file's metadata information.
+    match file.metadata() {
+        Ok(metadata) => {
+            // Returns the size of the file, in bytes, this metadata is for.
+            let size = metadata.len();
+
+            // Returns the last access time of this metadata.
+            let access_time = metadata
+                .accessed()
+                .ok()
+                .map(|time| time.duration_since(UNIX_EPOCH).unwrap());
+
+            // Returns the last modification time listed in this metadata.
+            let modified_time = metadata
+                .modified()
+                .ok()
+                .map(|time| time.duration_since(UNIX_EPOCH).unwrap());
+
+            // Returns the creation time listed in this metadata.
+            let birth_time = metadata
+                .created()
+                .ok()
+                .map(|time| time.duration_since(UNIX_EPOCH).unwrap());
+
+            let is_directory = metadata.is_dir();
+            let is_file = metadata.is_file();
+            let is_symbolic_link = metadata.is_symlink();
+
+            let mut stats = FileStatistics {
+                size,
+                access_time,
+                modified_time,
+                birth_time,
+                is_directory,
+                is_file,
+                is_symbolic_link,
+                ..Default::default()
+            };
+
+            // In UNIX systems we can get some extra info.
+            if cfg!(unix) {
+                use std::os::unix::fs::FileTypeExt;
+                use std::os::unix::fs::MetadataExt;
+
+                stats.is_socket = Some(metadata.file_type().is_socket());
+                stats.is_fifo = Some(metadata.file_type().is_fifo());
+                stats.is_block_device = Some(metadata.file_type().is_block_device());
+                stats.is_character_device = Some(metadata.file_type().is_char_device());
+                stats.blocks = Some(metadata.blocks());
+                stats.block_size = Some(metadata.blksize());
+                stats.mode = Some(metadata.mode());
+                stats.device = Some(metadata.dev());
+                stats.group_id = Some(metadata.gid());
+                stats.inode = Some(metadata.ino());
+                stats.hard_links = Some(metadata.nlink());
+                stats.rdev = Some(metadata.rdev());
+            }
+
+            Ok(stats)
+        }
+        Err(e) => bail!(e),
+    }
+}
+
+/// Creates a JavaScript file stats object.
+fn create_v8_stats_object<'a>(
+    scope: &mut v8::HandleScope<'a>,
+    stats: FileStatistics,
+) -> v8::Local<'a, v8::Object> {
+    // This will be out stats object.
+    let target = v8::Object::new(scope);
+    let undefined = v8::undefined(scope);
+
+    // The size of the file in bytes.
+    let size = v8::Number::new(scope, stats.size as f64);
+
+    // The timestamp indicating the last time this file was accessed.
+    let access_time: v8::Local<v8::Value> = match stats.access_time {
+        Some(value) => v8::Number::new(scope, value.as_millis() as f64).into(),
+        None => undefined.into(),
+    };
+
+    // The timestamp indicating the last time this file was modified.
+    let modified_time: v8::Local<v8::Value> = match stats.modified_time {
+        Some(value) => v8::Number::new(scope, value.as_millis() as f64).into(),
+        None => undefined.into(),
+    };
+
+    // The timestamp indicating the creation time of this file.
+    let birth_time: v8::Local<v8::Value> = match stats.birth_time {
+        Some(value) => v8::Number::new(scope, value.as_millis() as f64).into(),
+        None => undefined.into(),
+    };
+
+    set_property_to(scope, target, "size", size.into());
+    set_property_to(scope, target, "atimeMs", access_time.into());
+    set_property_to(scope, target, "mtimeMs", modified_time.into());
+    set_property_to(scope, target, "birthtimeMs", birth_time.into());
+
+    let is_file = v8::Boolean::new(scope, stats.is_file);
+    let is_directory = v8::Boolean::new(scope, stats.is_directory);
+    let is_symbolic_link = v8::Boolean::new(scope, stats.is_symbolic_link);
+
+    set_property_to(scope, target, "isFile", is_file.into());
+    set_property_to(scope, target, "isDirectory", is_directory.into());
+    set_property_to(scope, target, "isSymbolicLink", is_symbolic_link.into());
+
+    // UNIX only metrics.
+
+    let is_socket: v8::Local<v8::Value> = match stats.is_socket {
+        Some(value) => v8::Boolean::new(scope, value).into(),
+        None => undefined.into(),
+    };
+
+    let is_fifo: v8::Local<v8::Value> = match stats.is_fifo {
+        Some(value) => v8::Boolean::new(scope, value).into(),
+        None => undefined.into(),
+    };
+
+    let is_block_device: v8::Local<v8::Value> = match stats.is_block_device {
+        Some(value) => v8::Boolean::new(scope, value).into(),
+        None => undefined.into(),
+    };
+
+    let is_character_device: v8::Local<v8::Value> = match stats.is_character_device {
+        Some(value) => v8::Boolean::new(scope, value).into(),
+        None => undefined.into(),
+    };
+
+    let blocks: v8::Local<v8::Value> = match stats.blocks {
+        Some(value) => v8::Number::new(scope, value as f64).into(),
+        None => undefined.into(),
+    };
+
+    let block_size: v8::Local<v8::Value> = match stats.block_size {
+        Some(value) => v8::Number::new(scope, value as f64).into(),
+        None => undefined.into(),
+    };
+
+    let mode: v8::Local<v8::Value> = match stats.mode {
+        Some(value) => v8::Number::new(scope, value as f64).into(),
+        None => undefined.into(),
+    };
+
+    let device: v8::Local<v8::Value> = match stats.device {
+        Some(value) => v8::Number::new(scope, value as f64).into(),
+        None => undefined.into(),
+    };
+
+    let group_id: v8::Local<v8::Value> = match stats.group_id {
+        Some(value) => v8::Number::new(scope, value as f64).into(),
+        None => undefined.into(),
+    };
+
+    let inode: v8::Local<v8::Value> = match stats.inode {
+        Some(value) => v8::Number::new(scope, value as f64).into(),
+        None => undefined.into(),
+    };
+
+    let hard_links: v8::Local<v8::Value> = match stats.hard_links {
+        Some(value) => v8::Number::new(scope, value as f64).into(),
+        None => undefined.into(),
+    };
+
+    let rdev: v8::Local<v8::Value> = match stats.rdev {
+        Some(value) => v8::Number::new(scope, value as f64).into(),
+        None => undefined.into(),
+    };
+
+    set_property_to(scope, target, "isSocket", is_socket.into());
+    set_property_to(scope, target, "isFIFO", is_fifo.into());
+    set_property_to(scope, target, "isBlockDevice", is_block_device.into());
+    set_property_to(scope, target, "blocks", blocks.into());
+    set_property_to(scope, target, "blksize", block_size.into());
+    set_property_to(scope, target, "mode", mode.into());
+    set_property_to(scope, target, "dev", device.into());
+    set_property_to(scope, target, "gid", group_id.into());
+    set_property_to(scope, target, "inode", inode.into());
+    set_property_to(scope, target, "nlink", hard_links.into());
+    set_property_to(scope, target, "rdev", rdev.into());
+    set_property_to(
+        scope,
+        target,
+        "isCharacterDevice",
+        is_character_device.into(),
+    );
+
+    target
 }
