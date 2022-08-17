@@ -7,6 +7,7 @@ use crate::bindings::throw_exception;
 use crate::event_loop::TaskResult;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
+use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::Result;
 use serde::Deserialize;
@@ -56,14 +57,16 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 
     set_function_to(scope, target, "open", open);
     set_function_to(scope, target, "openSync", open_sync);
-    set_function_to(scope, target, "close", close);
-    set_function_to(scope, target, "closeSync", close_sync);
     set_function_to(scope, target, "read", read);
     set_function_to(scope, target, "readSync", read_sync);
     set_function_to(scope, target, "write", write);
     set_function_to(scope, target, "writeSync", write_sync);
     set_function_to(scope, target, "stat", stat);
     set_function_to(scope, target, "statSync", stat_sync);
+    set_function_to(scope, target, "mkdir", mkdir);
+    set_function_to(scope, target, "mkdirSync", mkdir_sync);
+    set_function_to(scope, target, "close", close);
+    set_function_to(scope, target, "closeSync", close_sync);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
@@ -188,56 +191,6 @@ fn open_sync(
             throw_exception(scope, &e.to_string());
         }
     }
-}
-
-/// Closes a file asynchronously.
-fn close(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
-    // Get the file_wrap object.
-    let file_wrap = args.get(0).to_object(scope).unwrap();
-
-    // Create a promise resolver and extract the actual promise.
-    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
-    let promise = promise_resolver.get_promise(scope);
-
-    if let Some(file) = get_internal_ref::<Option<File>>(scope, file_wrap, 0).take() {
-        // Note: By taking the file reference out of the option and immediately dropping
-        // it will make rust to close the file.
-        drop(file);
-
-        let success = v8::Boolean::new(scope, true);
-        promise_resolver.resolve(scope, success.into());
-        rv.set(promise.into());
-
-        return;
-    }
-
-    let message = v8::String::new(scope, "File is closed.").unwrap();
-    let exception = v8::Exception::error(scope, message);
-
-    promise_resolver.reject(scope, exception);
-    rv.set(promise.into());
-}
-
-/// Closes a file synchronously.
-fn close_sync(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
-) {
-    // Get the file_wrap object.
-    let file_wrap = args.get(0).to_object(scope).unwrap();
-
-    if let Some(file) = get_internal_ref::<Option<File>>(scope, file_wrap, 0).take() {
-        // Note: By taking the file reference out of the option and immediately dropping
-        // it will make rust to close the file.
-        return drop(file);
-    }
-
-    throw_exception(scope, "File is closed.");
 }
 
 /// Describes what will run after the async read_file_op completes.
@@ -416,6 +369,7 @@ impl JsFuture for FsWriteFuture {
                 .open(scope)
                 .resolve(scope, undefined.into())
                 .unwrap();
+
             return;
         }
 
@@ -640,6 +594,149 @@ fn stat_sync(
     };
 }
 
+/// Describes what will run after the async mkdir_op completes.
+struct FsMkdirFuture {
+    promise: v8::Global<v8::PromiseResolver>,
+    maybe_result: TaskResult,
+}
+
+impl JsFuture for FsMkdirFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        // If the result is None then mkdir worked.
+        if self.maybe_result.is_none() {
+            let undefined = v8::undefined(scope);
+            self.promise
+                .open(scope)
+                .resolve(scope, undefined.into())
+                .unwrap();
+
+            return;
+        }
+
+        // Something went wrong.
+        let result = self.maybe_result.take().unwrap();
+
+        // Something went wrong while getting the file's stats.
+        if let Err(e) = result {
+            let message = v8::String::new(scope, &e.to_string()).unwrap();
+            let exception = v8::Exception::error(scope, message);
+            // Reject the promise on failure.
+            self.promise.open(scope).reject(scope, exception);
+            return;
+        }
+
+        unreachable!();
+    }
+}
+
+/// Creates a directory asynchronously.
+fn mkdir(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get desired folder location.
+    let path = args.get(0).to_rust_string_lossy(scope);
+    let recursive = args.get(1).to_rust_string_lossy(scope) == "true";
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    let task = move || match mkdir_op(path, recursive) {
+        Ok(_) => None,
+        Err(e) => Some(Result::Err(e)),
+    };
+
+    let task_cb = {
+        let promise = v8::Global::new(scope, promise_resolver);
+        let state_rc = state_rc.clone();
+
+        move |maybe_result: TaskResult| {
+            let mut state = state_rc.borrow_mut();
+            let future = FsMkdirFuture {
+                promise,
+                maybe_result,
+            };
+            state.pending_futures.push(Box::new(future));
+            state.check_and_interrupt();
+        }
+    };
+
+    // Spawn the async task using the event-loop.
+    state.handle.spawn(task, Some(task_cb));
+
+    rv.set(promise.into());
+}
+
+/// Creates a directory synchronously.
+fn mkdir_sync(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    // Get desired folder location.
+    let path = args.get(0).to_rust_string_lossy(scope);
+    let recursive = args.get(1).to_rust_string_lossy(scope) == "true";
+
+    if let Err(e) = mkdir_op(path, recursive) {
+        throw_exception(scope, &e.to_string());
+    }
+}
+
+/// Closes a file asynchronously.
+fn close(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get the file_wrap object.
+    let file_wrap = args.get(0).to_object(scope).unwrap();
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    if let Some(file) = get_internal_ref::<Option<File>>(scope, file_wrap, 0).take() {
+        // Note: By taking the file reference out of the option and immediately dropping
+        // it will make rust to close the file.
+        drop(file);
+
+        let success = v8::Boolean::new(scope, true);
+        promise_resolver.resolve(scope, success.into());
+        rv.set(promise.into());
+
+        return;
+    }
+
+    let message = v8::String::new(scope, "File is closed.").unwrap();
+    let exception = v8::Exception::error(scope, message);
+
+    promise_resolver.reject(scope, exception);
+    rv.set(promise.into());
+}
+
+/// Closes a file synchronously.
+fn close_sync(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    // Get the file_wrap object.
+    let file_wrap = args.get(0).to_object(scope).unwrap();
+
+    if let Some(file) = get_internal_ref::<Option<File>>(scope, file_wrap, 0).take() {
+        // Note: By taking the file reference out of the option and immediately dropping
+        // it will make rust to close the file.
+        return drop(file);
+    }
+
+    throw_exception(scope, "File is closed.");
+}
+
 #[cfg(target_family = "unix")]
 fn get_file_reference(fd: usize) -> File {
     unsafe { fs::File::from_raw_fd(fd as RawFd) }
@@ -650,7 +747,6 @@ fn get_file_reference(handle: usize) -> File {
     unsafe { fs::File::from_raw_handle(handle as RawHandle) }
 }
 
-#[cfg(target_family = "unix")]
 /// Pure rust implementation of opening a file.
 fn open_file_op<P: AsRef<Path>>(path: P, flags: String) -> Result<usize> {
     // Options and flags which can be used to configure how a file is opened.
@@ -733,6 +829,7 @@ fn stats_op(file: &mut File) -> Result<FileStatistics> {
             let is_file = metadata.is_file();
             let is_symbolic_link = metadata.is_symlink();
 
+            #[allow(unused_mut)]
             let mut stats = FileStatistics {
                 size,
                 access_time,
@@ -745,7 +842,8 @@ fn stats_op(file: &mut File) -> Result<FileStatistics> {
             };
 
             // In UNIX systems we can get some extra info.
-            if cfg!(unix) {
+            #[cfg(target_family = "unix")]
+            {
                 use std::os::unix::fs::FileTypeExt;
                 use std::os::unix::fs::MetadataExt;
 
@@ -766,6 +864,14 @@ fn stats_op(file: &mut File) -> Result<FileStatistics> {
             Ok(stats)
         }
         Err(e) => bail!(e),
+    }
+}
+
+/// Pure rust implementation of creating directories.
+fn mkdir_op<P: AsRef<Path>>(path: P, recursive: bool) -> Result<()> {
+    match recursive {
+        true => fs::create_dir_all(path).map_err(|e| anyhow!(e)),
+        false => fs::create_dir(path).map_err(|e| anyhow!(e)),
     }
 }
 

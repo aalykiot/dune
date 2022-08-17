@@ -65,7 +65,7 @@ $ cd dune/ && cargo run -- <FILE>
 - [ ] `createReadStream(path, [options])`: creates a readable IO stream.
 - [ ] `createWriteStream(path, [options])`: creates a writable IO stream.
 - [x] `open(path, [mode])`: asynchronous file open.
-- [ ] `mkdir(path)`: creates a directory.
+- [x] `mkdir(path, [options])`: creates a directory.
 - [x] `readFile(path, [options])`: reads the entire contents of a file.
 - [ ] `rmdir(path)`: deletes a directory (must be empty).
 - [ ] `rm(path, [options])`: removes files and directories.

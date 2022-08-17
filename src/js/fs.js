@@ -287,7 +287,7 @@ export function openSync(path, mode = 'r') {
  * Reads asynchronously the entire contents of a file.
  *
  * @param {String} path
- * @param {String} encoding
+ * @param {String|Object} options
  * @returns {Promise<String|Uint8Array>}
  */
 
@@ -321,7 +321,7 @@ export async function readFile(path, options = {}) {
  * Reads synchronously the entire contents of a file.
  *
  * @param {String} path
- * @param {String} encoding
+ * @param {String|Object} options
  * @returns {String|Uint8Array}
  */
 
@@ -356,7 +356,7 @@ export function readFileSync(path, options = {}) {
  *
  * @param {String} path
  * @param {String|Uint8Array} data
- * @param {String} encoding
+ * @param {String|Object} options
  */
 
 export async function writeFile(path, data, options = {}) {
@@ -387,7 +387,7 @@ export async function writeFile(path, data, options = {}) {
  *
  * @param {String} path
  * @param {String|Uint8Array} data
- * @param {String} encoding
+ * @param {String|Object} options
  */
 
 export function writeFileSync(path, data, options = {}) {
@@ -463,7 +463,7 @@ export function copyFileSync(source, destination) {
  * @param {String} path
  */
 export async function stat(path) {
-  // Check the data argument type.
+  // Check the path argument type.
   if (typeof path !== 'string') {
     throw new TypeError('The "path" argument must be of type string.');
   }
@@ -484,7 +484,7 @@ export async function stat(path) {
  * @param {String} path
  */
 export function statSync(path) {
-  // Check the data argument type.
+  // Check the path argument type.
   if (typeof path !== 'string') {
     throw new TypeError('The "path" argument must be of type string.');
   }
@@ -499,6 +499,36 @@ export function statSync(path) {
   return stats;
 }
 
+/**
+ * Creates directories asynchronously.
+ *
+ * @param {String} path
+ * @param {Object} options
+ */
+export async function mkdir(path, options = {}) {
+  // Check the path argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  await binding.mkdir(path, options?.recursive || false);
+}
+
+/**
+ * Creates directories synchronously.
+ *
+ * @param {String} path
+ * @param {Object} options
+ */
+export function mkdirSync(path, options = {}) {
+  // Check the path argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  binding.mkdirSync(path, options?.recursive || false);
+}
+
 export default {
   File,
   open,
@@ -511,4 +541,6 @@ export default {
   copyFileSync,
   stat,
   statSync,
+  mkdir,
+  mkdirSync,
 };
