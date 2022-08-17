@@ -67,6 +67,8 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "mkdirSync", mkdir_sync);
     set_function_to(scope, target, "rmdir", rmdir);
     set_function_to(scope, target, "rmdirSync", rmdir_sync);
+    set_function_to(scope, target, "rm", rm);
+    set_function_to(scope, target, "rmSync", rm_sync);
     set_function_to(scope, target, "close", close);
     set_function_to(scope, target, "closeSync", close_sync);
 
@@ -758,6 +760,89 @@ fn rmdir_sync(
     }
 }
 
+/// Describes what will run after the async rm_op completes.
+struct FsRmFuture {
+    promise: v8::Global<v8::PromiseResolver>,
+    maybe_result: TaskResult,
+}
+
+impl JsFuture for FsRmFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        // If the result is None then mkdir worked.
+        if self.maybe_result.is_none() {
+            let undefined = v8::undefined(scope);
+            self.promise
+                .open(scope)
+                .resolve(scope, undefined.into())
+                .unwrap();
+
+            return;
+        }
+
+        // Something went wrong.
+        let result = self.maybe_result.take().unwrap();
+
+        // Something went wrong while getting the file's stats.
+        if let Err(e) = result {
+            let message = v8::String::new(scope, &e.to_string()).unwrap();
+            let exception = v8::Exception::error(scope, message);
+            // Reject the promise on failure.
+            self.promise.open(scope).reject(scope, exception);
+            return;
+        }
+
+        unreachable!();
+    }
+}
+
+/// Removes files and directories asynchronously.
+fn rm(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+    // Get to be removed folder location.
+    let path = args.get(0).to_rust_string_lossy(scope);
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    let task = move || match rm_op(path) {
+        Ok(_) => None,
+        Err(e) => Some(Result::Err(e)),
+    };
+
+    let task_cb = {
+        let promise = v8::Global::new(scope, promise_resolver);
+        let state_rc = state_rc.clone();
+
+        move |maybe_result: TaskResult| {
+            let mut state = state_rc.borrow_mut();
+            let future = FsRmFuture {
+                promise,
+                maybe_result,
+            };
+            state.pending_futures.push(Box::new(future));
+            state.check_and_interrupt();
+        }
+    };
+
+    // Spawn the async task using the event-loop.
+    state.handle.spawn(task, Some(task_cb));
+
+    rv.set(promise.into());
+}
+
+/// Removes files and directories.
+fn rm_sync(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+    // Get to be removed folder location.
+    let path = args.get(0).to_rust_string_lossy(scope);
+
+    if let Err(e) = rm_op(path) {
+        throw_exception(scope, &e.to_string());
+    }
+}
+
 /// Closes a file asynchronously.
 fn close(
     scope: &mut v8::HandleScope,
@@ -940,15 +1025,25 @@ fn stats_op<P: AsRef<Path>>(path: P) -> Result<FileStatistics> {
 
 /// Pure rust implementation of creating directories.
 fn mkdir_op<P: AsRef<Path>>(path: P, recursive: bool) -> Result<()> {
-    match recursive {
-        true => fs::create_dir_all(path).map_err(|e| anyhow!(e)),
-        false => fs::create_dir(path).map_err(|e| anyhow!(e)),
+    if recursive {
+        fs::create_dir_all(path).map_err(|e| anyhow!(e))?;
+        return Ok(());
     }
+    fs::create_dir(path).map_err(|e| anyhow!(e))
 }
 
 /// Pure rust implementation of deleting (empty) directories.
 fn rmdir_op<P: AsRef<Path>>(path: P) -> Result<()> {
     fs::remove_dir(path).map_err(|e| anyhow!(e))
+}
+
+/// Pure rust implementation of deleting files and directories.
+fn rm_op<P: AsRef<Path>>(path: P) -> Result<()> {
+    if stats_op(&path)?.is_directory {
+        fs::remove_dir_all(&path).map_err(|e| anyhow!(e))?;
+        return Ok(());
+    }
+    fs::remove_file(&path).map_err(|e| anyhow!(e))
 }
 
 /// Creates a JavaScript file stats object.

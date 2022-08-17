@@ -68,7 +68,7 @@ $ cd dune/ && cargo run -- <FILE>
 - [x] `mkdir(path, [options])`: creates a directory.
 - [x] `readFile(path, [options])`: reads the entire contents of a file.
 - [x] `rmdir(path, [options])`: deletes a directory (must be empty).
-- [ ] `rm(path, [options])`: removes files and directories.
+- [x] `rm(path, [options])`: removes files and directories.
 - [x] `stat(path)`: retrieves statistics for the file.
 - [x] `writeFile(String|Uint8Array , data, [options])`: writes data to the file, replacing the file if it already exists.
 

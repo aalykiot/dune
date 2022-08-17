@@ -587,6 +587,92 @@ export function rmdirSync(path, options = {}, __retries = 0) {
   }
 }
 
+/**
+ * Removes files and directories asynchronously.
+ *
+ * @param {String} path
+ * @param {Object} options
+ */
+export async function rm(path, options = {}, __retries = 0) {
+  // Check the path argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  // Set default options if not specified.
+  const recursive = options?.recursive || false;
+  const maxRetries = options?.maxRetries || 0;
+  const retryDelay = options?.retryDelay || 100;
+
+  // Get path's statistics.
+  const pathStat = await stat(path);
+
+  if (pathStat.isDirectory && !recursive) {
+    await rmdir(path, options);
+    return;
+  }
+
+  try {
+    // Try removing file or directory.
+    await binding.rm(path);
+  } catch (err) {
+    // If we maxed out the retries accept failure.
+    if (__retries >= maxRetries) throw err;
+
+    // Note: Wrapping the setTimeout into a promise is necessary otherwise the
+    // outer rm call won't wait for all the inner ones.
+    await new Promise((success, failure) => {
+      // Back-off and retry later.
+      setTimeout(
+        () =>
+          rm(path, options, __retries + 1)
+            .then(success)
+            .catch(failure),
+        retryDelay
+      );
+    });
+  }
+}
+
+/**
+ * Removes files and directories synchronously.
+ *
+ * @param {String} path
+ * @param {Object} options
+ */
+export function rmSync(path, options = {}, __retries = 0) {
+  // Check the path argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  // Set default options if not specified.
+  const recursive = options?.recursive || false;
+  const maxRetries = options?.maxRetries || 0;
+  const retryDelay = options?.retryDelay || 100;
+
+  // Get path's statistics.
+  const pathStat = statSync(path);
+
+  if (pathStat.isDirectory && !recursive) {
+    rmdirSync(path, options);
+    return;
+  }
+
+  try {
+    // Try removing file or directory.
+    binding.rmSync(path);
+  } catch (err) {
+    // If we maxed out the retries accept failure.
+    if (__retries >= maxRetries) throw err;
+
+    // Back-off and retry later.
+    setTimeout(() => {
+      rmSync(path, options, __retries + 1);
+    }, retryDelay);
+  }
+}
+
 export default {
   File,
   open,
@@ -603,4 +689,6 @@ export default {
   mkdirSync,
   rmdir,
   rmdirSync,
+  rm,
+  rmSync,
 };
