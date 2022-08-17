@@ -147,7 +147,7 @@ export class File {
       throw new Error('The file is not open.');
     }
 
-    return binding.stat(this._handle);
+    return binding.stat(this.path);
   }
 
   /**
@@ -159,7 +159,7 @@ export class File {
       throw new Error('The file is not open.');
     }
 
-    return binding.statSync(this._handle);
+    return binding.statSync(this.path);
   }
 
   /**
@@ -468,12 +468,8 @@ export async function stat(path) {
     throw new TypeError('The "path" argument must be of type string.');
   }
 
-  // Create a new file instance.
-  const file = new File(path, 'r');
-  await file.open();
-
-  const stats = await file.stat();
-  await file.close();
+  // Get path statistics.
+  const stats = await binding.stat(path);
 
   return stats;
 }
@@ -489,12 +485,8 @@ export function statSync(path) {
     throw new TypeError('The "path" argument must be of type string.');
   }
 
-  // Create a new file instance.
-  const file = new File(path, 'r');
-  file.openSync();
-
-  const stats = file.statSync();
-  file.closeSync();
+  // Get path statistics.
+  const stats = binding.statSync(path);
 
   return stats;
 }

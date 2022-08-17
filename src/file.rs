@@ -523,30 +523,17 @@ impl JsFuture for FsStatFuture {
 
 /// Get's asynchronously file statistics.
 fn stat(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
-    // Get the file_wrap object.
-    let file_wrap = args.get(0).to_object(scope).unwrap();
+    // Get the path.
+    let path = args.get(0).to_rust_string_lossy(scope);
 
     // Create a promise resolver and extract the actual promise.
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
     let promise = promise_resolver.get_promise(scope);
 
-    // Check if the file is already closed, otherwise create a file reference.
-    let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
-        Some(file) => file.try_clone().unwrap(),
-        None => {
-            let message = v8::String::new(scope, "File is closed.").unwrap();
-            let exception = v8::Exception::error(scope, message);
-            // Reject the promise.
-            promise_resolver.reject(scope, exception);
-            rv.set(promise.into());
-            return;
-        }
-    };
-
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
 
-    let task = move || match stats_op(&mut file) {
+    let task = move || match stats_op(path) {
         Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
@@ -578,19 +565,10 @@ fn stat_sync(
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
-    // Get the file_wrap object.
-    let file_wrap = args.get(0).to_object(scope).unwrap();
+    // Get the path.
+    let path = args.get(0).to_rust_string_lossy(scope);
 
-    // Check if the file is already closed, otherwise create a file reference.
-    let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
-        Some(file) => file.try_clone().unwrap(),
-        None => {
-            throw_exception(scope, "File is closed.");
-            return;
-        }
-    };
-
-    match stats_op(&mut file) {
+    match stats_op(path) {
         Ok(stats) => rv.set(create_v8_stats_object(scope, stats).into()),
         Err(e) => throw_exception(scope, &e.to_string()),
     };
@@ -893,9 +871,9 @@ fn write_file_op(file: &mut File, buffer: &[u8]) -> Result<()> {
 }
 
 /// Pure rust implementation of getting file statistics.
-fn stats_op(file: &mut File) -> Result<FileStatistics> {
+fn stats_op<P: AsRef<Path>>(path: P) -> Result<FileStatistics> {
     // Try get file's metadata information.
-    match file.metadata() {
+    match fs::metadata(path) {
         Ok(metadata) => {
             // Returns the size of the file, in bytes, this metadata is for.
             let size = metadata.len();
