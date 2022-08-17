@@ -65,6 +65,8 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "statSync", stat_sync);
     set_function_to(scope, target, "mkdir", mkdir);
     set_function_to(scope, target, "mkdirSync", mkdir_sync);
+    set_function_to(scope, target, "rmdir", rmdir);
+    set_function_to(scope, target, "rmdirSync", rmdir_sync);
     set_function_to(scope, target, "close", close);
     set_function_to(scope, target, "closeSync", close_sync);
 
@@ -687,6 +689,97 @@ fn mkdir_sync(
     }
 }
 
+/// Describes what will run after the async rmdir_op completes.
+struct FsRmdirFuture {
+    promise: v8::Global<v8::PromiseResolver>,
+    maybe_result: TaskResult,
+}
+
+impl JsFuture for FsRmdirFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        // If the result is None then mkdir worked.
+        if self.maybe_result.is_none() {
+            let undefined = v8::undefined(scope);
+            self.promise
+                .open(scope)
+                .resolve(scope, undefined.into())
+                .unwrap();
+
+            return;
+        }
+
+        // Something went wrong.
+        let result = self.maybe_result.take().unwrap();
+
+        // Something went wrong while getting the file's stats.
+        if let Err(e) = result {
+            let message = v8::String::new(scope, &e.to_string()).unwrap();
+            let exception = v8::Exception::error(scope, message);
+            // Reject the promise on failure.
+            self.promise.open(scope).reject(scope, exception);
+            return;
+        }
+
+        unreachable!();
+    }
+}
+
+/// Removes empty directories asynchronously.
+fn rmdir(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get to be removed folder location.
+    let path = args.get(0).to_rust_string_lossy(scope);
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    let task = move || match rmdir_op(path) {
+        Ok(_) => None,
+        Err(e) => Some(Result::Err(e)),
+    };
+
+    let task_cb = {
+        let promise = v8::Global::new(scope, promise_resolver);
+        let state_rc = state_rc.clone();
+
+        move |maybe_result: TaskResult| {
+            let mut state = state_rc.borrow_mut();
+            let future = FsRmdirFuture {
+                promise,
+                maybe_result,
+            };
+            state.pending_futures.push(Box::new(future));
+            state.check_and_interrupt();
+        }
+    };
+
+    // Spawn the async task using the event-loop.
+    state.handle.spawn(task, Some(task_cb));
+
+    rv.set(promise.into());
+}
+
+/// Removes empty directories.
+fn rmdir_sync(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    // Get to be removed folder location.
+    let path = args.get(0).to_rust_string_lossy(scope);
+
+    if let Err(e) = rmdir_op(path) {
+        throw_exception(scope, &e.to_string());
+    }
+}
+
 /// Closes a file asynchronously.
 fn close(
     scope: &mut v8::HandleScope,
@@ -873,6 +966,11 @@ fn mkdir_op<P: AsRef<Path>>(path: P, recursive: bool) -> Result<()> {
         true => fs::create_dir_all(path).map_err(|e| anyhow!(e)),
         false => fs::create_dir(path).map_err(|e| anyhow!(e)),
     }
+}
+
+/// Pure rust implementation of deleting (empty) directories.
+fn rmdir_op<P: AsRef<Path>>(path: P) -> Result<()> {
+    fs::remove_dir(path).map_err(|e| anyhow!(e))
 }
 
 /// Creates a JavaScript file stats object.

@@ -529,6 +529,72 @@ export function mkdirSync(path, options = {}) {
   binding.mkdirSync(path, options?.recursive || false);
 }
 
+/**
+ * Removes empty directories asynchronously.
+ *
+ * @param {String} path
+ * @param {Object} options
+ */
+export async function rmdir(path, options = {}, __retries = 0) {
+  // Check the path argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  const maxRetries = options?.maxRetries || 0;
+  const retryDelay = options?.retryDelay || 100;
+
+  try {
+    // Try removing the empty directory.
+    await binding.rmdir(path);
+  } catch (err) {
+    // If we maxed out the retries accept failure.
+    if (__retries >= maxRetries) throw err;
+
+    // Note: Wrapping the setTimeout into a promise is necessary otherwise the
+    // outer rmdir call won't wait for all the inner ones.
+    await new Promise((success, failure) => {
+      // Back-off and retry later.
+      setTimeout(
+        () =>
+          rmdir(path, options, __retries + 1)
+            .then(success)
+            .catch(failure),
+        retryDelay
+      );
+    });
+  }
+}
+
+/**
+ * Removes empty directories synchronously.
+ *
+ * @param {String} path
+ * @param {Object} options
+ */
+export function rmdirSync(path, options = {}, __retries = 0) {
+  // Check the path argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  const maxRetries = options?.maxRetries || 0;
+  const retryDelay = options?.retryDelay || 100;
+
+  try {
+    // Try removing the empty directory.
+    binding.rmdirSync(path);
+  } catch (err) {
+    // If we maxed out the retries accept failure.
+    if (__retries >= maxRetries) throw err;
+
+    // Back-off and retry later.
+    setTimeout(() => {
+      rmdirSync(path, options, __retries + 1);
+    }, retryDelay);
+  }
+}
+
 export default {
   File,
   open,
@@ -543,4 +609,6 @@ export default {
   statSync,
   mkdir,
   mkdirSync,
+  rmdir,
+  rmdirSync,
 };
