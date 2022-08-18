@@ -112,7 +112,7 @@ function prettifyArray(arr, depth = 0, isUniform) {
   // Tries to align the columns.
   const alignColumn = (elem, i) => {
     const length = elem.replace(/\u001b\[[0-9;]*m/g, '').length;
-    const shift = maxElementLength - length;
+    const shift = maxElementsPerRow === 1 ? 0 : maxElementLength - length;
     if (isUniform) {
       return i === arr.length - 1
         ? pre(shift) + elem
@@ -128,7 +128,7 @@ function prettifyArray(arr, depth = 0, isUniform) {
   const groupRows = (acc, elem, i) => {
     if (acc.atRow === maxElementsPerRow || i === 0) {
       acc.list.push([elem]);
-      acc.atRow = 0;
+      acc.atRow = 1;
     } else {
       acc.list[acc.list.length - 1].push(elem);
       acc.atRow++;
