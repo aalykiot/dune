@@ -1,7 +1,8 @@
 import { Console } from 'console';
 import { TextEncoder, TextDecoder } from 'text-encoding';
 import { setTimeout, setInterval, clearTimeout, clearInterval } from 'timers';
-import { cloneFunction } from 'util';
+import { cloneFunction, parseEnvVariable } from 'util';
+import { readFileSync } from 'fs';
 
 globalThis.global = globalThis;
 
@@ -12,8 +13,8 @@ function makeGlobal(name, value) {
   globalThis[name] = value;
 }
 
-// Note: adding a caching layer to `process.binding` allow us to not
-// cross the JavaScript to Rust bridge every time we need native methods.
+// Note: Adding a caching layer to `process.binding` allow us not
+// to cross the JavaScript - Rust bridge every time we need native methods.
 
 let cache = new Map();
 let internalBinding = cloneFunction(process.binding);
@@ -80,3 +81,23 @@ makeGlobal('clearInterval', clearInterval);
 
 makeGlobal('TextEncoder', TextEncoder);
 makeGlobal('TextDecoder', TextDecoder);
+
+// Loading env variables from a .env file automatically.
+
+const DOTENV_FILE = process.cwd() + '/.env';
+const DOTENV_COMMENTS = /(?<=^([^"']|"[^"']*")*)#.*/g;
+
+try {
+  const dotenvContent = readFileSync(DOTENV_FILE, 'utf-8');
+  const dotenv = dotenvContent
+    .split('\n')
+    .map((env) => env.replace(DOTENV_COMMENTS, '').trim())
+    .filter((env) => env !== '');
+
+  dotenv.forEach((env) => {
+    const [key, value] = env.split('=');
+    process.env[key.trim()] = parseEnvVariable(value);
+  });
+} catch (_) {
+  // We don't care about handling the error.
+}
