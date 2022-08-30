@@ -5,6 +5,7 @@ use crate::errors::JsError;
 use crate::event_loop::EventLoop;
 use crate::event_loop::LoopHandle;
 use crate::event_loop::LoopInterruptHandle;
+use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
 use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
@@ -83,6 +84,8 @@ impl JsRuntime {
         let mut isolate = v8::Isolate::new(v8::CreateParams::default());
 
         isolate.set_capture_stack_trace_for_uncaught_exceptions(true, 10);
+        isolate
+            .set_host_initialize_import_meta_object_callback(host_initialize_import_meta_object_cb);
 
         let context = {
             let scope = &mut v8::HandleScope::new(&mut *isolate);

@@ -8,6 +8,7 @@ use anyhow::Result;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::HashMap;
+use std::fs;
 use url::Url;
 
 lazy_static! {
@@ -72,8 +73,21 @@ impl ModuleMap {
         path: &str,
         module: v8::Local<'a, v8::Module>,
     ) {
-        let module_ref = v8::Global::new(scope, module);
-        self.map.insert(path.into(), module_ref);
+        // Make a global ref.
+        let module = v8::Global::new(scope, module);
+        let should_update_main =
+            self.main.is_none() && (fs::metadata(path).is_ok() || path.starts_with("http"));
+
+        // No main module has been set, so let's update it's value.
+        if should_update_main {
+            self.main = Some(path.into());
+        }
+
+        self.map.insert(path.into(), module);
+    }
+
+    pub fn main(&self) -> Option<ModulePath> {
+        self.main.clone()
     }
 }
 
