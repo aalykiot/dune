@@ -12,6 +12,7 @@ mod runtime;
 mod stdio;
 mod timers;
 mod typescript;
+mod dns;
 
 use errors::unwrap_or_exit;
 use modules::resolve_import;

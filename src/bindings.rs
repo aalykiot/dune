@@ -1,3 +1,4 @@
+use crate::dns;
 use crate::file;
 use crate::perf_hooks;
 use crate::process;
@@ -17,6 +18,7 @@ lazy_static! {
             ("timers", timers::initialize),
             ("fs", file::initialize),
             ("perf_hooks", perf_hooks::initialize),
+            ("dns", dns::initialize),
         ];
         HashMap::from_iter(bindings.into_iter())
     };

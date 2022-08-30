@@ -35,6 +35,7 @@ swc_ecma_transforms_base = "0.102.1"
 swc_ecma_transforms_typescript = "0.143.0"
 swc_ecma_visit = "0.75.0"
 serde = { version = "1.0.142", features = ["derive"] }
+dns-lookup = "1.0.8"
 
 [dev-dependencies]
 assert_fs = "1.0.7"
