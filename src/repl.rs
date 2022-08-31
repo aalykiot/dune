@@ -201,7 +201,7 @@ pub fn start(mut runtime: JsRuntime) {
 
     // Spawn the REPL thread.
     thread::spawn(move || {
-        let mut editor = Editor::new();
+        let mut editor = Editor::new().unwrap();
         let history_file_path = &dirs::home_dir().unwrap().join(CLI_ROOT).join(CLI_HISTORY);
 
         editor.set_helper(Some(RLHelper::new()));

@@ -66,6 +66,14 @@ pub struct JsRuntime {
 
 impl JsRuntime {
     pub fn new() -> JsRuntime {
+        let flags = concat!(
+            " --harmony-import-assertions",
+            " --turbo_fast_api_calls",
+            " --no-validate-asm",
+            " --noexperimental-async-stack-tagging-api"
+        );
+        v8::V8::set_flags_from_string(flags);
+
         // Fire up the v8 engine.
         static V8_INIT: Once = Once::new();
         V8_INIT.call_once(move || {
@@ -73,13 +81,6 @@ impl JsRuntime {
             v8::V8::initialize_platform(platform);
             v8::V8::initialize();
         });
-
-        let flags = concat!(
-            " --harmony-import-assertions",
-            " --turbo_fast_api_calls",
-            " --no-validate-asm"
-        );
-        v8::V8::set_flags_from_string(flags);
 
         let mut isolate = v8::Isolate::new(v8::CreateParams::default());
 
