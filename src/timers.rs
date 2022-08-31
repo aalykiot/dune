@@ -1,4 +1,5 @@
 use crate::bindings::set_function_to;
+use crate::event_loop::LoopHandle;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use std::rc::Rc;
@@ -63,7 +64,7 @@ fn create_timeout(
 
     let timer_cb = {
         let state_rc = state_rc.clone();
-        move || {
+        move |_: LoopHandle| {
             let mut state = state_rc.borrow_mut();
             let future = TimerFuture {
                 callback: Rc::clone(&callback),

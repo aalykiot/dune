@@ -1,5 +1,6 @@
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
+use crate::event_loop::LoopHandle;
 use crate::event_loop::TaskResult;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
@@ -93,7 +94,7 @@ fn dns_lookup(
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |maybe_result: TaskResult| {
+        move |_: LoopHandle, maybe_result: TaskResult| {
             let mut state = state_rc.borrow_mut();
             let future = DnsLookupFuture {
                 promise,

@@ -4,6 +4,7 @@ use crate::bindings::set_function_to;
 use crate::bindings::set_internal_ref;
 use crate::bindings::set_property_to;
 use crate::bindings::throw_exception;
+use crate::event_loop::LoopHandle;
 use crate::event_loop::TaskResult;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
@@ -146,7 +147,7 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |maybe_result: TaskResult| {
+        move |_: LoopHandle, maybe_result: TaskResult| {
             let mut state = state_rc.borrow_mut();
             let future = FsOpenFuture {
                 promise,
@@ -289,7 +290,7 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |maybe_result: TaskResult| {
+        move |_: LoopHandle, maybe_result: TaskResult| {
             let mut state = state_rc.borrow_mut();
             let future = FsReadFuture {
                 promise,
@@ -442,7 +443,7 @@ fn write(
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |maybe_result: TaskResult| {
+        move |_: LoopHandle, maybe_result: TaskResult| {
             // Get a mut reference to the runtime's state.
             let mut state = state_rc.borrow_mut();
             let fs_write_handle = FsWriteFuture {
@@ -544,7 +545,7 @@ fn stat(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |maybe_result: TaskResult| {
+        move |_: LoopHandle, maybe_result: TaskResult| {
             let mut state = state_rc.borrow_mut();
             let future = FsStatFuture {
                 promise,
@@ -637,7 +638,7 @@ fn mkdir(
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |maybe_result: TaskResult| {
+        move |_: LoopHandle, maybe_result: TaskResult| {
             let mut state = state_rc.borrow_mut();
             let future = FsMkdirFuture {
                 promise,
@@ -729,7 +730,7 @@ fn rmdir(
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |maybe_result: TaskResult| {
+        move |_: LoopHandle, maybe_result: TaskResult| {
             let mut state = state_rc.borrow_mut();
             let future = FsRmdirFuture {
                 promise,
@@ -816,7 +817,7 @@ fn rm(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: 
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |maybe_result: TaskResult| {
+        move |_: LoopHandle, maybe_result: TaskResult| {
             let mut state = state_rc.borrow_mut();
             let future = FsRmFuture {
                 promise,
