@@ -47,8 +47,8 @@ impl JsFuture for DnsLookupFuture {
             .map(|(address, family)| {
                 // Create new v8 handles.
                 let ip = v8::Object::new(scope);
-                let address = v8::String::new(scope, &address).unwrap().into();
-                let family = v8::String::new(scope, &family).unwrap().into();
+                let address = v8::String::new(scope, address).unwrap().into();
+                let family = v8::String::new(scope, family).unwrap().into();
 
                 // Set properties to IP object.
                 set_property_to(scope, ip, "address", address);
