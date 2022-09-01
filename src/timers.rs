@@ -71,7 +71,6 @@ fn create_timeout(
                 params: Rc::clone(&params),
             };
             state.pending_futures.push(Box::new(future));
-            state.check_and_interrupt();
         }
     };
 

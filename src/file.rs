@@ -154,7 +154,6 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
                 maybe_result,
             };
             state.pending_futures.push(Box::new(future));
-            state.check_and_interrupt();
         }
     };
 
@@ -297,7 +296,6 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
                 maybe_result,
             };
             state.pending_futures.push(Box::new(future));
-            state.check_and_interrupt();
         }
     };
 
@@ -451,7 +449,6 @@ fn write(
                 maybe_result,
             };
             state.pending_futures.push(Box::new(fs_write_handle));
-            state.check_and_interrupt();
         }
     };
 
@@ -552,7 +549,6 @@ fn stat(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
                 maybe_result,
             };
             state.pending_futures.push(Box::new(future));
-            state.check_and_interrupt();
         }
     };
 
@@ -645,7 +641,6 @@ fn mkdir(
                 maybe_result,
             };
             state.pending_futures.push(Box::new(future));
-            state.check_and_interrupt();
         }
     };
 
@@ -737,7 +732,6 @@ fn rmdir(
                 maybe_result,
             };
             state.pending_futures.push(Box::new(future));
-            state.check_and_interrupt();
         }
     };
 
@@ -824,7 +818,6 @@ fn rm(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: 
                 maybe_result,
             };
             state.pending_futures.push(Box::new(future));
-            state.check_and_interrupt();
         }
     };
 

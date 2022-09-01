@@ -1,10 +1,12 @@
 mod bindings;
+mod dns;
 mod errors;
 mod event_loop;
 mod file;
 mod hooks;
 mod loaders;
 mod modules;
+mod net;
 mod perf_hooks;
 mod process;
 mod repl;
@@ -12,7 +14,6 @@ mod runtime;
 mod stdio;
 mod timers;
 mod typescript;
-mod dns;
 
 use errors::unwrap_or_exit;
 use modules::resolve_import;

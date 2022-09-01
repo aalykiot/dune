@@ -85,7 +85,7 @@ $ cd dune/ && cargo run -- <FILE>
 ### Net
 
 - [ ] `createServer([options], [connectionListener])`: Creates a new TCP server.
-- [ ] `connect(path, [connectionListener])`: Creates unix socket connection to path.
+- [x] `createConnection(options, [connectionListener])`: Creates unix socket connection to a remote host.
 
 ### Net.Server
 
@@ -104,19 +104,19 @@ $ cd dune/ && cargo run -- <FILE>
 
 > Net.Socket is a class extending `EventEmitter`.
 
-- [ ] `connect(port, [host], [connectionListener])`: Opens the connection for a given socket.
+- [x] `connect(options, [connectionListener])`: Opens the connection for a given socket.
 - [ ] `setEncoding([encoding])`: Set the encoding for the socket.
 - [ ] `write(data, [encoding], [callback])`: Sends data on the socket.
 - [ ] `end([data])`: Half-closes the socket. i.e., it sends a FIN packet.
 - [ ] `address()`: Returns the bound address.
-- [ ] `remoteAddress`: The string representation of the remote IP address.
-- [ ] `remotePort`: The numeric representation of the remote port.
-- [ ] `bytesRead`: The amount of received bytes.
-- [ ] `bytesWritten`: The amount of bytes sent.
-- [ ] `Event: 'connect'`: Emitted when a socket connection is successfully established.
+- [x] `remoteAddress`: The string representation of the remote IP address.
+- [x] `remotePort`: The numeric representation of the remote port.
+- [x] `bytesRead`: The amount of received bytes.
+- [x] `bytesWritten`: The amount of bytes sent.
+- [x] `Event: 'connect'`: Emitted when a socket connection is successfully established.
 - [ ] `Event: 'data'`: Emitted when data is received.
 - [ ] `Event: 'end'`: Emitted when the other end of the socket sends a FIN packet.
-- [ ] `Event: 'error'`: Emitted when an error occurs.
+- [x] `Event: 'error'`: Emitted when an error occurs.
 - [ ] `Event: 'close'`: Emitted once the socket is fully closed.
 
 ### Performance Measurement

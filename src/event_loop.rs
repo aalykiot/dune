@@ -29,7 +29,7 @@ use std::time::Instant;
 use threadpool::ThreadPool;
 
 /// Wrapper type for resource identification.
-type Index = u32;
+pub type Index = u32;
 
 /// All objects that are tracked by the event-loop should implement the `Resource` trait.
 pub trait Resource: Downcast + 'static {
@@ -102,9 +102,9 @@ impl Resource for TcpListenerWrap {}
 #[allow(dead_code)]
 /// Useful information about a TCP socket.
 pub struct TcpSocketInfo {
-    id: Index,
-    host: SocketAddr,
-    remote: SocketAddr,
+    pub id: Index,
+    pub host: SocketAddr,
+    pub remote: SocketAddr,
 }
 
 #[allow(clippy::enum_variant_names)]
@@ -140,7 +140,7 @@ pub struct EventLoop {
     action_queue: mpsc::Receiver<Action>,
     action_queue_empty: Rc<Cell<bool>>,
     action_dispatcher: Rc<mpsc::Sender<Action>>,
-    close_queue: Vec<(Index, OnClose)>,
+    close_queue: Vec<(Index, Option<OnClose>)>,
     thread_pool: ThreadPool,
     event_dispatcher: Arc<Mutex<mpsc::Sender<Event>>>,
     event_queue: mpsc::Receiver<Event>,
@@ -337,7 +337,9 @@ impl EventLoop {
         for (rid, on_close) in self.close_queue.drain(..) {
             if let Some(mut resource) = self.resources.remove(&rid) {
                 resource.close();
-                (on_close)(handle.clone());
+                if let Some(cb) = on_close {
+                    (cb)(handle.clone());
+                }
             }
         }
         self.prepare();
@@ -483,7 +485,17 @@ impl EventLoop {
             }
         }
 
-        let on_read = tcp_wrap.on_read.as_mut().unwrap();
+        // Note: If a FIN packet received without us listening on the TCP stream, it means
+        // that the other side closed the connection so we'll schedule the resource
+        // for removal.
+
+        let on_read = match tcp_wrap.on_read.as_mut() {
+            Some(on_read) => on_read,
+            None => {
+                self.close_queue.push((index, None));
+                return;
+            }
+        };
 
         // Check if we had any errors while reading.
         if let Some(err) = read_error {
@@ -695,7 +707,7 @@ impl EventLoop {
     /// Schedules a TCP socket shutdown.
     fn tcp_close_req(&mut self, index: Index, on_close: Box<dyn FnOnce(LoopHandle) + 'static>) {
         // Schedule resource for graceful shutdown and removal.
-        self.close_queue.push((index, on_close));
+        self.close_queue.push((index, Some(on_close)));
     }
 
     /// Closes the write side of the stream.

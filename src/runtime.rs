@@ -4,7 +4,6 @@ use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::event_loop::EventLoop;
 use crate::event_loop::LoopHandle;
-use crate::event_loop::LoopInterruptHandle;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
 use crate::modules::create_origin;
@@ -13,7 +12,6 @@ use crate::modules::resolve_import;
 use crate::modules::ModuleMap;
 use anyhow::bail;
 use anyhow::Error;
-use std::cell::Cell;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
@@ -41,21 +39,7 @@ pub struct JsRuntimeState {
     pub startup_moment: Instant,
     /// Specifies the timestamp which the current process began in Unix time.
     pub time_origin: u128,
-    /// Specifies if an event-loop interrupt event is pending.
-    pub will_interrupt: Cell<bool>,
-    /// An interrupt handle for the event-loop.
-    pub waker: LoopInterruptHandle,
 }
-
-impl JsRuntimeState {
-    /// Sends an interrupt event to the event-loop if no other interrupt event is pending.
-    pub fn check_and_interrupt(&self) {
-        if !self.will_interrupt.get() {
-            self.waker.interrupt();
-        }
-    }
-}
-
 pub struct JsRuntime {
     /// A VM instance with its own heap.
     /// https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html
@@ -110,8 +94,6 @@ impl JsRuntime {
             pending_futures: Vec::new(),
             startup_moment: Instant::now(),
             time_origin,
-            will_interrupt: Cell::new(false),
-            waker: event_loop.interrupt_handle(),
         })));
 
         let mut runtime = JsRuntime {
@@ -220,7 +202,6 @@ impl JsRuntime {
     pub fn run_event_loop(&mut self) {
         while self.event_loop.has_pending_events() {
             self.tick_event_loop();
-            self.get_state().borrow().will_interrupt.set(false);
         }
     }
 

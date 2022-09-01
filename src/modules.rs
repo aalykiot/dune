@@ -25,6 +25,7 @@ lazy_static! {
             ("perf_hooks", include_str!("./js/perf_hooks.js")),
             ("colors", include_str!("./js/colors.js")),
             ("dns", include_str!("./js/dns.js")),
+            ("net", include_str!("./js/net.js")),
         ];
         HashMap::from_iter(modules.into_iter())
     };

@@ -101,7 +101,6 @@ fn dns_lookup(
                 maybe_result,
             };
             state.pending_futures.push(Box::new(future));
-            state.check_and_interrupt();
         }
     };
 
