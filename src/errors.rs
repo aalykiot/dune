@@ -35,6 +35,13 @@ pub fn generic_error(message: impl Into<Cow<'static, str>>) -> Error {
     CustomError::new("Error", message)
 }
 
+pub fn unhandled_promise_rejection_error(message: impl Into<Cow<'static, str>>) -> Error {
+    CustomError::new(
+        "Uncaught",
+        format!("Unhandled promise rejection: {}", message.into()),
+    )
+}
+
 /// Represents an exception coming from V8.
 #[derive(PartialEq, Clone)]
 pub struct JsError {

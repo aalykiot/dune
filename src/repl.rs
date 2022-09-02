@@ -249,7 +249,12 @@ pub fn start(mut runtime: JsRuntime) {
 
         // Poll the event-loop.
         if maybe_message.is_err() {
+            // Tick the event loop.
             runtime.tick_event_loop();
+            // Report if any unhandled promise rejection have been caught.
+            if runtime.has_promise_rejections() {
+                println!("{}", runtime.promise_rejections().iter().next().unwrap());
+            }
             continue;
         }
 

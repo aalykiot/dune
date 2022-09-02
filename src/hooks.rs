@@ -99,3 +99,27 @@ fn import_meta_resolve(
         Err(e) => throw_type_error(scope, &e.to_string()),
     };
 }
+
+/// Called when a promise rejects with no rejection handler specified.
+/// https://docs.rs/v8/0.49.0/v8/type.PromiseRejectCallback.html
+pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
+    // Create a v8 callback-scope.
+    let scope = &mut unsafe { v8::CallbackScope::new(&message) };
+    let event = message.get_event();
+
+    let reason = match event {
+        v8::PromiseRejectEvent::PromiseHandlerAddedAfterReject
+        | v8::PromiseRejectEvent::PromiseRejectAfterResolved
+        | v8::PromiseRejectEvent::PromiseResolveAfterResolved => return,
+        v8::PromiseRejectEvent::PromiseRejectWithNoHandler => message.get_value().unwrap(),
+    };
+
+    // Get access to the runtime's state.
+    let state_rc = JsRuntime::state(scope);
+    let mut state = state_rc.borrow_mut();
+
+    let reason = v8::Global::new(scope, reason);
+
+    // Register this promise rejection to the runtime.
+    state.promise_exceptions.push(reason);
+}

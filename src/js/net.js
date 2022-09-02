@@ -49,10 +49,10 @@ export class Socket extends EventEmitter {
       return;
     }
 
-    // Subscribe to the emiiter the on-connect callback if specified.
+    // Subscribe to the emitter the on-connect callback if specified.
     if (onConnection) this.on('connect', onConnection);
 
-    // Parse provided oprions.
+    // Parse provided options.
     const hostname = options?.host || '127.0.0.1';
     const port = options?.port || 80;
 

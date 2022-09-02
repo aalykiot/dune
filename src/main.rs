@@ -41,7 +41,10 @@ fn main() {
 
         match mod_result {
             Ok(_) => runtime.run_event_loop(),
-            Err(e) => eprintln!("{:#?}", e),
+            Err(e) => {
+                eprintln!("{:#?}", e);
+                std::process::exit(1);
+            }
         };
 
         return;

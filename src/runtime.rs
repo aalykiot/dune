@@ -1,11 +1,13 @@
 use crate::bindings;
 use crate::errors::generic_error;
+use crate::errors::unhandled_promise_rejection_error;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::event_loop::EventLoop;
 use crate::event_loop::LoopHandle;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
+use crate::hooks::promise_reject_cb;
 use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
 use crate::modules::resolve_import;
@@ -39,6 +41,8 @@ pub struct JsRuntimeState {
     pub startup_moment: Instant,
     /// Specifies the timestamp which the current process began in Unix time.
     pub time_origin: u128,
+    /// Holds exceptions from promises with no rejection handler.
+    pub promise_exceptions: Vec<v8::Global<v8::Value>>,
 }
 pub struct JsRuntime {
     /// A VM instance with its own heap.
@@ -69,6 +73,7 @@ impl JsRuntime {
         let mut isolate = v8::Isolate::new(v8::CreateParams::default());
 
         isolate.set_capture_stack_trace_for_uncaught_exceptions(true, 10);
+        isolate.set_promise_reject_callback(promise_reject_cb);
         isolate
             .set_host_initialize_import_meta_object_callback(host_initialize_import_meta_object_cb);
 
@@ -94,6 +99,7 @@ impl JsRuntime {
             pending_futures: Vec::new(),
             startup_moment: Instant::now(),
             time_origin,
+            promise_exceptions: Vec::new(),
         })));
 
         let mut runtime = JsRuntime {
@@ -201,7 +207,13 @@ impl JsRuntime {
     /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
         while self.event_loop.has_pending_events() {
+            // Tick the event loop.
             self.tick_event_loop();
+            // Report (and exit) if any unhandled promise rejection has been caught.
+            if self.has_promise_rejections() {
+                println!("{}", self.promise_rejections().iter().next().unwrap());
+                std::process::exit(1);
+            }
         }
     }
 
@@ -222,6 +234,30 @@ impl JsRuntime {
         for mut future in futures {
             future.run(scope);
         }
+    }
+
+    /// Returns if unhandled promise rejections where caught.
+    pub fn has_promise_rejections(&mut self) -> bool {
+        self.get_state().borrow().promise_exceptions.len() > 0
+    }
+
+    /// Returns all promise unhandled rejections.
+    pub fn promise_rejections(&mut self) -> Vec<Error> {
+        // Get a v8 handle-scope.
+        let scope = &mut self.handle_scope();
+
+        // Get access to the state.
+        let state_rc = JsRuntime::state(scope);
+        let mut state = state_rc.borrow_mut();
+
+        state
+            .promise_exceptions
+            .drain(..)
+            .map(|value| {
+                let reason = value.open(scope).to_rust_string_lossy(scope);
+                unhandled_promise_rejection_error(reason)
+            })
+            .collect()
     }
 }
 
