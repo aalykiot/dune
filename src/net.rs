@@ -75,18 +75,23 @@ fn connect(
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
 
-    // Try open a TCP stream with the remote host.
-    let connect = state.handle.tcp_connect(&address, {
+    let on_connection = {
         let state_rc = state_rc.clone();
         let promise = v8::Global::new(scope, promise_resolver);
-        move |_: LoopHandle, _: Index, sock: Result<TcpSocketInfo>| {
-            // Create a new JsFuture.
+        move |_: LoopHandle, index: Index, sock: Result<TcpSocketInfo>| {
             let mut state = state_rc.borrow_mut();
+            // If connection did't happen, remove the resource.
+            if sock.is_err() {
+                state.handle.tcp_close(index, |_: LoopHandle| {});
+            }
+            // Create a new JsFuture.
             let future = TcpConnectFuture { sock, promise };
-            // Push it to the runtime.
             state.pending_futures.push(Box::new(future));
         }
-    });
+    };
+
+    // Try open a TCP stream with the remote host.
+    let connect = state.handle.tcp_connect(&address, on_connection);
 
     // Check if the tcp_connect failed early.
     if let Err(e) = connect {

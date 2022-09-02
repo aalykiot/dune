@@ -6,6 +6,7 @@
 // https://nodejs.org/dist/latest-v18.x/docs/api/net.html
 
 import dns from 'dns';
+import assert from 'assert';
 import { EventEmitter } from 'events';
 
 const binding = process.binding('net');
@@ -34,12 +35,15 @@ export class Socket extends EventEmitter {
    * Initiates a connection on a given remote host.
    *
    * @param {Object} options
-   * @param {Function} onConnection
+   * @param {Function} [onConnection]
    */
-  async connect(options = {}, onConnection) {
+  connect(options = {}, onConnection) {
     // Check if socket is already connected.
     if (this._rid) {
-      this.emit('error', new Error(`Socket is already connected.`));
+      const error = new Error(
+        `Socket is already connected to <${this.remoteAddress}:${this.remotePort}>.`
+      );
+      this.emit('error', error);
       return;
     }
 
@@ -50,7 +54,10 @@ export class Socket extends EventEmitter {
     }
 
     // Subscribe to the emitter the on-connect callback if specified.
-    if (onConnection) this.on('connect', onConnection);
+    if (onConnection) {
+      assert.isFunction(onConnection);
+      this.on('connect', onConnection);
+    }
 
     // Parse provided options.
     const hostname = options?.host || '127.0.0.1';
@@ -58,29 +65,36 @@ export class Socket extends EventEmitter {
 
     this._connecting = true;
 
-    try {
-      // Use DNS lookup to resolve the hostname.
-      const addresses = await dns.lookup(hostname);
+    // Note: Using async/await makes the syntax more readable but in order
+    // to do use it we'll create a wrapper function.
 
-      // Prefer IPv4 address.
-      const host = addresses.some((addr) => addr.family === 'IPv4')
-        ? addresses.filter((addr) => addr.family === 'IPv4')[0].address
-        : addresses[0].address;
+    const try_connect = async () => {
+      try {
+        // Use DNS lookup to resolve the hostname.
+        const addresses = await dns.lookup(hostname);
 
-      // Try to connect to the remote host.
-      const socketInfo = await binding.connect(host, port);
+        // Prefer IPv4 address.
+        const host = addresses.some((addr) => addr.family === 'IPv4')
+          ? addresses.filter((addr) => addr.family === 'IPv4')[0].address
+          : addresses[0].address;
 
-      // Update socket's local state.
-      this._rid = socketInfo.rid;
-      this.remoteAddress = socketInfo.remoteAddress;
-      this.remotePort = socketInfo.remotePort;
-      this._connecting = false;
+        // Try to connect to the remote host.
+        const socketInfo = await binding.connect(host, port);
 
-      // Fire the success event.
-      this.emit('connect', socketInfo);
-    } catch (e) {
-      this.emit('error', e);
-    }
+        // Update socket's local state.
+        this._rid = socketInfo.rid;
+        this._connecting = false;
+        this.remoteAddress = socketInfo.remoteAddress;
+        this.remotePort = socketInfo.remotePort;
+
+        // Fire the success event.
+        this.emit('connect', socketInfo);
+      } catch (e) {
+        this.emit('error', e);
+      }
+    };
+
+    try_connect();
   }
 }
 
@@ -88,7 +102,7 @@ export class Socket extends EventEmitter {
  * Initiates a connection on a given remote host.
  *
  * @param {Object} options
- * @param {Function} onConnection
+ * @param {Function} [onConnection]
  */
 export function createConnection(options, onConnection) {
   const socket = new Socket();
