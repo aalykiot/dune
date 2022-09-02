@@ -192,6 +192,14 @@ function stringifyError(error) {
   return error.stack;
 }
 
+function isArrayBuffer(value) {
+  return value instanceof ArrayBuffer;
+}
+
+function stringifyArrayBuffer(value) {
+  return `ArrayBuffer { byteLength: ${stringify(value.byteLength)} }`;
+}
+
 /**
  * Specifically stringifies JavaScript objects.
  *
@@ -208,6 +216,10 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
     return stringifyArray(value, seen, depth);
   }
 
+  if (isArrayBuffer(value)) {
+    return stringifyArrayBuffer(value);
+  }
+
   if (isTypedArray(value)) {
     return stringifyTypedArray(value, depth);
   }
@@ -222,6 +234,12 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
 
   if (isError(value)) {
     return stringifyError(value);
+  }
+
+  // It's an object type that console does not support.
+  if (value.toString() !== '[object Object]') {
+    const type = value.toString().replace('[object ', '').replace(']', '');
+    return `${type} {}`;
   }
 
   // Looks like it's a regular object.
