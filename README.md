@@ -1,16 +1,13 @@
 # Dune
 
-Dune is a hobby JavaScript and TypeScript runtime written in **Rust**, based on **V8**, and developed completely for fun and experimentation.
+Dune is an open-source, cross-platform, shell around the **V8** engine, written in **Rust** and capable of running JavaScript (dah) and TypeScript code out of the box.
+
+Developed completely for fun and experimentation.
 
 <p>
 <img src="https://img.shields.io/badge/version-v0.1.0-lightgray?style=for-the-badge" />
 <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" />
 </p>
-
-## Branches
-
-- main -> this is what's currently working.
-- develop -> new features are developed here (things might be broken).
 
 ## Installation
 
