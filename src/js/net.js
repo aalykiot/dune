@@ -24,6 +24,7 @@ export class Socket extends EventEmitter {
     super();
     this._rid = undefined;
     this._connecting = false;
+    this._reading = false;
     this._encoding = undefined;
     this.bytesRead = 0;
     this.bytesWritten = 0;
@@ -34,23 +35,31 @@ export class Socket extends EventEmitter {
   /**
    * Initiates a connection on a given remote host.
    *
-   * @param {Object} options
+   * @param {Number} port
+   * @param {String} [host]
    * @param {Function} [onConnection]
    */
-  connect(options = {}, onConnection) {
+  connect(port, hostname = '127.0.0.1', onConnection) {
+    // Check the port parameter type.
+    if (Number.isNaN(Number.parseInt(port))) {
+      throw new TypeError(`The "port" argument must be castable to number.`);
+    }
+
+    // Check the host parameter type.
+    if (hostname && typeof hostname !== 'string') {
+      throw new TypeError(`The "host" argument must be of type string.`);
+    }
+
     // Check if socket is already connected.
     if (this._rid) {
-      const error = new Error(
+      throw new Error(
         `Socket is already connected to <${this.remoteAddress}:${this.remotePort}>.`
       );
-      this.emit('error', error);
-      return;
     }
 
     // Check if a connection is happening.
     if (this._connecting) {
-      this.emit('error', new Error(`Socket is trying to connect.`));
-      return;
+      throw new Error('Socket is trying to connect.');
     }
 
     // Subscribe to the emitter the on-connect callback if specified.
@@ -59,14 +68,10 @@ export class Socket extends EventEmitter {
       this.on('connect', onConnection);
     }
 
-    // Parse provided options.
-    const hostname = options?.host || '127.0.0.1';
-    const port = options?.port || 80;
-
     this._connecting = true;
 
-    // Note: Using async/await makes the syntax more readable but in order
-    // to do use it we'll create a wrapper function.
+    // Note: We're wrapping the connection logic inside an async function
+    // since the async/await syntax makes the code more readable.
 
     const try_connect = async () => {
       try {
@@ -87,26 +92,74 @@ export class Socket extends EventEmitter {
         this.remoteAddress = socketInfo.remoteAddress;
         this.remotePort = socketInfo.remotePort;
 
-        // Fire the success event.
         this.emit('connect', socketInfo);
-      } catch (e) {
-        this.emit('error', e);
+        this.#readStart();
+      } catch (err) {
+        // Use event-emitter to throw connection errors (if registered).
+        if (this.listenerCount('error') > 0) {
+          return this.emit('error', err);
+        }
+        throw err;
       }
     };
 
     try_connect();
+  }
+
+  /**
+   * Starts listening for incoming socket messages.
+   */
+  #readStart() {
+    // Setup the TCP stream on_read callback.
+    const on_read_cb = (err, arrayBufferView) => {
+      // Use event-emitter to throw reading errors (if registered).
+      if (err && this.listenerCount('error') !== 0) {
+        return this.emit('error', err);
+      }
+
+      if (err) throw err;
+
+      // Check if the remote host closed the connection.
+      if (arrayBufferView.byteLength === 0) {
+        return this.emit('end'); // TODO: close the socket.
+      }
+
+      // Transform ArrayBuffer into a Uint8Array we can use.
+      const data = new Uint8Array(arrayBufferView);
+      const data_transform = !this._encoding
+        ? data
+        : new TextDecoder(this._encoding).decode(new Uint8Array(data));
+
+      this.emit('data', data_transform);
+    };
+
+    binding.readStart(this._rid, on_read_cb);
+  }
+
+  /**
+   * Sets the encoding for the current socket.
+   *
+   * @param {String} [encoding]
+   */
+  setEncoding(encoding = 'utf-8') {
+    // Check the parameter type.
+    if (typeof encoding !== 'string') {
+      throw new TypeError('The "encoding" argument must be of type string.');
+    }
+    this._encoding = encoding;
   }
 }
 
 /**
  * Initiates a connection on a given remote host.
  *
- * @param {Object} options
+ * @param {Number} port
+ * @param {String} [host]
  * @param {Function} [onConnection]
  */
-export function createConnection(options, onConnection) {
+export function createConnection(port, hostname, onConnection) {
   const socket = new Socket();
-  socket.connect(options, onConnection);
+  socket.connect(port, hostname, onConnection);
   return socket;
 }
 
