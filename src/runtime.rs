@@ -1,6 +1,5 @@
 use crate::bindings;
 use crate::errors::generic_error;
-use crate::errors::unhandled_promise_rejection_error;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::event_loop::EventLoop;
@@ -44,6 +43,7 @@ pub struct JsRuntimeState {
     /// Holds exceptions from promises with no rejection handler.
     pub promise_exceptions: Vec<v8::Global<v8::Value>>,
 }
+
 pub struct JsRuntime {
     /// A VM instance with its own heap.
     /// https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html
@@ -206,12 +206,16 @@ impl JsRuntime {
 
     /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
-        while self.event_loop.has_pending_events() {
+        while self.event_loop.has_pending_events() || self.has_promise_rejections() {
             // Tick the event loop.
             self.tick_event_loop();
             // Report (and exit) if any unhandled promise rejection has been caught.
             if self.has_promise_rejections() {
-                println!("{}", self.promise_rejections().iter().next().unwrap());
+                let rejection = self.promise_rejections().remove(0);
+                let rejection = format!("{:?}", rejection);
+                let rejection = rejection.replacen(" ", " (in promise) ", 1);
+
+                println!("{}", rejection);
                 std::process::exit(1);
             }
         }
@@ -238,11 +242,11 @@ impl JsRuntime {
 
     /// Returns if unhandled promise rejections where caught.
     pub fn has_promise_rejections(&mut self) -> bool {
-        self.get_state().borrow().promise_exceptions.len() > 0
+        !self.get_state().borrow().promise_exceptions.is_empty()
     }
 
     /// Returns all promise unhandled rejections.
-    pub fn promise_rejections(&mut self) -> Vec<Error> {
+    pub fn promise_rejections(&mut self) -> Vec<JsError> {
         // Get a v8 handle-scope.
         let scope = &mut self.handle_scope();
 
@@ -254,8 +258,8 @@ impl JsRuntime {
             .promise_exceptions
             .drain(..)
             .map(|value| {
-                let reason = value.open(scope).to_rust_string_lossy(scope);
-                unhandled_promise_rejection_error(reason)
+                let exception = v8::Local::new(scope, value);
+                JsError::from_v8_exception(scope, exception)
             })
             .collect()
     }

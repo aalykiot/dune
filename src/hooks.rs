@@ -118,8 +118,39 @@ pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
     let state_rc = JsRuntime::state(scope);
     let mut state = state_rc.borrow_mut();
 
-    let reason = v8::Global::new(scope, reason);
+    let reason = reason.to_rust_string_lossy(scope);
+
+    // Create a new v8 exception.
+    let exception = match reason.split(":").next() {
+        Some("RangeError") => {
+            let exception_message = reason.replacen("RangeError: ", "", 1);
+            let exception_message = v8::String::new(scope, &exception_message).unwrap();
+            v8::Exception::range_error(scope, exception_message)
+        }
+        Some("ReferenceError") => {
+            let exception_message = reason.replacen("ReferenceError: ", "", 1);
+            let exception_message = v8::String::new(scope, &exception_message).unwrap();
+            v8::Exception::reference_error(scope, exception_message)
+        }
+        Some("SyntaxError") => {
+            let exception_message = reason.replacen("SyntaxError: ", "", 1);
+            let exception_message = v8::String::new(scope, &exception_message).unwrap();
+            v8::Exception::syntax_error(scope, exception_message)
+        }
+        Some("TypeError") => {
+            let exception_message = reason.replacen("TypeError: ", "", 1);
+            let exception_message = v8::String::new(scope, &exception_message).unwrap();
+            v8::Exception::type_error(scope, exception_message)
+        }
+        _ => {
+            let exception_message = reason.replacen("Error: ", "", 1);
+            let exception_message = v8::String::new(scope, &exception_message).unwrap();
+            v8::Exception::error(scope, exception_message)
+        }
+    };
 
     // Register this promise rejection to the runtime.
-    state.promise_exceptions.push(reason);
+    state
+        .promise_exceptions
+        .push(v8::Global::new(scope, exception));
 }
