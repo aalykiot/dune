@@ -255,7 +255,7 @@ pub fn start(mut runtime: JsRuntime) {
             if runtime.has_promise_rejections() {
                 let rejection = runtime.promise_rejections().remove(0);
                 let rejection = format!("{}", rejection);
-                let rejection = rejection.replacen(" ", " (in promise) ", 1);
+                let rejection = rejection.replacen(' ', " (in promise) ", 1);
                 println!("{}", rejection);
             }
             continue;

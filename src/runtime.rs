@@ -213,7 +213,7 @@ impl JsRuntime {
             if self.has_promise_rejections() {
                 let rejection = self.promise_rejections().remove(0);
                 let rejection = format!("{:?}", rejection);
-                let rejection = rejection.replacen(" ", " (in promise) ", 1);
+                let rejection = rejection.replacen(' ', " (in promise) ", 1);
 
                 println!("{}", rejection);
                 std::process::exit(1);

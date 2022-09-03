@@ -14,6 +14,8 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 
     set_function_to(scope, target, "connect", connect);
     set_function_to(scope, target, "readStart", read_start);
+    set_function_to(scope, target, "write", write);
+    set_function_to(scope, target, "close", close);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
@@ -175,4 +177,110 @@ fn read_start(
             state.pending_futures.push(Box::new(future));
         }
     });
+}
+
+struct TcpWriteFuture {
+    result: Result<usize>,
+    promise: v8::Global<v8::PromiseResolver>,
+}
+
+impl JsFuture for TcpWriteFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        match self.result.as_ref() {
+            Ok(bytes) => {
+                // Create a v8 value from the usize.
+                let bytes = *bytes as i32;
+                let bytes = v8::Integer::new(scope, bytes);
+
+                self.promise
+                    .open(scope)
+                    .resolve(scope, bytes.into())
+                    .unwrap();
+            }
+            Err(e) => {
+                // Reject the promise.
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, message);
+
+                self.promise.open(scope).reject(scope, exception).unwrap();
+            }
+        }
+    }
+}
+
+fn write(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let index = args.get(0).int32_value(scope).unwrap() as u32;
+    let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
+
+    // Move bytes from the ArrayBuffer to a Rust vector.
+    let mut buffer = vec![0; data.byte_length()];
+    data.copy_contents(&mut buffer);
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    let on_write = {
+        let state_rc = state_rc.clone();
+        let promise = v8::Global::new(scope, promise_resolver);
+        move |_: LoopHandle, _: Index, result: Result<usize>| {
+            let mut state = state_rc.borrow_mut();
+            let future = TcpWriteFuture { result, promise };
+            state.pending_futures.push(Box::new(future));
+        }
+    };
+
+    state.handle.tcp_write(index, &buffer, on_write);
+    rv.set(promise.into());
+}
+
+struct TcpCloseFuture {
+    promise: v8::Global<v8::PromiseResolver>,
+}
+
+impl JsFuture for TcpCloseFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        let undefined = v8::undefined(scope);
+        self.promise
+            .open(scope)
+            .resolve(scope, undefined.into())
+            .unwrap();
+    }
+}
+
+/// Closes the TCP socket.
+fn close(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get socket's ID.
+    let index = args.get(0).int32_value(scope).unwrap() as u32;
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    let on_close = {
+        let state_rc = state_rc.clone();
+        let promise = v8::Global::new(scope, promise_resolver);
+        move |_: LoopHandle| {
+            let mut state = state_rc.borrow_mut();
+            let future = TcpCloseFuture { promise };
+            state.pending_futures.push(Box::new(future));
+        }
+    };
+
+    state.handle.tcp_close(index, on_close);
+    rv.set(promise.into());
 }

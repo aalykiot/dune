@@ -102,9 +102,10 @@ $ cd dune/ && cargo run -- <FILE>
 > Net.Socket is a class extending `EventEmitter`.
 
 - [x] `connect(port, [host], [connectionListener])`: Opens the connection for a given socket.
-- [x] `setEncoding([encoding])`: Set the encoding for the socket.
-- [ ] `write(data, [encoding], [callback])`: Sends data on the socket.
-- [ ] `end([data])`: Half-closes the socket. i.e., it sends a FIN packet.
+- [x] `setEncoding(encoding)`: Set the encoding for the socket.
+- [x] `write(data, [callback])`: Sends data on the socket.
+- [x] `end([data])`: Half-closes the socket. i.e., it sends a FIN packet.
+- [x] `destroy()`: Closes and discards the TCP socket stream.
 - [ ] `address()`: Returns the bound address.
 - [x] `remoteAddress`: The string representation of the remote IP address.
 - [x] `remotePort`: The numeric representation of the remote port.
@@ -114,7 +115,7 @@ $ cd dune/ && cargo run -- <FILE>
 - [x] `Event: 'data'`: Emitted when data is received.
 - [x] `Event: 'end'`: Emitted when the other end of the socket sends a FIN packet.
 - [x] `Event: 'error'`: Emitted when an error occurs.
-- [ ] `Event: 'close'`: Emitted once the socket is fully closed.
+- [x] `Event: 'close'`: Emitted once the socket is fully closed.
 
 ### Performance Measurement
 

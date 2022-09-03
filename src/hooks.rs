@@ -121,7 +121,7 @@ pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
     let reason = reason.to_rust_string_lossy(scope);
 
     // Create a new v8 exception.
-    let exception = match reason.split(":").next() {
+    let exception = match reason.split(':').next() {
         Some("RangeError") => {
             let exception_message = reason.replacen("RangeError: ", "", 1);
             let exception_message = v8::String::new(scope, &exception_message).unwrap();
