@@ -351,6 +351,13 @@ export function readFileSync(path, options = {}) {
   return data;
 }
 
+function toUint8Array(data, encoding) {
+  if (!(data instanceof Uint8Array)) {
+    return new TextEncoder(encoding).encode(data);
+  }
+  return data;
+}
+
 /**
  * Writes asynchronously contents to a file.
  *
@@ -372,9 +379,10 @@ export async function writeFile(path, data, options = {}) {
   // Default to utf-8 encoding.
   if (!encoding) encoding = 'utf-8';
 
+  const data_u8 = toUint8Array(data, encoding);
+
   // Create a file instance.
   const file = new File(path, 'w');
-  const data_u8 = new TextEncoder(encoding).encode(data);
 
   // Open file, write data, and close it.
   await file.open();
@@ -403,9 +411,10 @@ export function writeFileSync(path, data, options = {}) {
   // Default to utf-8 encoding.
   if (!encoding) encoding = 'utf-8';
 
+  const data_u8 = toUint8Array(data, encoding);
+
   // Create a file instance.
   const file = new File(path, 'w');
-  const data_u8 = new TextEncoder(encoding).encode(data);
 
   // Open file, write data, and close it.
   file.openSync();

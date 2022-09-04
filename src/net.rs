@@ -37,11 +37,11 @@ impl JsFuture for TcpConnectFuture {
                 // Create a JavaScript socket info object.
                 let socket_info = v8::Object::new(scope);
 
-                let rid = v8::Number::new(scope, sock.id as f64);
+                let id = v8::Number::new(scope, sock.id as f64);
                 let address = v8::String::new(scope, &address).unwrap();
                 let port = v8::Number::new(scope, port as f64);
 
-                set_property_to(scope, socket_info, "rid", rid.into());
+                set_property_to(scope, socket_info, "id", id.into());
                 set_property_to(scope, socket_info, "remoteAddress", address.into());
                 set_property_to(scope, socket_info, "remotePort", port.into());
 

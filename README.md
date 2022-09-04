@@ -81,8 +81,8 @@ $ cd dune/ && cargo run -- <FILE>
 
 ### Net
 
-- [ ] `createServer(port, [host], [connectionListener])`: Creates a new TCP server.
-- [x] `createConnection(port, [host], [connectionListener])`: Creates unix socket connection to a remote host.
+- [ ] `createServer([connectionListener])`: Creates a new TCP server.
+- [x] `createConnection(options, [connectionListener])`: Creates unix socket connection to a remote host.
 
 ### Net.Server
 
@@ -101,7 +101,7 @@ $ cd dune/ && cargo run -- <FILE>
 
 > Net.Socket is a class extending `EventEmitter`.
 
-- [x] `connect(port, [host], [connectionListener])`: Opens the connection for a given socket.
+- [x] `connect(options, [connectionListener])`: Opens the connection for a given socket.
 - [x] `setEncoding(encoding)`: Set the encoding for the socket.
 - [x] `write(data, [callback])`: Sends data on the socket.
 - [x] `end([data])`: Half-closes the socket. i.e., it sends a FIN packet.

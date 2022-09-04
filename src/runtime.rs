@@ -206,7 +206,10 @@ impl JsRuntime {
 
     /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
-        while self.event_loop.has_pending_events() || self.has_promise_rejections() {
+        while self.event_loop.has_pending_events()
+            || self.has_promise_rejections()
+            || self.isolate.has_pending_background_tasks()
+        {
             // Tick the event loop.
             self.tick_event_loop();
             // Report (and exit) if any unhandled promise rejection has been caught.
