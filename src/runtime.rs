@@ -14,6 +14,7 @@ use crate::modules::ModuleMap;
 use anyhow::bail;
 use anyhow::Error;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Once;
 use std::time::Instant;
@@ -41,7 +42,7 @@ pub struct JsRuntimeState {
     /// Specifies the timestamp which the current process began in Unix time.
     pub time_origin: u128,
     /// Holds exceptions from promises with no rejection handler.
-    pub promise_exceptions: Vec<v8::Global<v8::Value>>,
+    pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
 }
 
 pub struct JsRuntime {
@@ -99,7 +100,7 @@ impl JsRuntime {
             pending_futures: Vec::new(),
             startup_moment: Instant::now(),
             time_origin,
-            promise_exceptions: Vec::new(),
+            promise_exceptions: HashMap::new(),
         })));
 
         let mut runtime = JsRuntime {
@@ -255,8 +256,8 @@ impl JsRuntime {
 
         state
             .promise_exceptions
-            .drain(..)
-            .map(|value| {
+            .drain()
+            .map(|(_, value)| {
                 let exception = v8::Local::new(scope, value);
                 JsError::from_v8_exception(scope, exception, Some("(in promise) "))
             })

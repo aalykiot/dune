@@ -105,20 +105,32 @@ fn import_meta_resolve(
 pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
     // Create a v8 callback-scope.
     let scope = &mut unsafe { v8::CallbackScope::new(&message) };
+    let undefined = v8::undefined(scope).into();
     let event = message.get_event();
 
+    use v8::PromiseRejectEvent::*;
+
     let reason = match event {
-        v8::PromiseRejectEvent::PromiseHandlerAddedAfterReject
-        | v8::PromiseRejectEvent::PromiseRejectAfterResolved
-        | v8::PromiseRejectEvent::PromiseResolveAfterResolved => return,
-        v8::PromiseRejectEvent::PromiseRejectWithNoHandler => message.get_value().unwrap(),
+        PromiseHandlerAddedAfterReject
+        | PromiseRejectAfterResolved
+        | PromiseResolveAfterResolved => undefined,
+        PromiseRejectWithNoHandler => message.get_value().unwrap(),
     };
 
-    // Get access to the runtime's state.
+    let promise = message.get_promise();
+    let promise = v8::Global::new(scope, promise);
+
     let state_rc = JsRuntime::state(scope);
     let mut state = state_rc.borrow_mut();
 
-    state
-        .promise_exceptions
-        .push(v8::Global::new(scope, reason));
+    match event {
+        PromiseHandlerAddedAfterReject => {
+            state.promise_exceptions.remove(&promise);
+        }
+        PromiseRejectWithNoHandler => {
+            let reason = v8::Global::new(scope, reason);
+            state.promise_exceptions.insert(promise, reason);
+        }
+        PromiseRejectAfterResolved | PromiseResolveAfterResolved => {}
+    }
 }
