@@ -51,17 +51,23 @@ impl JsError {
     // https://github.com/denoland/rusty_v8/blob/0d093a02f658781d52e6d70d138768fc19a79d54/examples/shell.rs#L158
     pub fn from_v8_exception<'a>(
         scope: &'a mut v8::HandleScope,
-        exception: v8::Local<'a, v8::Value>,
+        rejection: v8::Local<'a, v8::Value>,
+        prefix: Option<&str>,
     ) -> Self {
         // Create a new HandleScope.
         let scope = &mut v8::HandleScope::new(scope);
-        let message = v8::Exception::create_message(scope, exception);
+        let message = v8::Exception::create_message(scope, rejection);
 
-        // Get error from thrown exception.
-        let exception_string = exception
-            .to_string(scope)
-            .unwrap()
-            .to_rust_string_lossy(scope);
+        let mut message_value =
+            message
+                .get(scope)
+                .to_rust_string_lossy(scope)
+                .replacen("Uncaught ", "", 1);
+
+        // Check if message needs prefixing.
+        if let Some(value) = prefix {
+            message_value.insert_str(0, value);
+        }
 
         let resource_name = message.get_script_resource_name(scope).map_or_else(
             || "(unknown)".into(),
@@ -72,23 +78,29 @@ impl JsError {
             .get_source_line(scope)
             .map(|s| s.to_string(scope).unwrap().to_rust_string_lossy(scope));
 
-        let line_number = message
-            .get_line_number(scope)
-            .and_then(|v| v.try_into().ok());
+        let line_number = message.get_line_number(scope).map(|num| num as i64);
 
-        let start_column = message.get_start_column().try_into().ok();
-        let end_column = message.get_end_column().try_into().ok();
+        let start_column = Some(message.get_start_column() as i64);
+        let end_column = Some(message.get_end_column() as i64);
 
-        let exception: v8::Local<v8::Object> = exception.try_into().unwrap();
+        // Cast v8::PromiseRejectMessage to v8::Object so we can take it's `.stack` property.
+        let exception = v8::Local::<v8::Object>::try_from(rejection);
 
-        // Access error.stack to ensure `prepareStackTrace()` has been called.
-        let stack = v8::String::new(scope, "stack").unwrap();
-        let stack = exception.get(scope, stack.into());
-        let stack: Option<v8::Local<v8::String>> = stack.and_then(|s| s.try_into().ok());
-        let stack = stack.map(|s| s.to_rust_string_lossy(scope));
+        // Ignore source line when no stack-trace is available.
+        let source_line = exception.map(|_| source_line).map(|s| s.unwrap()).ok();
+
+        let stack = exception
+            .map(|exception| {
+                let stack = v8::String::new(scope, "stack").unwrap();
+                let stack = exception.get(scope, stack.into());
+                let stack: Option<v8::Local<v8::String>> = stack.and_then(|s| s.try_into().ok());
+                stack.map(|s| s.to_rust_string_lossy(scope))
+            })
+            .map(|stack| stack.unwrap())
+            .ok();
 
         JsError {
-            message: exception_string,
+            message: message_value,
             resource_name,
             source_line,
             line_number,
@@ -120,29 +132,37 @@ impl Display for JsError {
 }
 
 impl Debug for JsError {
-    /// Displays a full version of the error with stacktrace.
+    /// Displays a full version of the error with stack-trace.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Output exception information.
-        writeln!(f, "{} {}", "Uncaught".red().bold(), self.message)?;
-        writeln!(f, "{}", self.source_line.as_ref().unwrap())?;
+        write!(f, "{} {}", "Uncaught".red().bold(), self.message)?;
 
-        // Indicate the position where the error was thrown.
-        let start_column = self.start_column.unwrap_or_default();
-        let end_column = self.end_column.unwrap_or_default();
+        // Output source-line if exists.
+        match self.source_line.as_ref() {
+            Some(source_line) if !source_line.is_empty() => {
+                // Log the source-line.
+                writeln!(f, "\n{}", source_line)?;
 
-        for _ in 0..start_column {
-            write!(f, " ")?;
-        }
+                // Indicate the position where the error was thrown.
+                let start_column = self.start_column.unwrap_or_default();
+                let end_column = self.end_column.unwrap_or_default();
 
-        for _ in start_column..end_column {
-            let mark = "^".red();
-            write!(f, "{}", mark)?;
-        }
+                for _ in 0..start_column {
+                    write!(f, " ")?;
+                }
 
-        // Print stacktrace if available.
-        if let Some(stack) = self.stack.as_ref() {
-            write!(f, "\n{}", stack.dimmed())?;
-        }
+                for _ in start_column..end_column {
+                    let mark = "^".red();
+                    write!(f, "{}", mark)?;
+                }
+
+                // Print stacktrace if available.
+                if let Some(stack) = self.stack.as_ref() {
+                    write!(f, "\n{}", stack.dimmed())?;
+                }
+            }
+            _ => {}
+        };
 
         Ok(())
     }

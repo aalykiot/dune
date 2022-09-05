@@ -194,7 +194,7 @@ export class Socket extends EventEmitter {
 
     // Check if socket is half-closed.
     if (!this.#writable) {
-      throw new Error(`Socket is half-closed.`);
+      throw new Error(`The socket stream is not writable.`);
     }
 
     // Default tu UTF-8 encodning.

@@ -134,7 +134,7 @@ impl JsRuntime {
             None => {
                 assert!(tc_scope.has_caught());
                 let exception = tc_scope.exception().unwrap();
-                bail!(JsError::from_v8_exception(tc_scope, exception));
+                bail!(JsError::from_v8_exception(tc_scope, exception, None));
             }
         };
 
@@ -143,7 +143,7 @@ impl JsRuntime {
             None => {
                 assert!(tc_scope.has_caught());
                 let exception = tc_scope.exception().unwrap();
-                bail!(JsError::from_v8_exception(tc_scope, exception));
+                bail!(JsError::from_v8_exception(tc_scope, exception, None));
             }
         }
     }
@@ -170,7 +170,7 @@ impl JsRuntime {
             None => {
                 assert!(tc_scope.has_caught());
                 let exception = tc_scope.exception().unwrap();
-                bail!(JsError::from_v8_exception(tc_scope, exception));
+                bail!(JsError::from_v8_exception(tc_scope, exception, None));
             }
         };
 
@@ -180,14 +180,14 @@ impl JsRuntime {
         {
             assert!(tc_scope.has_caught());
             let exception = tc_scope.exception().unwrap();
-            bail!(JsError::from_v8_exception(tc_scope, exception));
+            bail!(JsError::from_v8_exception(tc_scope, exception, None));
         }
 
         let module_result = module.evaluate(tc_scope);
 
         if module.get_status() == v8::ModuleStatus::Errored {
             let exception = module.get_exception();
-            bail!(JsError::from_v8_exception(tc_scope, exception));
+            bail!(JsError::from_v8_exception(tc_scope, exception, None));
         }
 
         match module_result {
@@ -214,11 +214,7 @@ impl JsRuntime {
             self.tick_event_loop();
             // Report (and exit) if any unhandled promise rejection has been caught.
             if self.has_promise_rejections() {
-                let rejection = self.promise_rejections().remove(0);
-                let rejection = format!("{:?}", rejection);
-                let rejection = rejection.replacen(' ', " (in promise) ", 1);
-
-                println!("{}", rejection);
+                println!("{:?}", self.promise_rejections().remove(0));
                 std::process::exit(1);
             }
         }
@@ -262,7 +258,7 @@ impl JsRuntime {
             .drain(..)
             .map(|value| {
                 let exception = v8::Local::new(scope, value);
-                JsError::from_v8_exception(scope, exception)
+                JsError::from_v8_exception(scope, exception, Some("(in promise) "))
             })
             .collect()
     }

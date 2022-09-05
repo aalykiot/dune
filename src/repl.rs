@@ -253,10 +253,7 @@ pub fn start(mut runtime: JsRuntime) {
             runtime.tick_event_loop();
             // Report if any unhandled promise rejection has been caught.
             if runtime.has_promise_rejections() {
-                let rejection = runtime.promise_rejections().remove(0);
-                let rejection = format!("{}", rejection);
-                let rejection = rejection.replacen(' ', " (in promise) ", 1);
-                println!("{}", rejection);
+                println!("{}", runtime.promise_rejections().remove(0));
             }
             continue;
         }
