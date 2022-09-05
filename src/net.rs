@@ -15,6 +15,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "connect", connect);
     set_function_to(scope, target, "readStart", read_start);
     set_function_to(scope, target, "write", write);
+    set_function_to(scope, target, "shutdown", shutdown);
     set_function_to(scope, target, "close", close);
 
     // Return v8 global handle.
@@ -238,6 +239,40 @@ fn write(
     };
 
     state.handle.tcp_write(index, &buffer, on_write);
+    rv.set(promise.into());
+}
+
+struct TcpShutdownFuture {
+    promise: v8::Global<v8::PromiseResolver>,
+}
+
+impl JsFuture for TcpShutdownFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        let undefined = v8::undefined(scope);
+        self.promise
+            .open(scope)
+            .resolve(scope, undefined.into())
+            .unwrap();
+    }
+}
+
+// Half-closes the TCP stream.
+fn shutdown(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get socket's ID.
+    let index = args.get(0).int32_value(scope).unwrap() as u32;
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    state.handle.tcp_shutdown(index);
     rv.set(promise.into());
 }
 

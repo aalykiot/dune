@@ -42,6 +42,7 @@ export class Socket extends EventEmitter {
   #id;
   #connecting;
   #encoding;
+  #writable;
 
   /**
    * Creates a new Socket instance.
@@ -109,6 +110,7 @@ export class Socket extends EventEmitter {
 
       this.#id = socketInfo.id;
       this.#connecting = false;
+      this.#writable = true;
       this.remoteAddress = socketInfo.remoteAddress;
       this.remotePort = socketInfo.remotePort;
 
@@ -190,6 +192,11 @@ export class Socket extends EventEmitter {
       throw new Error(`Socket is not connected to a remote host.`);
     }
 
+    // Check if socket is half-closed.
+    if (!this.#writable) {
+      throw new Error(`Socket is half-closed.`);
+    }
+
     // Default tu UTF-8 encodning.
     encoding = encoding || this.#encoding || 'utf-8';
 
@@ -201,6 +208,26 @@ export class Socket extends EventEmitter {
     if (onWrite) onWrite(bytesWritten);
 
     return bytesWritten;
+  }
+
+  /**
+   * Half-closes the TCP stream.
+   *
+   * @param {String|Uint8Array} data
+   * @param {String} [encoding]
+   * @returns {Promise<*>}
+   */
+  async end(data, encoding = 'utf-8') {
+    // Check socket connection.
+    if (!this.#id) {
+      throw new Error(`Socket is not connected to a remote host.`);
+    }
+    // If data is specified, write it to stream.
+    if (data) {
+      await this.write(data, encoding);
+    }
+    await binding.shutdown(this.#id);
+    this.#writable = false;
   }
 
   /**
@@ -223,6 +250,7 @@ export class Socket extends EventEmitter {
   _reset() {
     this.#id = undefined;
     this.#connecting = false;
+    this.#writable = false;
     this.#encoding = undefined;
     this.bytesRead = 0;
     this.bytesWritten = 0;
