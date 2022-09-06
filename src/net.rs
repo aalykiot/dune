@@ -15,6 +15,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "connect", connect);
     set_function_to(scope, target, "readStart", read_start);
     set_function_to(scope, target, "write", write);
+    set_function_to(scope, target, "listen", listen);
     set_function_to(scope, target, "shutdown", shutdown);
     set_function_to(scope, target, "close", close);
 
@@ -240,6 +241,97 @@ fn write(
 
     state.handle.tcp_write(index, &buffer, on_write);
     rv.set(promise.into());
+}
+
+struct TcpListenFuture {
+    socket: Result<TcpSocketInfo>,
+    on_connection: Rc<v8::Global<v8::Function>>,
+}
+
+impl JsFuture for TcpListenFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        // Create the v8 value for the data parameter.
+        let socket_value: v8::Local<v8::Value> = match self.socket.as_mut() {
+            Ok(sock) => {
+                // Extract info from the TcpSocketInfo.
+                let address = sock.remote.ip().to_string();
+                let port = sock.remote.port();
+
+                // Create a JavaScript socket info object.
+                let socket_info = v8::Object::new(scope);
+
+                let id = v8::Integer::new(scope, sock.id as i32);
+                let address = v8::String::new(scope, &address).unwrap();
+                let port = v8::Integer::new(scope, port as i32);
+
+                set_property_to(scope, socket_info, "id", id.into());
+                set_property_to(scope, socket_info, "remoteAddress", address.into());
+                set_property_to(scope, socket_info, "remotePort", port.into());
+
+                socket_info.into()
+            }
+            Err(_) => v8::null(scope).into(),
+        };
+
+        // Create the v8 value for the error parameter.
+        let error_value: v8::Local<v8::Value> = match self.socket.as_mut() {
+            Err(e) => {
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                v8::Exception::error(scope, message)
+            }
+            Ok(_) => v8::null(scope).into(),
+        };
+
+        // Get access to the on_connection callback.
+        let on_connection = v8::Local::new(scope, (*self.on_connection).clone());
+        let undefined = v8::undefined(scope).into();
+
+        on_connection.call(scope, undefined, &[error_value, socket_value]);
+    }
+}
+
+/// Starts listening for incoming connections.
+fn listen(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get INTERFACE and PORT from arguments.
+    let interface = args.get(0).to_rust_string_lossy(scope);
+    let port = args.get(1).to_rust_string_lossy(scope);
+    let address = format!("{}:{}", interface, port);
+
+    // Get on_connection callback.
+    let on_connection = v8::Local::<v8::Function>::try_from(args.get(2)).unwrap();
+    let on_connection = Rc::new(v8::Global::new(scope, on_connection));
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    // Tell the event-loop to listen for connection on address.
+    let server_id = state.handle.tcp_listen(&address, {
+        let state_rc = state_rc.clone();
+        move |_: LoopHandle, _: Index, socket: Result<TcpSocketInfo>| {
+            let mut state = state_rc.borrow_mut();
+            let future = TcpListenFuture {
+                socket,
+                on_connection: Rc::clone(&on_connection),
+            };
+            state.pending_futures.push(Box::new(future));
+        }
+    });
+
+    // Check mostly for address bind errors.
+    if let Err(e) = server_id {
+        let message = v8::String::new(scope, &e.to_string()).unwrap();
+        let exception = v8::Exception::error(scope, message);
+        scope.throw_exception(exception);
+        return;
+    }
+
+    let id_value = v8::Integer::new(scope, server_id.unwrap() as i32);
+
+    rv.set(id_value.into());
 }
 
 struct TcpShutdownFuture {

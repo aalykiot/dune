@@ -570,7 +570,7 @@ impl EventLoop {
             handle,
             id,
             Ok(TcpSocketInfo {
-                id: index,
+                id,
                 host: stream.socket.local_addr().unwrap(),
                 remote: stream.socket.peer_addr().unwrap(),
             }),

@@ -81,21 +81,21 @@ $ cd dune/ && cargo run -- <FILE>
 
 ### Net
 
-- [ ] `createServer([connectionListener])`: Creates a new TCP server.
+- [x] `createServer([connectionListener])`: Creates a new TCP server.
 - [x] `createConnection(options, [connectionListener])`: Creates unix socket connection to a remote host.
 
 ### Net.Server
 
 > Net.Server is a class extending `EventEmitter`.
 
-- [ ] `listen(port, [host], [callback])`: Begin accepting connections on the specified port and host.
-- [ ] `close([callback])`: Stops the server from accepting new connections and keeps existing connections.
+- [x] `listen(port, [host], [callback])`: Begin accepting connections on the specified port and host.
+- [x] `close([callback])`: Stops the server from accepting new connections and keeps existing connections.
 - [ ] `address()`: Returns the bound address.
-- [ ] `getConnections()`: Get the number of concurrent connections on the server.
-- [ ] `Event: 'listening'`: Emitted when the server has been bound after calling `server.listen`.
-- [ ] `Event: 'connection'`: Emitted when a new connection is made.
-- [ ] `Event: 'close'`: Emitted when the server closes.
-- [ ] `Event: 'error'`: Emitted when an error occurs.
+- [x] `getConnections()`: Get the number of concurrent connections on the server.
+- [x] `Event: 'listening'`: Emitted when the server has been bound after calling `server.listen`.
+- [x] `Event: 'connection'`: Emitted when a new connection is made.
+- [x] `Event: 'close'`: Emitted when the server closes.
+- [x] `Event: 'error'`: Emitted when an error occurs.
 
 ### Net.Socket
 
