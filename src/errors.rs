@@ -36,7 +36,7 @@ pub fn generic_error(message: impl Into<Cow<'static, str>>) -> Error {
 }
 
 /// Represents an exception coming from V8.
-#[derive(PartialEq, Clone, Default)]
+#[derive(Eq, PartialEq, Clone, Default)]
 pub struct JsError {
     pub message: String,
     pub resource_name: String,
