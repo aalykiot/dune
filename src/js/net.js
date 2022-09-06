@@ -459,6 +459,35 @@ class Server extends EventEmitter {
     // Notify listeners for the new connection.
     this.emit('connection', socket);
   }
+
+  /**
+   * Server should be an async iterator.
+   */
+  async *[Symbol.asyncIterator]() {
+    const queue = [makeDeferredPromise()];
+    let done = false;
+    let idx = 0;
+
+    this.on('connection', (socket) => {
+      queue[idx].resolve(socket);
+      const promise = makeDeferredPromise();
+      idx++;
+      queue.push(promise);
+    });
+
+    this.on('error', (e) => {
+      throw e;
+    });
+
+    this.on('close', () => (done = true));
+
+    while (!done) {
+      const data = await queue[0];
+      queue.shift();
+      idx--;
+      yield data;
+    }
+  }
 }
 
 export default {
