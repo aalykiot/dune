@@ -149,6 +149,9 @@ impl ModuleLoader for FsModuleLoader {
     }
 }
 
+static DUNE_ROOT: &str = ".dune";
+static DUNE_CACHE_DIR: &str = "cache";
+
 #[derive(Default)]
 /// Loader supporting URL imports.
 pub struct UrlModuleLoader {
@@ -180,7 +183,10 @@ impl ModuleLoader for UrlModuleLoader {
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
         // Create a .cache directory.
-        let cache_dir = env::current_dir()?.join(".cache");
+        let cache_dir = &dirs::home_dir()
+            .unwrap()
+            .join(DUNE_ROOT)
+            .join(DUNE_CACHE_DIR);
 
         if fs::create_dir_all(&cache_dir).is_err() {
             bail!(generic_error("Failed to create module caching directory"))
