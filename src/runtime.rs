@@ -84,9 +84,9 @@ impl JsRuntime {
 
         if options.seed.is_some() {
             v8::V8::set_flags_from_string(&format!(
-                "{}{}",
+                "{} --predictable --random-seed={}",
                 flags,
-                format!(" --predictable --random-seed={}", options.seed.unwrap())
+                options.seed.unwrap()
             ));
         } else {
             v8::V8::set_flags_from_string(flags);

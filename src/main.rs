@@ -55,11 +55,8 @@ enum Commands {
 }
 
 fn main() {
-    // Parse command line arguments.
-    let args: Vec<String> = env::args().collect();
-
     // If no arguments specified, start the REPL.
-    if args.len() == 1 {
+    if env::args().count() == 1 {
         // Start REPL.
         repl::start(JsRuntime::new());
         return;
