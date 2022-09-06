@@ -151,7 +151,10 @@ impl ModuleLoader for FsModuleLoader {
 
 #[derive(Default)]
 /// Loader supporting URL imports.
-pub struct UrlModuleLoader;
+pub struct UrlModuleLoader {
+    // Ignores the cache and re-downloads the dependency.
+    pub skip_cache: bool,
+}
 
 impl ModuleLoader for UrlModuleLoader {
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath> {
@@ -187,10 +190,12 @@ impl ModuleLoader for UrlModuleLoader {
         let hash = Sha1::default().digest(specifier.as_bytes()).to_hex();
         let module_path = cache_dir.join(&hash);
 
-        // Check cache, and load file.
-        if module_path.is_file() {
-            let source = fs::read_to_string(&module_path).unwrap();
-            return Ok(source);
+        if !self.skip_cache {
+            // Check cache, and load file.
+            if module_path.is_file() {
+                let source = fs::read_to_string(&module_path).unwrap();
+                return Ok(source);
+            }
         }
 
         println!("{} {}", "Downloading".green(), specifier);

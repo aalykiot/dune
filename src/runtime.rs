@@ -43,6 +43,19 @@ pub struct JsRuntimeState {
     pub time_origin: u128,
     /// Holds exceptions from promises with no rejection handler.
     pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
+    /// Runtime options.
+    pub options: JsRuntimeOptions,
+}
+
+#[derive(Debug, Default)]
+#[allow(dead_code)]
+pub struct JsRuntimeOptions {
+    // The seed used in Math.random() method.
+    pub seed: Option<i64>,
+    // Reloads every URL import.
+    pub reload: bool,
+    // Enables unstable features and APIs.
+    pub unstable: bool,
 }
 
 pub struct JsRuntime {
@@ -54,14 +67,30 @@ pub struct JsRuntime {
 }
 
 impl JsRuntime {
+    /// Creates a new JsRuntime.
     pub fn new() -> JsRuntime {
+        Self::with_options(JsRuntimeOptions::default())
+    }
+
+    /// Creates a new JsRuntime based on provided options.
+    pub fn with_options(options: JsRuntimeOptions) -> JsRuntime {
+        // Configuration flags for V8.
         let flags = concat!(
             " --harmony-import-assertions",
             " --turbo_fast_api_calls",
             " --no-validate-asm",
             " --noexperimental-async-stack-tagging-api"
         );
-        v8::V8::set_flags_from_string(flags);
+
+        if options.seed.is_some() {
+            v8::V8::set_flags_from_string(&format!(
+                "{}{}",
+                flags,
+                format!(" --predictable --random-seed={}", options.seed.unwrap())
+            ));
+        } else {
+            v8::V8::set_flags_from_string(flags);
+        }
 
         // Fire up the v8 engine.
         static V8_INIT: Once = Once::new();
@@ -101,6 +130,7 @@ impl JsRuntime {
             startup_moment: Instant::now(),
             time_origin,
             promise_exceptions: HashMap::new(),
+            options,
         })));
 
         let mut runtime = JsRuntime {

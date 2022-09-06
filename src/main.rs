@@ -19,21 +19,21 @@ use clap::{Parser, Subcommand};
 use errors::unwrap_or_exit;
 use modules::resolve_import;
 use runtime::JsRuntime;
+use runtime::JsRuntimeOptions;
 use std::env;
 
 #[derive(Parser)]
 #[clap(
     name = "dune",
     about = "A hobby runtime for JavaScript and TypeScript",
-    version,
-    author
+    version
 )]
 struct Cli {
     #[clap(subcommand)]
     command: Commands,
 }
 
-#[derive(Subcommand)]
+#[derive(Clone, Subcommand)]
 enum Commands {
     #[clap(about = "Run a JavaScript or TypeScript program")]
     Run {
@@ -41,23 +41,17 @@ enum Commands {
         script: String,
         #[clap(short, long, help = "Reload every URL import (cache is ignored)")]
         reload: bool,
-        #[clap(long, help = "Suppress messages when downloading dependencies")]
-        quite: bool,
         #[clap(long, help = "Make the Math.random() method predictable")]
-        seed: Option<f64>,
+        seed: Option<i64>,
         #[clap(long, help = "Enable unstable features and APIs")]
         unstable: bool,
     },
-    #[clap(about = "Upgrade dune to the latest version")]
+    #[clap(about = "Bundle everything into a single file (WIP)")]
+    Bundle,
+    #[clap(about = "Upgrade to the latest dune version (WIP)")]
     Upgrade,
     #[clap(about = "Start the REPL (read, eval, print, loop)")]
     Repl,
-}
-
-/// Prints a message to console and exits with non-zero code.
-fn report_and_exit(message: &str) {
-    eprintln!("{}", message);
-    std::process::exit(1);
 }
 
 fn main() {
@@ -65,7 +59,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     // If no arguments specified, start the REPL.
-    if args.is_empty() {
+    if args.len() == 1 {
         // Start REPL.
         repl::start(JsRuntime::new());
         return;
@@ -74,26 +68,37 @@ fn main() {
     // Otherwise, use clap to parse the arguments.
     let cli = Cli::parse();
 
-    match &cli.command {
-        Commands::Run { script, .. } => {
+    match cli.command {
+        Commands::Run {
+            script,
+            reload,
+            seed,
+            unstable,
+        } => {
             // NOTE: The following code tries to resolve the given filename
             // to an absolute path. If the first time fails we will append `./` to
             // it first, and retry the resolution in case the user forgot to specify it.
             let filename = unwrap_or_exit(
-                resolve_import(None, script)
+                resolve_import(None, &script)
                     .or_else(|_| resolve_import(None, &format!("./{}", script))),
             );
 
+            let options = JsRuntimeOptions {
+                seed,
+                reload,
+                unstable,
+            };
+
             // Create new JS runtime.
-            let mut runtime = JsRuntime::new();
+            let mut runtime = JsRuntime::with_options(options);
             let mod_result = runtime.execute_module(&filename, None);
 
             match mod_result {
                 Ok(_) => runtime.run_event_loop(),
-                Err(e) => report_and_exit(&format!("{:?}", e)),
+                Err(e) => eprintln!("{:?}", e),
             };
         }
         Commands::Repl => repl::start(JsRuntime::new()),
-        Commands::Upgrade => report_and_exit("The `upgrade` command it's not implemented :("),
+        Commands::Upgrade | Commands::Bundle => println!("This command is not available :("),
     }
 }

@@ -123,7 +123,7 @@ pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath>
 
         match (is_core_module_import, is_url_import) {
             (true, _) => Box::new(CoreModuleLoader),
-            (_, true) => Box::new(UrlModuleLoader),
+            (_, true) => Box::new(UrlModuleLoader::default()),
             _ => Box::new(FsModuleLoader),
         }
     };
@@ -133,7 +133,7 @@ pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath>
 }
 
 /// Loads an import using the appropriate loader.
-pub fn load_import(specifier: &str) -> Result<ModuleSource> {
+pub fn load_import(specifier: &str, skip_cache: bool) -> Result<ModuleSource> {
     // Windows absolute path regex validator.
     lazy_static! {
         static ref WINDOWS_REGEX: Regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
@@ -147,7 +147,7 @@ pub fn load_import(specifier: &str) -> Result<ModuleSource> {
     ) {
         (true, _, _) => Box::new(CoreModuleLoader),
         (_, true, _) => Box::new(FsModuleLoader),
-        (_, _, true) => Box::new(UrlModuleLoader),
+        (_, _, true) => Box::new(UrlModuleLoader { skip_cache }),
         _ => Box::new(FsModuleLoader),
     };
 
@@ -166,10 +166,13 @@ pub fn fetch_module_tree<'a>(
     let origin = create_origin(scope, filename, true);
     let state = JsRuntime::state(scope);
 
+    // This options is used only when loading URL imports.
+    let skip_cache = state.borrow().options.reload;
+
     // Find appropriate loader if source is empty.
     let source = match source {
         Some(source) => source.into(),
-        None => unwrap_or_exit(load_import(filename)),
+        None => unwrap_or_exit(load_import(filename, skip_cache)),
     };
     let source = v8::String::new(scope, &source).unwrap();
     let source = v8::script_compiler::Source::new(source, Some(&origin));
