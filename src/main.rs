@@ -54,7 +54,32 @@ enum Commands {
     Repl,
 }
 
+/// Custom hook on panics (copied from Deno).
+fn setup_panic_hook() {
+    let orig_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        eprintln!("\n============================================================");
+        eprintln!("Dune has panicked. This is a bug in Dune. Please report this");
+        eprintln!("at https://github.com/aalykiot/dune/issues");
+        eprintln!("If you can reliably reproduce this panic, include the");
+        eprintln!("reproduction steps and re-run with the RUST_BACKTRACE=1 env");
+        eprintln!("var set and include the backtrace in your report.");
+        eprintln!();
+        eprintln!("Platform: {} {}", env::consts::OS, env::consts::ARCH);
+        eprintln!("Version: {}", env!("CARGO_PKG_VERSION"));
+        eprintln!("Args: {:?}", env::args().collect::<Vec<_>>());
+        eprintln!();
+        orig_hook(panic_info);
+        std::process::exit(1);
+    }));
+}
+
 fn main() {
+    // Set custom panic hook on release builds.
+    if !cfg!(debug_assertions) {
+        setup_panic_hook();
+    }
+
     // If no arguments specified, start the REPL.
     if env::args().count() == 1 {
         // Start REPL.
