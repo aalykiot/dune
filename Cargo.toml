@@ -1,7 +1,12 @@
 [package]
 name = "dune"
 version = "0.1.0"
+authors = ["Alex Alikiotis <alexalikiotis5@gmail.com>"]
 edition = "2021"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/aalykiot/dune"
+description = "A hobby runtime for JavaScript and TypeScript 🚀"
 
 [[bin]]
 name = "dune"
@@ -37,6 +42,7 @@ swc_ecma_visit = "0.76.6"
 serde = { version = "1.0.142", features = ["derive"] }
 dns-lookup = "1.0.8"
 mio = { version = "0.8.4", features = ["os-poll", "net"] }
+clap = { version = "3.2.19", features = ["derive"] }
 
 [dev-dependencies]
 assert_fs = "1.0.7"
