@@ -20,7 +20,7 @@ esac
 
 dune_uri="https://github.com/aalykiot/dune/releases/latest/download/dune-${target}.zip"
 
-dune_root="$DUNE_ROOT:-$HOME/.dune}"
+dune_root="${DUNE_ROOT:-$HOME/.dune}"
 dune_bin="$dune_root/bin"
 dune_exe="$dune_bin/dune"
 
