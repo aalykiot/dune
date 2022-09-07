@@ -14,6 +14,7 @@ case $(uname -sm) in
   "Linux aarch64")
     echo "Error: Dune builds for Linux aarch64 are not available." 1>&2
     exit 1
+    ;;
   *) target="x86_64-unknown-linux-gnu" ;;
 esac
 
