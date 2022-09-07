@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/aalykiot/dune/main/install.sh | sh
 
 **Windows**
 
-You have to manually download and unzip the <a href="https://github.com/aalykiot/dune/releases/latest/download/dune-x86_64-pc-windows-gnu.zip">release</a> build.
+You have to manually download and unzip the <a href="https://github.com/aalykiot/dune/releases/latest/download/dune-x86_64-pc-windows-msvc.zip">release</a> build.
 
 > A powershell installation script is coming soon.
 
