@@ -11,17 +11,55 @@ Developed completely for fun and experimentation.
 
 ## Installation
 
-Clone the repo from GitHub:
+**Mac, Linux:**
 
 ```bash
-$ git clone https://github.com/aalykiot/dune.git
+curl -fsSL https://raw.githubusercontent.com/aalykiot/dune/main/install.sh | sh
 ```
 
-Run dune using cargo:
+**Windows**
+
+You have to manually download and unzip the <a href="https://github.com/aalykiot/dune/releases/latest/download/dune-x86_64-pc-windows-gnu.zip">release</a> build.
+
+> A powershell installation script is coming soon.
+
+**From Source:**
+
+Clone the repo and build it using <a href="https://rustup.rs/">Cargo</a>.
 
 ```bash
-$ cd dune/ && cargo run -- <FILE>
+git clone https://github.com/aalykiot/dune.git && cd ./dune && cargo release
 ```
+
+> Make sure to create a `.dune` directory under your user.
+
+## Getting Started
+
+A simple example.
+
+```js
+import shortid from 'https://cdn.skypack.dev/shortid';
+
+console.log(shortid()); //=> "lXN1aGba2"
+```
+
+Another example using the net module.
+
+```js
+import net from 'net';
+
+const server = net.createServer(async (socket) => {
+  console.log('Got new connection!');
+  await socket.write('Hello! 👋\n');
+  await socket.destroy();
+});
+
+server.listen(3000, '127.0.0.1', () => {
+  console.log('Server is listening on port 3000...');
+});
+```
+
+The complete API reference is in the next section.
 
 ## Target API
 
