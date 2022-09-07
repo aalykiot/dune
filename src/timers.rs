@@ -1,4 +1,5 @@
 use crate::bindings::set_function_to;
+use crate::errors::JsError;
 use crate::event_loop::LoopHandle;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
@@ -30,7 +31,17 @@ impl JsFuture for TimerFuture {
             .map(|arg| v8::Local::new(scope, arg))
             .collect();
 
-        callback.call(scope, undefined, &args);
+        let tc_scope = &mut v8::TryCatch::new(scope);
+
+        callback.call(tc_scope, undefined, &args);
+
+        // On exception, report it and exit.
+        if tc_scope.has_caught() {
+            let exception = tc_scope.exception().unwrap();
+            let exception = JsError::from_v8_exception(tc_scope, exception, None);
+            println!("{:?}", exception);
+            std::process::exit(1);
+        }
     }
 }
 
