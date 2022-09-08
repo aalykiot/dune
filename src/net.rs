@@ -6,6 +6,7 @@ use crate::event_loop::TcpSocketInfo;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
+use std::net::IpAddr;
 use std::rc::Rc;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
@@ -33,19 +34,44 @@ impl JsFuture for TcpConnectFuture {
         match self.sock.as_ref() {
             Ok(sock) => {
                 // Extract info from the TcpSocketInfo.
-                let address = sock.remote.ip().to_string();
+                let host_port = sock.host.port();
+                let host_address = sock.host.ip().to_string();
+                let host_family = match sock.host.ip() {
+                    IpAddr::V4(_) => "IPv4",
+                    IpAddr::V6(_) => "IPv6",
+                };
+
+                let host = v8::Object::new(scope);
+
+                // Host IP attributes.
+                let port = v8::Integer::new(scope, host_port as i32);
+                let family = v8::String::new(scope, host_family).unwrap();
+                let address = v8::String::new(scope, &host_address).unwrap();
+
+                set_property_to(scope, host, "port", port.into());
+                set_property_to(scope, host, "family", family.into());
+                set_property_to(scope, host, "address", address.into());
+
+                // Remote IP attributes.
                 let port = sock.remote.port();
+                let address = sock.remote.ip().to_string();
+
+                let remote = v8::Object::new(scope);
+
+                let port = v8::Integer::new(scope, port as i32);
+                let address = v8::String::new(scope, &address).unwrap();
+
+                set_property_to(scope, remote, "port", port.into());
+                set_property_to(scope, remote, "address", address.into());
 
                 // Create a JavaScript socket info object.
                 let socket_info = v8::Object::new(scope);
 
                 let id = v8::Number::new(scope, sock.id as f64);
-                let address = v8::String::new(scope, &address).unwrap();
-                let port = v8::Number::new(scope, port as f64);
 
                 set_property_to(scope, socket_info, "id", id.into());
-                set_property_to(scope, socket_info, "remoteAddress", address.into());
-                set_property_to(scope, socket_info, "remotePort", port.into());
+                set_property_to(scope, socket_info, "host", host.into());
+                set_property_to(scope, socket_info, "remote", remote.into());
 
                 self.promise
                     .open(scope)
@@ -329,9 +355,27 @@ fn listen(
         return;
     }
 
-    let id_value = v8::Integer::new(scope, server_id.unwrap() as i32);
+    let id = v8::Integer::new(scope, server_id.unwrap() as i32);
+    let host = v8::Object::new(scope);
 
-    rv.set(id_value.into());
+    let port = args.get(1).to_int32(scope).unwrap();
+    let address = args.get(0).to_string(scope).unwrap();
+    let family = match interface.parse().unwrap() {
+        IpAddr::V4(_) => v8::String::new(scope, "IPv4").unwrap(),
+        IpAddr::V6(_) => v8::String::new(scope, "IPv6").unwrap(),
+    };
+
+    set_property_to(scope, host, "port", port.into());
+    set_property_to(scope, host, "family", family.into());
+    set_property_to(scope, host, "address", address.into());
+
+    // The actual object we'll return.
+    let ret_value = v8::Object::new(scope);
+
+    set_property_to(scope, ret_value, "id", id.into());
+    set_property_to(scope, ret_value, "host", host.into());
+
+    rv.set(ret_value.into());
 }
 
 struct TcpShutdownFuture {

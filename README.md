@@ -128,7 +128,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 - [x] `listen(port, [host], [callback])`: Begin accepting connections on the specified port and host.
 - [x] `close([callback])`: Stops the server from accepting new connections and keeps existing connections.
-- [ ] `address()`: Returns the bound address.
+- [x] `address()`: Returns the bound address.
 - [x] `getConnections()`: Get the number of concurrent connections on the server.
 - [x] `Event: 'listening'`: Emitted when the server has been bound after calling `server.listen`.
 - [x] `Event: 'connection'`: Emitted when a new connection is made.
@@ -144,7 +144,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `write(data, [callback])`: Sends data on the socket.
 - [x] `end([data])`: Half-closes the socket. i.e., it sends a FIN packet.
 - [x] `destroy()`: Closes and discards the TCP socket stream.
-- [ ] `address()`: Returns the bound address.
+- [x] `address()`: Returns the bound address.
 - [x] `remoteAddress`: The string representation of the remote IP address.
 - [x] `remotePort`: The numeric representation of the remote port.
 - [x] `bytesRead`: The amount of received bytes.
