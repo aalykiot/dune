@@ -11,15 +11,17 @@ Developed completely for fun and experimentation.
 
 **Mac, Linux:**
 
-```bash
+```sh
 curl -fsSL https://raw.githubusercontent.com/aalykiot/dune/main/install.sh | sh
 ```
 
-**Windows**
+**Windows (PowerShell)**
 
-You have to manually download and unzip the <a href="https://github.com/aalykiot/dune/releases/latest/download/dune-x86_64-pc-windows-msvc.zip">release</a> build.
+```powershell
+irm https://raw.githubusercontent.com/aalykiot/dune/main/install.ps1 | iex
+```
 
-> A powershell installation script is coming soon.
+> Otherwise you have to manually download and unzip the <a href="https://github.com/aalykiot/dune/releases/latest/download/dune-x86_64-pc-windows-msvc.zip">release</a> build.
 
 **From Source:**
 
@@ -57,7 +59,7 @@ server.listen(3000, '127.0.0.1', () => {
 });
 ```
 
-The complete API reference is in the next section.
+For more examples look at the <a href="./examples">examples</a> directory.
 
 ## Target API
 
