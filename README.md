@@ -87,7 +87,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `version`: the dune version.
 - [x] `versions`: an object listing the version strings of dune and its dependencies.
 - [x] `binding(module)`: exposes modules with bindings to Rust.
-- [ ] `kill(pid, [signal])`: sends the signal to the process identified by pid.
+- [x] `kill(pid, [signal])`: sends the signal to the process identified by pid.
 - [x] `stdout`: points to system's `stdout` stream.
 - [ ] `stdin`: points to system's `stdin` stream.
 - [x] `stderr`: points to system's `stderr` stream.

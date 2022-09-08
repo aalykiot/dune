@@ -13,6 +13,9 @@ name = "dune"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.25.0", features=["signal"] }
+
 [dependencies]
 v8 = { version = "0.49.0", default-features = false }
 threadpool = "1.8.1"

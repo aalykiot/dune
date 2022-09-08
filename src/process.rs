@@ -7,11 +7,13 @@ use crate::bindings::create_object_under;
 use crate::bindings::set_constant_to;
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
+use crate::bindings::throw_exception;
 use crate::bindings::BINDINGS;
 use crate::JsRuntime;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::env;
+use std::process::Command;
 
 lazy_static! {
     static ref VERSIONS: HashMap<&'static str, &'static str> = {
@@ -162,6 +164,46 @@ pub fn initialize<'s>(
     });
 
     set_property_to(scope, process, "versions", versions.into());
+
+    // `process.kill` - sends the signal to the process identified by pid.
+    set_function_to(
+        scope,
+        process,
+        "kill",
+        |scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue| {
+            // Get PID and SIGNAL arguments
+            let pid = args.get(0).to_rust_string_lossy(scope);
+            let signal = args.get(1).to_rust_string_lossy(scope);
+
+            // Handle kill in UNIX platforms.
+            if cfg!(unix) {
+                // Check if the value is a valid NIX signal.
+                if nix::sys::signal::Signal::iterator()
+                    .map(|s| s.as_str())
+                    .find(|v| **v == signal)
+                    .is_none()
+                {
+                    throw_exception(scope, &format!("Invalid signal: {}", signal));
+                    return;
+                }
+                // Try to kill the process.
+                if let Err(e) = Command::new("kill")
+                    .args([&format!("-{}", signal), &pid])
+                    .output()
+                {
+                    throw_exception(scope, &e.to_string());
+                }
+            }
+
+            // Handle kill in the Windows platform.
+            if cfg!(not(unix)) {
+                // Note: In windows platform we'll ignore the signal argument.
+                if let Err(e) = Command::new("Taskkill").args(["/F", "/PID", &pid]).output() {
+                    throw_exception(scope, &e.to_string());
+                }
+            }
+        },
+    );
 
     // `process.binding` - exposes native modules to JavaScript.
     set_function_to(

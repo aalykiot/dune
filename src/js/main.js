@@ -13,13 +13,13 @@ function makeGlobal(name, value) {
   globalThis[name] = value;
 }
 
-// Note: Adding a caching layer to `process.binding` allow us not
-// to cross the JavaScript - Rust bridge every time we need native methods.
+// Note: Adding a caching layer to `process.binding` allows us to not
+// cross the JavaScript <-> Rust bridge every time we need native methods.
 
 let cache = new Map();
 let internalBinding = cloneFunction(process.binding);
 
-process.binding = function (name) {
+process.binding = (name) => {
   // Check bindings cache.
   if (cache.has(name)) return cache.get(name);
 
@@ -28,6 +28,16 @@ process.binding = function (name) {
   cache.set(name, binding);
 
   return binding;
+};
+
+const kill = cloneFunction(process.kill);
+
+process.kill = (pid, signal = 'SIGKILL') => {
+  // Check arguments.
+  if (!pid || Number.isNaN(Number.parseInt(pid))) {
+    throw new TypeError(`The "pid" argument must be of type number.`);
+  }
+  kill(pid, signal);
 };
 
 // Setting up the STDOUT stream.
