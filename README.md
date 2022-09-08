@@ -28,7 +28,7 @@ irm https://raw.githubusercontent.com/aalykiot/dune/main/install.ps1 | iex
 Clone the repo and build it using <a href="https://rustup.rs/">Cargo</a>.
 
 ```bash
-git clone https://github.com/aalykiot/dune.git && cd ./dune && cargo release
+git clone https://github.com/aalykiot/dune.git && cd ./dune && cargo build --release
 ```
 
 > Make sure to create a `.dune` directory under your user.
