@@ -166,38 +166,38 @@ fn uptime(
     rv.set(uptime.into());
 }
 
-/// Sends the signal to the process identified by pid.
+#[cfg(target_family = "unix")]
 fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get PID and SIGNAL arguments
     let pid = args.get(0).to_rust_string_lossy(scope);
     let signal = args.get(1).to_rust_string_lossy(scope);
 
-    // Kill process in UNIX platforms.
-    if cfg!(unix) {
-        // Check if the value is a valid NIX signal.
-        if nix::sys::signal::Signal::iterator()
-            .map(|s| s.as_str())
-            .find(|v| **v == signal)
-            .is_none()
-        {
-            throw_exception(scope, &format!("Invalid signal: {}", signal));
-            return;
-        }
-        // Try to kill the process.
-        if let Err(e) = Command::new("kill")
-            .args([&format!("-{}", signal), &pid])
-            .output()
-        {
-            throw_exception(scope, &e.to_string());
-        }
+    // Check if the value is a valid NIX signal.
+    if nix::sys::signal::Signal::iterator()
+        .map(|s| s.as_str())
+        .find(|v| **v == signal)
+        .is_none()
+    {
+        throw_exception(scope, &format!("Invalid signal: {}", signal));
+        return;
     }
 
-    // Kill process in Windows platform.
-    if cfg!(not(unix)) {
-        // Note: In windows we'll ignore the signal argument.
-        if let Err(e) = Command::new("Taskkill").args(["/F", "/PID", &pid]).output() {
-            throw_exception(scope, &e.to_string());
-        }
+    // Try to kill the process.
+    if let Err(e) = Command::new("kill")
+        .args([&format!("-{}", signal), &pid])
+        .output()
+    {
+        throw_exception(scope, &e.to_string());
+    }
+}
+
+#[cfg(target_family = "windows")]
+fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+    // Get PID argument.
+    let pid = args.get(0).to_rust_string_lossy(scope);
+    // Try to kill the process.
+    if let Err(e) = Command::new("Taskkill").args(["/F", "/PID", &pid]).output() {
+        throw_exception(scope, &e.to_string());
     }
 }
 
