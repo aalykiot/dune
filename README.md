@@ -70,7 +70,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `console`: a subset of the WHATWG console.
 - [x] `TextEncoder` / `TextDecoder`: WHATWG encoding API.
 - [x] `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: DOM style timers.
-- [ ] `setImmediate` / `clearImmediate`: node.js like immediate timers.
+- [x] `setImmediate` / `clearImmediate`: node.js like immediate timers.
 - [x] `process`: an object that provides info about the current dune process.
 
 ### Process

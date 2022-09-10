@@ -1,6 +1,6 @@
+import timers from 'timers';
 import { Console } from 'console';
 import { TextEncoder, TextDecoder } from 'text-encoding';
-import { setTimeout, setInterval, clearTimeout, clearInterval } from 'timers';
 import { cloneFunction, parseEnvVariable } from 'util';
 import { readFileSync } from 'fs';
 
@@ -84,10 +84,12 @@ Object.defineProperty(process, 'stderr', {
 
 makeGlobal('console', new Console());
 
-makeGlobal('setTimeout', setTimeout);
-makeGlobal('setInterval', setInterval);
-makeGlobal('clearTimeout', clearTimeout);
-makeGlobal('clearInterval', clearInterval);
+makeGlobal('setTimeout', timers.setTimeout);
+makeGlobal('setInterval', timers.setInterval);
+makeGlobal('setImmediate', timers.setImmediate);
+makeGlobal('clearTimeout', timers.clearTimeout);
+makeGlobal('clearInterval', timers.clearInterval);
+makeGlobal('clearImmediate', timers.clearImmediate);
 
 makeGlobal('TextEncoder', TextEncoder);
 makeGlobal('TextDecoder', TextDecoder);

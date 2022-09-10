@@ -3,9 +3,11 @@
 // The Timers API provides functionality to allow developers to create DOM style timers.
 // https://www.w3schools.com/js/js_timing.asp
 
+import assert from 'assert';
+
 const TIMEOUT_MAX = Math.pow(2, 31) - 1;
 
-const { createTimeout, destroyTimeout } = process.binding('timers');
+const binding = process.binding('timers');
 
 let nextId = 1;
 
@@ -24,11 +26,11 @@ const activeTimers = new Map();
  *
  * @param {Function} callback
  * @param {Number} delay
- * @param {Array|undefined} args
+ * @param {...any} [args]
  * @returns {Number}
  */
 
-function setTimeout(callback, delay, ...args) {
+export function setTimeout(callback, delay, ...args) {
   // Coalesce to number or NaN.
   delay *= 1;
 
@@ -38,11 +40,24 @@ function setTimeout(callback, delay, ...args) {
   }
 
   // Check if callback is a valid function.
-  if (typeof callback !== 'function') {
-    throw new TypeError(`The "callback" argument must be of type function.`);
-  }
+  assert.isFunction(callback);
 
-  return initializeTimer(callback, delay, args, false);
+  // Pin down the correct ID value.
+  const id = nextId++;
+
+  const timer = binding.createTimeout(
+    () => {
+      callback(...args);
+      activeTimers.delete(id);
+    },
+    delay,
+    false
+  );
+
+  // Update `activeTimers` map.
+  activeTimers.set(id, timer);
+
+  return id;
 }
 
 /**
@@ -52,14 +67,14 @@ function setTimeout(callback, delay, ...args) {
  * @param {Number} id
  */
 
-function clearTimeout(id) {
-  if (typeof id !== 'number') {
-    throw new TypeError(`The "timeout" argument must be of type number.`);
-  }
-  if (!activeTimers.has(id)) return;
+export function clearTimeout(id) {
+  // Check parameter's type.
+  assert.integer(id);
 
-  destroyTimeout(activeTimers.get(id));
-  activeTimers.delete(id);
+  if (activeTimers.has(id)) {
+    binding.removeTimeout(activeTimers.get(id));
+    activeTimers.delete(id);
+  }
 }
 
 /**
@@ -68,11 +83,11 @@ function clearTimeout(id) {
  *
  * @param {Function} callback
  * @param {Number} delay
- * @param {Array|undefined} args
+ * @param {...any} [args]
  * @returns {Number}
  */
 
-function setInterval(callback, delay, ...args) {
+export function setInterval(callback, delay, ...args) {
   // Coalesce to number or NaN.
   delay *= 1;
 
@@ -82,11 +97,16 @@ function setInterval(callback, delay, ...args) {
   }
 
   // Check if callback is a valid function.
-  if (typeof callback !== 'function') {
-    throw new TypeError(`The "callback" argument must be of type function.`);
-  }
+  assert.isFunction(callback);
 
-  return initializeTimer(callback, delay, args, true);
+  // Pin down the correct ID value.
+  const id = nextId++;
+  const timer = binding.createTimeout(callback, delay, true, args);
+
+  // Update `activeTimers` map.
+  activeTimers.set(id, timer);
+
+  return id;
 }
 
 /**
@@ -96,43 +116,54 @@ function setInterval(callback, delay, ...args) {
  * @param {Number} id
  */
 
-function clearInterval(id) {
+export function clearInterval(id) {
   clearTimeout(id);
 }
 
 /**
- * Initializes a timeout or an interval based on the receiving parameters.
+ * Schedules the "immediate" execution of the callback after the I/O phase.
  *
  * @param {Function} callback
- * @param {Number} delay
- * @param {Array|undefined} args
- * @param {Boolean|undefined} repeat
- * @param {Number|undefined} prevId
+ * @param  {...any} [args]
  * @returns {Number}
  */
+export function setImmediate(callback, ...args) {
+  // Check arg type.
+  assert.isFunction(callback);
 
-function initializeTimer(callback, delay, args, repeat, prevId) {
-  const id = prevId ?? nextId++;
-  const task = () => {
-    // We're handling repeated timers (aka intervals) by continuously creating
-    // new event-loop timers and keeping the JS timer ID constant.
-    if (repeat) {
-      callback(...args);
-      if (activeTimers.has(id)) {
-        initializeTimer(callback, delay, args, true, id);
-      }
-      return;
-    }
-    // This branch executes on one-off timers (aka timeouts).
+  // Pin down the correct ID value.
+  const id = nextId++;
+  const immediate = binding.createImmediate(() => {
     callback(...args);
     activeTimers.delete(id);
-  };
+  });
 
-  // Schedule a new timer to the event-loop and update the `activeTimers` map.
-  const index = createTimeout(task, delay);
-  activeTimers.set(id, index);
+  // Update `activeTimers` map.
+  activeTimers.set(id, immediate);
 
   return id;
 }
 
-export { setTimeout, setInterval, clearTimeout, clearInterval };
+/**
+ * Cancels an Immediate timer created by setImmediate().
+ *
+ * @param {Number} id
+ */
+export function clearImmediate(id) {
+  // Check parameter's type.
+  assert.integer(id);
+
+  if (activeTimers.has(id)) {
+    binding.removeImmediate(activeTimers.get(id));
+    activeTimers.delete(id);
+  }
+}
+
+export default {
+  setTimeout,
+  setInterval,
+  setImmediate,
+  clearTimeout,
+  clearInterval,
+  clearImmediate,
+};
