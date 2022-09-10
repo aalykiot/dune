@@ -150,11 +150,7 @@ fn memory_usage(
 }
 
 /// A number describing the amount of time (in seconds) the process is running.
-fn uptime(
-    scope: &mut v8::HandleScope,
-    _: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn uptime(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get access to runtime's state.
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
@@ -173,10 +169,9 @@ fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8:
     let signal = args.get(1).to_rust_string_lossy(scope);
 
     // Check if the value is a valid NIX signal.
-    if nix::sys::signal::Signal::iterator()
+    if !nix::sys::signal::Signal::iterator()
         .map(|s| s.as_str())
-        .find(|v| **v == signal)
-        .is_none()
+        .any(|v| *v == signal)
     {
         throw_exception(scope, &format!("Invalid signal: {}", signal));
         return;
