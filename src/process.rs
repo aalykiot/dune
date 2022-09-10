@@ -152,7 +152,7 @@ fn memory_usage(
 /// A number describing the amount of time (in seconds) the process is running.
 fn uptime(
     scope: &mut v8::HandleScope,
-    _args: v8::FunctionCallbackArguments,
+    _: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
     // Get access to runtime's state.

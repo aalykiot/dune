@@ -97,12 +97,13 @@ For more examples look at the <a href="./examples">examples</a> directory.
 > This module should also include a `Sync` method for every async operation available.
 
 - [x] `copyFile(src, dest)`: copies `src` to `dest`.
-- [ ] `createReadStream(path, [options])`: creates a readable IO stream.
-- [ ] `createWriteStream(path, [options])`: creates a writable IO stream.
+- [ ] `createReadStream(path, [options])`: creates a readable IO stream. 🚧
+- [ ] `createWriteStream(path, [options])`: creates a writable IO stream. 🚧
 - [x] `open(path, [mode])`: asynchronous file open.
 - [x] `mkdir(path, [options])`: creates a directory.
 - [x] `readFile(path, [options])`: reads the entire contents of a file.
 - [x] `rmdir(path, [options])`: deletes a directory (must be empty).
+- [x] `readdir(path)`: reads the contents of a directory.
 - [x] `rm(path, [options])`: removes files and directories.
 - [x] `stat(path)`: retrieves statistics for the file.
 - [x] `writeFile(String|Uint8Array , data, [options])`: writes data to the file, replacing the file if it already exists.
@@ -111,8 +112,8 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 - [x] `fd`: the numeric file descriptor.
 - [x] `close()`: closes the file.
-- [ ] `createReadStream()`: creates a readable IO stream.
-- [ ] `createWriteStream()`: creates a writable IO stream.
+- [ ] `createReadStream()`: creates a readable IO stream. 🚧
+- [ ] `createWriteStream()`: creates a writable IO stream. 🚧
 - [x] `read([size, [offset]])`: reads data from the file.
 - [x] `stat()`: retrieves statistics for the file.
 - [x] `write(String|Uint8Array, [offset])`: writes data to the file.
