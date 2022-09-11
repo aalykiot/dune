@@ -107,7 +107,7 @@ impl ModuleMap {
                 Err(e) => {
                     let exception = v8::String::new(scope, &e.to_string()).unwrap();
                     let exception = v8::Exception::error(scope, exception);
-                    promise.open(scope).reject(scope, exception.into());
+                    promise.open(scope).reject(scope, exception);
                     return;
                 }
             },
