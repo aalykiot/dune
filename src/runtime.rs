@@ -4,12 +4,16 @@ use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::event_loop::EventLoop;
 use crate::event_loop::LoopHandle;
+use crate::event_loop::TaskResult;
+use crate::hooks::host_import_module_dynamically_cb;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
 use crate::hooks::promise_reject_cb;
 use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
+use crate::modules::load_import;
 use crate::modules::resolve_import;
+use crate::modules::DynamicImportFuture;
 use crate::modules::ModuleMap;
 use anyhow::bail;
 use anyhow::Error;
@@ -104,6 +108,8 @@ impl JsRuntime {
 
         isolate.set_capture_stack_trace_for_uncaught_exceptions(true, 10);
         isolate.set_promise_reject_callback(promise_reject_cb);
+        isolate.set_host_import_module_dynamically_callback(host_import_module_dynamically_cb);
+
         isolate
             .set_host_initialize_import_meta_object_callback(host_initialize_import_meta_object_cb);
 
@@ -233,6 +239,7 @@ impl JsRuntime {
     pub fn tick_event_loop(&mut self) {
         self.event_loop.tick();
         self.run_pending_futures();
+        self.prepare_dynamic_imports();
     }
 
     /// Runs the event-loop until no more pending events exists.
@@ -240,6 +247,7 @@ impl JsRuntime {
         while self.event_loop.has_pending_events()
             || self.has_promise_rejections()
             || self.isolate.has_pending_background_tasks()
+            || self.has_pending_dynamic_imports()
         {
             // Tick the event loop.
             self.tick_event_loop();
@@ -275,6 +283,11 @@ impl JsRuntime {
         !self.get_state().borrow().promise_exceptions.is_empty()
     }
 
+    /// Returns if we have dynamic imports in pending state.
+    pub fn has_pending_dynamic_imports(&mut self) -> bool {
+        !self.get_state().borrow().modules.dynamic_imports.is_empty()
+    }
+
     /// Returns all promise unhandled rejections.
     pub fn promise_rejections(&mut self) -> Vec<JsError> {
         // Get a v8 handle-scope.
@@ -292,6 +305,66 @@ impl JsRuntime {
                 JsError::from_v8_exception(scope, exception, Some("(in promise) "))
             })
             .collect()
+    }
+
+    /// Loads pending dynamic imports using the event-loop.
+    pub fn prepare_dynamic_imports(&mut self) {
+        // Get a v8 handle-scope.
+        let scope = &mut self.handle_scope();
+        let state_rc = JsRuntime::state(scope);
+
+        // NOTE: The reason we move all the dynamic imports to a separate vec is because
+        // we need to drop the `state` borrow before we start iterating through all
+        // of them to avoid borrowing panics at runtime.
+        let dynamic_imports: Vec<(String, v8::Global<v8::PromiseResolver>)> = state_rc
+            .borrow_mut()
+            .modules
+            .dynamic_imports
+            .drain(..)
+            .collect();
+
+        for (specifier, promise) in dynamic_imports {
+            // Borrow runtime's state.
+            let mut state = state_rc.borrow_mut();
+
+            // Note: The `dynamic_imports_seen` is there to help us identify concurrent
+            // imports with the same specifier. In that case we should only execute the
+            // module one and return it's namespace object for every request.
+            if state.modules.dynamic_imports_seen.contains(&specifier) {
+                // Reschedule dynamic import.
+                state
+                    .modules
+                    .new_dynamic_import(scope, None, &specifier, promise);
+
+                continue;
+            }
+
+            state.modules.dynamic_imports_seen.insert(specifier.clone());
+
+            // The async import task.
+            let task = {
+                let specifier = specifier.clone();
+                move || match load_import(&specifier, false) {
+                    Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
+                    Err(e) => Some(Result::Err(e)),
+                }
+            };
+
+            let task_cb = {
+                let state_rc = state_rc.clone();
+                move |_: LoopHandle, maybe_result: TaskResult| {
+                    let mut state = state_rc.borrow_mut();
+                    let future = DynamicImportFuture {
+                        specifier,
+                        promise,
+                        maybe_result,
+                    };
+                    state.pending_futures.push(Box::new(future));
+                }
+            };
+
+            state.handle.spawn(task, Some(task_cb));
+        }
     }
 }
 
