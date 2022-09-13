@@ -23,6 +23,9 @@ use modules::resolve_import;
 use runtime::JsRuntime;
 use runtime::JsRuntimeOptions;
 use std::env;
+use std::fs;
+use std::path::Path;
+use tools::bundle;
 use tools::upgrade;
 
 #[derive(Parser)]
@@ -49,9 +52,18 @@ enum Commands {
         #[clap(long, help = "Enable unstable features and APIs")]
         unstable: bool,
     },
-    #[clap(about = "Bundle everything into a single file (WIP)")]
-    Bundle,
-    #[clap(about = "Upgrade to the latest dune version (WIP)")]
+    #[clap(about = "Bundle everything into a single file")]
+    Bundle {
+        #[clap(forbid_empty_values = true, help = "The entry point script")]
+        entry: String,
+        #[clap(short, long, help = "The filename of the generated bundle")]
+        output: Option<String>,
+        #[clap(short, long, help = "Reload every URL import (cache is ignored)")]
+        reload: bool,
+        #[clap(long, help = "Minify the generated bundle")]
+        minify: bool,
+    },
+    #[clap(about = "Upgrade to the latest dune version")]
     Upgrade,
     #[clap(about = "Start the REPL (read, eval, print, loop)")]
     Repl,
@@ -93,8 +105,24 @@ fn upgrade_command() {
     }
 }
 
-fn bundle_command() {
-    println!("This command is not available :(");
+fn bundle_command(entry: String, output: Option<String>, reload: bool, minify: bool) {
+    match bundle::run_bundle(&entry, reload, minify) {
+        Ok(source) => {
+            // If output is specified write source there, otherwise print it to screen.
+            match output {
+                Some(output) => {
+                    // Make sure output has a .js extension.
+                    let path = Path::new(&output).with_extension("js");
+                    // Write source to output.
+                    if let Err(e) = fs::write(path, source) {
+                        eprintln!("{}", generic_error(e.to_string()));
+                    }
+                }
+                None => println!("{}", source),
+            };
+        }
+        Err(e) => eprintln!("{:?}", generic_error(e.to_string())),
+    }
 }
 
 /// Custom hook on panics (copied from Deno).
@@ -140,8 +168,13 @@ fn main() {
             seed,
             unstable,
         } => run_command(script, reload, seed, unstable),
-        Commands::Repl => repl_command(),
+        Commands::Bundle {
+            entry,
+            output,
+            reload,
+            minify,
+        } => bundle_command(entry, output, reload, minify),
         Commands::Upgrade => upgrade_command(),
-        Commands::Bundle => bundle_command(),
+        Commands::Repl => repl_command(),
     }
 }
