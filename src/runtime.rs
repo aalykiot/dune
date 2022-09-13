@@ -329,9 +329,10 @@ impl JsRuntime {
 
             // Note: The `dynamic_imports_seen` is there to help us identify concurrent
             // imports with the same specifier. In that case we should only execute the
-            // module one and return it's namespace object for every request.
+            // module once and return it's namespace object for every request.
             if state.modules.dynamic_imports_seen.contains(&specifier) {
-                // Reschedule dynamic import.
+                // Reschedule since another import with the same specifier is pending
+                // (will use the cache to resolve the import later).
                 state
                     .modules
                     .new_dynamic_import(scope, None, &specifier, promise);
@@ -341,7 +342,7 @@ impl JsRuntime {
 
             state.modules.dynamic_imports_seen.insert(specifier.clone());
 
-            // The async import task.
+            // Use the event-loop to asynchronously load the import.
             let task = {
                 let specifier = specifier.clone();
                 move || match load_import(&specifier, false) {

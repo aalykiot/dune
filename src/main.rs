@@ -13,14 +13,17 @@ mod repl;
 mod runtime;
 mod stdio;
 mod timers;
+mod tools;
 mod typescript;
 
+use crate::errors::generic_error;
 use clap::{Parser, Subcommand};
 use errors::unwrap_or_exit;
 use modules::resolve_import;
 use runtime::JsRuntime;
 use runtime::JsRuntimeOptions;
 use std::env;
+use tools::upgrade;
 
 #[derive(Parser)]
 #[clap(
@@ -52,6 +55,46 @@ enum Commands {
     Upgrade,
     #[clap(about = "Start the REPL (read, eval, print, loop)")]
     Repl,
+}
+
+fn run_command(script: String, reload: bool, seed: Option<i64>, unstable: bool) {
+    // NOTE: The following code tries to resolve the given filename
+    // to an absolute path. If the first time fails we will append `./` to
+    // it first, and retry the resolution in case the user forgot to specify it.
+    let filename = unwrap_or_exit(
+        resolve_import(None, &script).or_else(|_| resolve_import(None, &format!("./{}", script))),
+    );
+
+    let options = JsRuntimeOptions {
+        seed,
+        reload,
+        unstable,
+    };
+
+    // Create new JS runtime.
+    let mut runtime = JsRuntime::with_options(options);
+    let mod_result = runtime.execute_module(&filename, None);
+
+    match mod_result {
+        Ok(_) => runtime.run_event_loop(),
+        Err(e) => eprintln!("{:?}", e),
+    };
+}
+
+fn repl_command() {
+    // Start REPL.
+    repl::start(JsRuntime::new());
+}
+
+fn upgrade_command() {
+    match upgrade::run_upgrade() {
+        Ok(_) => println!("Upgraded successfully"),
+        Err(e) => eprintln!("{}", generic_error(e.to_string())),
+    }
+}
+
+fn bundle_command() {
+    println!("This command is not available :(");
 }
 
 /// Custom hook on panics (copied from Deno).
@@ -96,31 +139,9 @@ fn main() {
             reload,
             seed,
             unstable,
-        } => {
-            // NOTE: The following code tries to resolve the given filename
-            // to an absolute path. If the first time fails we will append `./` to
-            // it first, and retry the resolution in case the user forgot to specify it.
-            let filename = unwrap_or_exit(
-                resolve_import(None, &script)
-                    .or_else(|_| resolve_import(None, &format!("./{}", script))),
-            );
-
-            let options = JsRuntimeOptions {
-                seed,
-                reload,
-                unstable,
-            };
-
-            // Create new JS runtime.
-            let mut runtime = JsRuntime::with_options(options);
-            let mod_result = runtime.execute_module(&filename, None);
-
-            match mod_result {
-                Ok(_) => runtime.run_event_loop(),
-                Err(e) => eprintln!("{:?}", e),
-            };
-        }
-        Commands::Repl => repl::start(JsRuntime::new()),
-        Commands::Upgrade | Commands::Bundle => println!("This command is not available :("),
+        } => run_command(script, reload, seed, unstable),
+        Commands::Repl => repl_command(),
+        Commands::Upgrade => upgrade_command(),
+        Commands::Bundle => bundle_command(),
     }
 }
