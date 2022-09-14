@@ -70,7 +70,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `console`: a subset of the WHATWG console.
 - [x] `TextEncoder` / `TextDecoder`: WHATWG encoding API.
 - [x] `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: DOM style timers.
-- [ ] `setImmediate` / `clearImmediate`: node.js like immediate timers.
+- [x] `setImmediate` / `clearImmediate`: node.js like immediate timers.
 - [x] `process`: an object that provides info about the current dune process.
 
 ### Process
@@ -87,7 +87,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `version`: the dune version.
 - [x] `versions`: an object listing the version strings of dune and its dependencies.
 - [x] `binding(module)`: exposes modules with bindings to Rust.
-- [ ] `kill(pid, [signal])`: sends the signal to the process identified by pid.
+- [x] `kill(pid, [signal])`: sends the signal to the process identified by pid.
 - [x] `stdout`: points to system's `stdout` stream.
 - [ ] `stdin`: points to system's `stdin` stream.
 - [x] `stderr`: points to system's `stderr` stream.
@@ -97,12 +97,13 @@ For more examples look at the <a href="./examples">examples</a> directory.
 > This module should also include a `Sync` method for every async operation available.
 
 - [x] `copyFile(src, dest)`: copies `src` to `dest`.
-- [ ] `createReadStream(path, [options])`: creates a readable IO stream.
-- [ ] `createWriteStream(path, [options])`: creates a writable IO stream.
+- [ ] `createReadStream(path, [options])`: creates a readable IO stream. 🚧
+- [ ] `createWriteStream(path, [options])`: creates a writable IO stream. 🚧
 - [x] `open(path, [mode])`: asynchronous file open.
 - [x] `mkdir(path, [options])`: creates a directory.
 - [x] `readFile(path, [options])`: reads the entire contents of a file.
 - [x] `rmdir(path, [options])`: deletes a directory (must be empty).
+- [x] `readdir(path)`: reads the contents of a directory.
 - [x] `rm(path, [options])`: removes files and directories.
 - [x] `stat(path)`: retrieves statistics for the file.
 - [x] `writeFile(String|Uint8Array , data, [options])`: writes data to the file, replacing the file if it already exists.
@@ -111,8 +112,8 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 - [x] `fd`: the numeric file descriptor.
 - [x] `close()`: closes the file.
-- [ ] `createReadStream()`: creates a readable IO stream.
-- [ ] `createWriteStream()`: creates a writable IO stream.
+- [ ] `createReadStream()`: creates a readable IO stream. 🚧
+- [ ] `createWriteStream()`: creates a writable IO stream. 🚧
 - [x] `read([size, [offset]])`: reads data from the file.
 - [x] `stat()`: retrieves statistics for the file.
 - [x] `write(String|Uint8Array, [offset])`: writes data to the file.
@@ -128,7 +129,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 - [x] `listen(port, [host], [callback])`: Begin accepting connections on the specified port and host.
 - [x] `close([callback])`: Stops the server from accepting new connections and keeps existing connections.
-- [ ] `address()`: Returns the bound address.
+- [x] `address()`: Returns the bound address.
 - [x] `getConnections()`: Get the number of concurrent connections on the server.
 - [x] `Event: 'listening'`: Emitted when the server has been bound after calling `server.listen`.
 - [x] `Event: 'connection'`: Emitted when a new connection is made.
@@ -144,7 +145,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `write(data, [callback])`: Sends data on the socket.
 - [x] `end([data])`: Half-closes the socket. i.e., it sends a FIN packet.
 - [x] `destroy()`: Closes and discards the TCP socket stream.
-- [ ] `address()`: Returns the bound address.
+- [x] `address()`: Returns the bound address.
 - [x] `remoteAddress`: The string representation of the remote IP address.
 - [x] `remotePort`: The numeric representation of the remote port.
 - [x] `bytesRead`: The amount of received bytes.

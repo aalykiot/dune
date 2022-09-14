@@ -51,8 +51,8 @@ impl JsFuture for DnsLookupFuture {
                 let family = v8::String::new(scope, family).unwrap().into();
 
                 // Set properties to IP object.
-                set_property_to(scope, ip, "address", address);
                 set_property_to(scope, ip, "family", family);
+                set_property_to(scope, ip, "address", address);
 
                 ip.into()
             })

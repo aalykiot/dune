@@ -70,6 +70,9 @@ type TcpListenerOnConnection = Box<dyn FnMut(LoopHandle, Index, Result<TcpSocket
 type TcpOnWrite = Box<dyn FnOnce(LoopHandle, Index, Result<usize>) + 'static>;
 type TcpOnRead = Box<dyn FnMut(LoopHandle, Index, Result<Vec<u8>>) + 'static>;
 
+// Wrapper around check callbacks.
+type OnCheck = Box<dyn FnOnce(LoopHandle) + 'static>;
+
 // Wrapper around close callbacks.
 type OnClose = Box<dyn FnOnce(LoopHandle) + 'static>;
 
@@ -107,10 +110,17 @@ pub struct TcpSocketInfo {
     pub remote: SocketAddr,
 }
 
+// Describes a callback that will run once after the Poll phase.
+pub struct CheckWrap {
+    cb: Option<OnCheck>,
+}
+
+impl Resource for CheckWrap {}
+
 #[allow(clippy::enum_variant_names)]
 enum Action {
     TimerReq(Index, TimerWrap),
-    TimerDeleteReq(Index),
+    TimerRemoveReq(Index),
     SpawnReq(Index, Task, TaskWrap),
     TcpConnectionReq(Index, TcpStreamWrap),
     TcpListenReq(Index, TcpListenerWrap),
@@ -118,6 +128,8 @@ enum Action {
     TcpReadStartReq(Index, TcpOnRead),
     TcpCloseReq(Index, OnClose),
     TcpShutdownReq(Index),
+    CheckReq(Index, CheckWrap),
+    CheckRemoveReq(Index),
 }
 
 enum Event {
@@ -140,6 +152,7 @@ pub struct EventLoop {
     action_queue: mpsc::Receiver<Action>,
     action_queue_empty: Rc<Cell<bool>>,
     action_dispatcher: Rc<mpsc::Sender<Action>>,
+    check_queue: Vec<Index>,
     close_queue: Vec<(Index, Option<OnClose>)>,
     thread_pool: ThreadPool,
     event_dispatcher: Arc<Mutex<mpsc::Sender<Event>>>,
@@ -175,6 +188,7 @@ impl EventLoop {
             action_queue,
             action_queue_empty: Rc::new(Cell::new(true)),
             action_dispatcher: Rc::new(action_dispatcher),
+            check_queue: Vec::new(),
             close_queue: Vec::new(),
             thread_pool: ThreadPool::new(4),
             event_dispatcher,
@@ -212,6 +226,7 @@ impl EventLoop {
         self.prepare();
         self.run_timers();
         self.run_poll();
+        self.run_check();
         self.run_close();
     }
 }
@@ -226,7 +241,7 @@ impl EventLoop {
         while let Ok(action) = self.action_queue.try_recv() {
             match action {
                 Action::TimerReq(index, timer) => self.timer_req(index, timer),
-                Action::TimerDeleteReq(index) => self.timer_delete_req(&index),
+                Action::TimerRemoveReq(index) => self.timer_remove_req(index),
                 Action::SpawnReq(index, task, t_wrap) => self.spawn_req(index, task, t_wrap),
                 Action::TcpConnectionReq(index, tc_wrap) => self.tcp_connection_req(index, tc_wrap),
                 Action::TcpListenReq(index, tc_wrap) => self.tcp_listen_req(index, tc_wrap),
@@ -234,6 +249,8 @@ impl EventLoop {
                 Action::TcpReadStartReq(index, cb) => self.tcp_read_start_req(index, cb),
                 Action::TcpCloseReq(index, cb) => self.tcp_close_req(index, cb),
                 Action::TcpShutdownReq(index) => self.tcp_shutdown_req(index),
+                Action::CheckReq(index, cb) => self.check_req(index, cb),
+                Action::CheckRemoveReq(index) => self.check_remove_req(index),
             };
         }
         self.action_queue_empty.set(true);
@@ -284,6 +301,7 @@ impl EventLoop {
         // Based on what resources the event-loop is currently running will decide
         // how long we should wait on the this phase.
         let timeout = match self.timer_queue.iter().next() {
+            Some(_) if !self.check_queue.is_empty() => Some(Duration::ZERO),
             Some((t, _)) => Some(*t - Instant::now()),
             None if self.pending_tasks > 0 => None,
             None => Some(Duration::ZERO),
@@ -326,6 +344,29 @@ impl EventLoop {
             }
             self.prepare();
         }
+    }
+
+    /// Runs all check callbacks.
+    fn run_check(&mut self) {
+        // Create a new event-loop handle.
+        let handle = self.handle();
+
+        for rid in self.check_queue.drain(..) {
+            // Remove resource from the event-loop.
+            let mut resource = match self.resources.remove(&rid) {
+                Some(resource) => resource,
+                None => continue,
+            };
+
+            if let Some(cb) = resource
+                .downcast_mut::<CheckWrap>()
+                .map(|wrap| wrap.cb.take().unwrap())
+            {
+                // Run callback.
+                (cb)(handle.clone());
+            }
+        }
+        self.prepare();
     }
 
     /// Cleans up `dying` resources.
@@ -599,9 +640,9 @@ impl EventLoop {
     }
 
     /// Removes an existed timer.
-    fn timer_delete_req(&mut self, index: &Index) {
-        self.resources.remove(index);
-        self.timer_queue.retain(|_, v| *v != *index);
+    fn timer_remove_req(&mut self, index: Index) {
+        self.resources.remove(&index);
+        self.timer_queue.retain(|_, v| *v != index);
     }
 
     /// Spawns a new task to the thread-pool.
@@ -721,6 +762,19 @@ impl EventLoop {
         // Cast resource to TcpStreamWrap.
         resource.downcast_mut::<TcpStreamWrap>().unwrap().close();
     }
+
+    /// Schedules a new check callback.
+    fn check_req(&mut self, index: Index, check_wrap: CheckWrap) {
+        // Add the check_wrap to the event loop.
+        self.resources.insert(index, Box::new(check_wrap));
+        self.check_queue.push(index);
+    }
+
+    /// Removes a check callback from the event-loop.
+    fn check_remove_req(&mut self, index: Index) {
+        self.resources.remove(&index);
+        self.timer_queue.retain(|_, v| *v != index);
+    }
 }
 
 impl Default for EventLoop {
@@ -773,7 +827,7 @@ impl LoopHandle {
 
     /// Removes a scheduled timer from the event-loop.
     pub fn remove_timer(&self, index: &Index) {
-        self.actions.send(Action::TimerDeleteReq(*index)).unwrap();
+        self.actions.send(Action::TimerRemoveReq(*index)).unwrap();
         self.actions_queue_empty.set(false);
     }
 
@@ -902,6 +956,29 @@ impl LoopHandle {
     /// Closes the write side of the TCP stream.
     pub fn tcp_shutdown(&self, index: Index) {
         self.actions.send(Action::TcpShutdownReq(index)).unwrap();
+        self.actions_queue_empty.set(false);
+    }
+
+    /// Schedules a new check callback.
+    pub fn check<F>(&self, on_check: F) -> Index
+    where
+        F: FnOnce(LoopHandle) + 'static,
+    {
+        let index = self.index();
+        let on_check = Box::new(on_check);
+
+        self.actions
+            .send(Action::CheckReq(index, CheckWrap { cb: Some(on_check) }))
+            .unwrap();
+
+        self.actions_queue_empty.set(false);
+
+        index
+    }
+
+    /// Removes a check callback from the event-loop.
+    pub fn remove_check(&self, index: &Index) {
+        self.actions.send(Action::CheckRemoveReq(*index)).unwrap();
         self.actions_queue_empty.set(false);
     }
 }

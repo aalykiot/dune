@@ -13,6 +13,7 @@ use anyhow::bail;
 use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
+use std::ffi::OsString;
 use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -68,6 +69,8 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "mkdirSync", mkdir_sync);
     set_function_to(scope, target, "rmdir", rmdir);
     set_function_to(scope, target, "rmdirSync", rmdir_sync);
+    set_function_to(scope, target, "readdir", readdir);
+    set_function_to(scope, target, "readdirSync", readdir_sync);
     set_function_to(scope, target, "rm", rm);
     set_function_to(scope, target, "rmSync", rm_sync);
     set_function_to(scope, target, "close", close);
@@ -755,6 +758,114 @@ fn rmdir_sync(
     }
 }
 
+/// Describes what will run after the async read_dir_op completes.
+struct ReadDirFuture {
+    promise: v8::Global<v8::PromiseResolver>,
+    maybe_result: TaskResult,
+}
+
+impl JsFuture for ReadDirFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        // Unwrap the result.
+        let result = self.maybe_result.take().unwrap();
+
+        // Check if something went wrong on directory read.
+        if let Err(e) = result {
+            let message = v8::String::new(scope, &e.to_string()).unwrap();
+            let exception = v8::Exception::error(scope, message);
+            // Reject the promise on failure.
+            self.promise.open(scope).reject(scope, exception);
+            return;
+        }
+
+        // Otherwise, resolve the promise passing the result.
+        let result = result.unwrap();
+
+        // Deserialize bincode binary into an actual rust type.
+        let directory: Vec<OsString> = bincode::deserialize(&result).unwrap();
+        let directory: Vec<v8::Local<v8::Value>> = directory
+            .iter()
+            .map(|entry| entry.to_str().unwrap())
+            .map(|entry| v8::String::new(scope, entry).unwrap())
+            .map(|entry_value| entry_value.into())
+            .collect();
+
+        let directory_value = v8::Array::new_with_elements(scope, &directory);
+
+        self.promise
+            .open(scope)
+            .resolve(scope, directory_value.into())
+            .unwrap();
+    }
+}
+
+/// Reads the contents of a directory asynchronously.
+fn readdir(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get desired folder location.
+    let path = args.get(0).to_rust_string_lossy(scope);
+
+    // Create a promise resolver and extract the actual promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    let task = move || match readdir_op(path) {
+        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+        Err(e) => Some(Result::Err(e)),
+    };
+
+    let task_cb = {
+        let promise = v8::Global::new(scope, promise_resolver);
+        let state_rc = state_rc.clone();
+
+        move |_: LoopHandle, maybe_result: TaskResult| {
+            let mut state = state_rc.borrow_mut();
+            let future = ReadDirFuture {
+                promise,
+                maybe_result,
+            };
+            state.pending_futures.push(Box::new(future));
+        }
+    };
+
+    state.handle.spawn(task, Some(task_cb));
+
+    rv.set(promise.into());
+}
+
+/// Reads the contents of a directory synchronously.
+fn readdir_sync(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get the path.
+    let path = args.get(0).to_rust_string_lossy(scope);
+
+    match readdir_op(path) {
+        Ok(directory) => {
+            // Cast OsString values to v8::Locals.
+            let directory: Vec<v8::Local<v8::Value>> = directory
+                .iter()
+                .map(|entry| entry.to_str().unwrap())
+                .map(|entry| v8::String::new(scope, entry).unwrap())
+                .map(|entry_value| entry_value.into())
+                .collect();
+
+            let directory_value = v8::Array::new_with_elements(scope, &directory);
+
+            rv.set(directory_value.into());
+        }
+        Err(e) => throw_exception(scope, &e.to_string()),
+    }
+}
+
 /// Describes what will run after the async rm_op completes.
 struct FsRmFuture {
     promise: v8::Global<v8::PromiseResolver>,
@@ -1029,6 +1140,13 @@ fn mkdir_op<P: AsRef<Path>>(path: P, recursive: bool) -> Result<()> {
 /// Pure rust implementation of deleting (empty) directories.
 fn rmdir_op<P: AsRef<Path>>(path: P) -> Result<()> {
     fs::remove_dir(path).map_err(|e| anyhow!(e))
+}
+
+/// Pure rust implementation of reading a directory.
+fn readdir_op<P: AsRef<Path>>(path: P) -> Result<Vec<OsString>> {
+    fs::read_dir(path)
+        .map(|directory| directory.map(|entry| entry.unwrap().file_name()).collect())
+        .map_err(|e| anyhow!(e))
 }
 
 /// Pure rust implementation of deleting files and directories.

@@ -134,3 +134,37 @@ pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
         PromiseRejectAfterResolved | PromiseResolveAfterResolved => {}
     }
 }
+
+/// Called when we require the embedder to load a module.
+/// https://docs.rs/v8/0.49.0/v8/type.HostImportModuleDynamicallyCallback.html
+pub extern "C" fn host_import_module_dynamically_cb(
+    context: v8::Local<v8::Context>,
+    _: v8::Local<v8::Data>,
+    base: v8::Local<v8::Value>,
+    specifier: v8::Local<v8::String>,
+    _: v8::Local<v8::FixedArray>,
+) -> *mut v8::Promise {
+    // SAFETY: `CallbackScope` can be safely constructed from `Local<Context>`
+    let scope = &mut unsafe { v8::CallbackScope::new(context) };
+
+    // Get module base and specifier as strings.
+    let base = base.to_rust_string_lossy(scope);
+    let specifier = specifier.to_rust_string_lossy(scope);
+
+    // Create the import promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
+
+    let global_promise = v8::Global::new(scope, promise_resolver);
+    let state_rc = JsRuntime::state(scope);
+
+    // Register a new dynamic import.
+    state_rc.borrow_mut().modules.new_dynamic_import(
+        scope,
+        Some(&base),
+        &specifier,
+        global_promise,
+    );
+
+    &*promise as *const _ as *mut _
+}

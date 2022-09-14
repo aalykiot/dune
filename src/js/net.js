@@ -70,6 +70,7 @@ export function createServer(onConnection) {
  */
 export class Socket extends EventEmitter {
   #id;
+  #host;
   #connecting;
   #encoding;
   #writable;
@@ -141,8 +142,9 @@ export class Socket extends EventEmitter {
       this.#id = socketInfo.id;
       this.#connecting = false;
       this.#writable = true;
-      this.remoteAddress = socketInfo.remoteAddress;
-      this.remotePort = socketInfo.remotePort;
+      this.#host = socketInfo.host;
+      this.remoteAddress = socketInfo.remote.address;
+      this.remotePort = socketInfo.remote.port;
 
       this.emit('connect', socketInfo);
       binding.readStart(this.#id, this._onSocketRead.bind(this));
@@ -150,6 +152,15 @@ export class Socket extends EventEmitter {
     } catch (e) {
       this._throw(e);
     }
+  }
+
+  /**
+   * Returns the bound address, the address family name and port of the socket.
+   *
+   * @returns {Object}
+   */
+  address() {
+    return this.#host;
   }
 
   _throw(err) {
@@ -334,6 +345,7 @@ export class Socket extends EventEmitter {
  */
 class Server extends EventEmitter {
   #id;
+  #host;
   #connections;
 
   /**
@@ -388,10 +400,18 @@ class Server extends EventEmitter {
         : addresses[0].address;
 
       // Bind server to address, and start listening for connections.
-      this.#id = binding.listen(host, port, this._onNewConnection.bind(this));
+      const socketInfo = binding.listen(
+        host,
+        port,
+        this._onNewConnection.bind(this)
+      );
+
+      // Update internal state.
+      this.#id = socketInfo.id;
+      this.#host = socketInfo.host;
 
       // Everything OK, emit the listening event.
-      this.emit('listening', { host, port });
+      this.emit('listening', this.#host);
     } catch (e) {
       this._throw(e);
     }
@@ -404,6 +424,15 @@ class Server extends EventEmitter {
    */
   getConnections() {
     return this.#connections;
+  }
+
+  /**
+   * Returns the bound address, the address family name and port of the socket.
+   *
+   * @returns {Object}
+   */
+  address() {
+    return this.#host;
   }
 
   /**

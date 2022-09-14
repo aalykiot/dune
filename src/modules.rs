@@ -1,13 +1,17 @@
 use crate::errors::unwrap_or_exit;
+use crate::event_loop::TaskResult;
+use crate::hooks::module_resolve_cb;
 use crate::loaders::CoreModuleLoader;
 use crate::loaders::FsModuleLoader;
 use crate::loaders::ModuleLoader;
 use crate::loaders::UrlModuleLoader;
+use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs;
 use url::Url;
 
@@ -57,18 +61,18 @@ pub fn create_origin<'s>(
 pub type ModulePath = String;
 pub type ModuleSource = String;
 
-/// Points to a module that lives inside v8.
-pub type ModuleReference = v8::Global<v8::Module>;
-
 #[derive(Default)]
 #[allow(dead_code)]
 /// Holds information about resolved ES modules.
 pub struct ModuleMap {
     main: Option<ModulePath>,
-    map: HashMap<ModulePath, ModuleReference>,
+    modules: HashMap<ModulePath, v8::Global<v8::Module>>,
+    pub dynamic_imports_seen: HashSet<ModulePath>,
+    pub dynamic_imports: Vec<(ModulePath, v8::Global<v8::PromiseResolver>)>,
 }
 
 impl ModuleMap {
+    /// Registers a new ES module to the map.
     pub fn new_es_module<'a>(
         &mut self,
         scope: &mut v8::HandleScope<'a>,
@@ -85,24 +89,136 @@ impl ModuleMap {
             self.main = Some(path.into());
         }
 
-        self.map.insert(path.into(), module);
+        self.modules.insert(path.into(), module);
     }
 
+    /// Registers a new dynamic import.
+    pub fn new_dynamic_import<'s>(
+        &mut self,
+        scope: &mut v8::HandleScope<'s>,
+        base: Option<&str>,
+        specifier: &str,
+        promise: v8::Global<v8::PromiseResolver>,
+    ) {
+        // Try to resolve the import.
+        let specifier = match base {
+            Some(base) => match resolve_import(Some(base), specifier) {
+                Ok(specifier) => specifier,
+                Err(e) => {
+                    let exception = v8::String::new(scope, &e.to_string()).unwrap();
+                    let exception = v8::Exception::error(scope, exception);
+                    promise.open(scope).reject(scope, exception);
+                    return;
+                }
+            },
+            None => specifier.into(),
+        };
+
+        // Check if we have the requested module to our cache.
+        if let Some(module) = self.modules.get(&specifier) {
+            let module = v8::Local::new(scope, module);
+            let namespace = module.get_module_namespace();
+            promise.open(scope).resolve(scope, namespace);
+            return;
+        }
+
+        self.dynamic_imports.push((specifier.clone(), promise));
+    }
+
+    /// Returns the main module.
     pub fn main(&self) -> Option<ModulePath> {
         self.main.clone()
     }
 }
 
+pub struct DynamicImportFuture {
+    pub specifier: String,
+    pub maybe_result: TaskResult,
+    pub promise: v8::Global<v8::PromiseResolver>,
+}
+
+impl JsFuture for DynamicImportFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        // Extract the result.
+        let result = self.maybe_result.take().unwrap();
+
+        // Handle when something goes wrong with loading the import.
+        if let Err(e) = result {
+            let message = v8::String::new(scope, &e.to_string()).unwrap();
+            let exception = v8::Exception::error(scope, message);
+            // Reject the promise on failure.
+            self.promise.open(scope).reject(scope, exception);
+            return;
+        }
+
+        // Create module's origin.
+        let origin = create_origin(scope, &self.specifier, true);
+
+        // Otherwise, get the result and deserialize it.
+        let source = result.unwrap();
+        let source: String = bincode::deserialize(&source).unwrap();
+        let source = v8::String::new(scope, &source).unwrap();
+        let source = v8::script_compiler::Source::new(source, Some(&origin));
+
+        // Create a try-catch scope.
+        let tc_scope = &mut v8::TryCatch::new(scope);
+
+        // Compile source to a v8 module.
+        let module = match v8::script_compiler::compile_module(tc_scope, source) {
+            Some(module) => module,
+            None => {
+                let exception = tc_scope.exception().unwrap();
+                self.promise.open(tc_scope).reject(tc_scope, exception);
+                return;
+            }
+        };
+
+        // Instantiate ES module.
+        if module
+            .instantiate_module(tc_scope, module_resolve_cb)
+            .is_none()
+        {
+            assert!(tc_scope.has_caught());
+            let exception = tc_scope.exception().unwrap();
+            self.promise.open(tc_scope).reject(tc_scope, exception);
+            return;
+        }
+
+        let _ = module.evaluate(tc_scope);
+
+        // Check for module evaluation errors.
+        if module.get_status() == v8::ModuleStatus::Errored {
+            let exception = module.get_exception();
+            self.promise.open(tc_scope).reject(tc_scope, exception);
+            return;
+        }
+
+        // Update the ES modules map (for future requests).
+        let state_rc = JsRuntime::state(tc_scope);
+        let mut state = state_rc.borrow_mut();
+
+        state
+            .modules
+            .new_es_module(tc_scope, &self.specifier, module);
+
+        // Note: Since this is a dynamic import will resolve the promise
+        // with the module's namespace object instead of it's evaluation result.
+        self.promise
+            .open(tc_scope)
+            .resolve(tc_scope, module.get_module_namespace());
+    }
+}
+
 impl std::ops::Deref for ModuleMap {
-    type Target = HashMap<ModulePath, ModuleReference>;
+    type Target = HashMap<ModulePath, v8::Global<v8::Module>>;
     fn deref(&self) -> &Self::Target {
-        &self.map
+        &self.modules
     }
 }
 
 impl std::ops::DerefMut for ModuleMap {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.map
+        &mut self.modules
     }
 }
 

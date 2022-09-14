@@ -287,8 +287,8 @@ export function openSync(path, mode = 'r') {
  * Reads asynchronously the entire contents of a file.
  *
  * @param {String} path
- * @param {String|Object} options
- * @returns {Promise<String|Uint8Array>}
+ * @param {(String|Object)} options
+ * @returns {Promise<(String|Uint8Array)>}
  */
 
 export async function readFile(path, options = {}) {
@@ -321,8 +321,8 @@ export async function readFile(path, options = {}) {
  * Reads synchronously the entire contents of a file.
  *
  * @param {String} path
- * @param {String|Object} options
- * @returns {String|Uint8Array}
+ * @param {(String|Object)} options
+ * @returns {(String|Uint8Array)}
  */
 
 export function readFileSync(path, options = {}) {
@@ -364,6 +364,7 @@ function toUint8Array(data, encoding) {
  * @param {String} path
  * @param {String|Uint8Array} data
  * @param {String|Object} options
+ * @returns {Promise}
  */
 
 export async function writeFile(path, data, options = {}) {
@@ -428,6 +429,7 @@ export function writeFileSync(path, data, options = {}) {
  * @param {String} path
  * @param {String|Uint8Array} data
  * @param {String} encoding
+ * @returns {Promise}
  */
 
 export async function copyFile(source, destination) {
@@ -470,6 +472,7 @@ export function copyFileSync(source, destination) {
  * Retrieves asynchronously statistics for the file.
  *
  * @param {String} path
+ * @returns {Promise<Object>}
  */
 export async function stat(path) {
   // Check the path argument type.
@@ -487,6 +490,7 @@ export async function stat(path) {
  * Retrieves synchronously statistics for the file.
  *
  * @param {String} path
+ * @returns {Object}
  */
 export function statSync(path) {
   // Check the path argument type.
@@ -505,6 +509,7 @@ export function statSync(path) {
  *
  * @param {String} path
  * @param {Object} options
+ * @returns {Promise}
  */
 export async function mkdir(path, options = {}) {
   // Check the path argument type.
@@ -535,6 +540,7 @@ export function mkdirSync(path, options = {}) {
  *
  * @param {String} path
  * @param {Object} options
+ * @returns {Promise}
  */
 export async function rmdir(path, options = {}, __retries = 0) {
   // Check the path argument type.
@@ -597,10 +603,41 @@ export function rmdirSync(path, options = {}, __retries = 0) {
 }
 
 /**
+ * Reads asynchronously the contents of a directory.
+ * 
+ * @param {String} path
+ * @returns {Promise<String[]>}  
+ */
+export async function readdir(path) {
+  // Check the path argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  return binding.readdir(path);
+}
+
+/**
+ * Reads the contents of a directory.
+ * 
+ * @param {String} path
+ * @returns {String[]}
+ */
+ export function readdirSync(path) {
+  // Check the path argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  return binding.readdirSync(path);
+}
+
+/**
  * Removes files and directories asynchronously.
  *
  * @param {String} path
  * @param {Object} options
+ * @returns {Promise}
  */
 export async function rm(path, options = {}, __retries = 0) {
   // Check the path argument type.
@@ -698,6 +735,8 @@ export default {
   mkdirSync,
   rmdir,
   rmdirSync,
+  readdir,
+  readdirSync,
   rm,
   rmSync,
 };
