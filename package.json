@@ -1,7 +1,7 @@
 {
   "name": "dune",
-  "version": "0.1.0",
-  "description": "Dune is a hobby JavaScript and TypeScript runtime.",
+  "version": "0.2.0",
+  "description": "A hobby runtime for JavaScript and TypeScript 🚀",
   "main": "src/js/main.js",
   "scripts": {
     "lint": "eslint ./src/js/**/*.js"
