@@ -9,6 +9,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 
     set_function_to(scope, target, "write", write);
     set_function_to(scope, target, "writeError", write_error);
+    set_function_to(scope, target, "read", read);
     set_function_to(scope, target, "clear", clear);
 
     // Return v8 global handle.
@@ -37,6 +38,18 @@ fn write_error(
     // Flush bytes to stderr.
     io::stderr().write_all(content).unwrap();
     io::stderr().flush().unwrap();
+}
+
+/// Reads (synchronously) a string from the stdin.
+fn read(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, mut ret: v8::ReturnValue) {
+    // Read input from system's stdin stream.
+    let mut input = String::new();
+    let stdin = io::stdin();
+    stdin.read_line(&mut input).unwrap();
+
+    // Return data back to JavaScript.
+    let input = v8::String::new(scope, input.trim_end()).unwrap();
+    ret.set(input.into());
 }
 
 /// Clears the terminal if the environment allows it.

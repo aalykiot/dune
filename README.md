@@ -68,6 +68,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `global`: reference to the global object.
 - [x] `globalThis`: same as `global`.
 - [x] `console`: a subset of the WHATWG console.
+- [x] `prompt`: shows the given message and waits for the user's input.
 - [x] `TextEncoder` / `TextDecoder`: WHATWG encoding API.
 - [x] `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: DOM style timers.
 - [x] `setImmediate` / `clearImmediate`: node.js like immediate timers.
@@ -89,7 +90,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `binding(module)`: exposes modules with bindings to Rust.
 - [x] `kill(pid, [signal])`: sends the signal to the process identified by pid.
 - [x] `stdout`: points to system's `stdout` stream.
-- [ ] `stdin`: points to system's `stdin` stream.
+- [x] `stdin`: points to system's `stdin` stream.
 - [x] `stderr`: points to system's `stderr` stream.
 
 ### File System

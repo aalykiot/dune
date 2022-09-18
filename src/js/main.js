@@ -1,5 +1,5 @@
 import timers from 'timers';
-import { Console } from 'console';
+import { Console, prompt } from 'console';
 import { TextEncoder, TextDecoder } from 'text-encoding';
 import { cloneFunction, parseEnvVariable } from 'util';
 import { readFileSync } from 'fs';
@@ -40,49 +40,37 @@ process.kill = (pid, signal = 'SIGKILL') => {
   kill(pid, signal);
 };
 
-// Setting up the STDOUT stream.
-
-let stdout = process.stdout;
+// Setting up STDOUT, STDIN and STDERR streams.
 
 Object.defineProperty(process, 'stdout', {
   get() {
-    // Don't initialize twice.
-    if (stdout) return stdout;
-
-    // Setup stdout stream.
-    const binding = process.binding('stdio');
-
     return {
-      write(value) {
-        binding.write(value);
-      },
+      write: process.binding('stdio').write,
     };
   },
   configurable: true,
 });
 
-// Setting up the STDERR stream.
-
-let stderr = process.stderr;
+Object.defineProperty(process, 'stdin', {
+  get() {
+    return {
+      read: process.binding('stdio').read,
+    };
+  },
+  configurable: true,
+});
 
 Object.defineProperty(process, 'stderr', {
   get() {
-    // Don't initialize twice.
-    if (stderr) return stderr;
-
-    // Setup stderr stream.
-    const binding = process.binding('stdio');
-
     return {
-      write(value) {
-        binding.writeError(value);
-      },
+      write: process.binding('stdio').writeError,
     };
   },
   configurable: true,
 });
 
 makeGlobal('console', new Console());
+makeGlobal('prompt', prompt);
 
 makeGlobal('setTimeout', timers.setTimeout);
 makeGlobal('setInterval', timers.setInterval);

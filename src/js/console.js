@@ -268,9 +268,23 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
 }
 
 /**
+ * Shows the given message and waits for the user's input.
+ *
+ * @param {String} [message]
+ * @param {String} [defaultValue]
+ * @returns
+ */
+export function prompt(message = 'Prompt', defaultValue = null) {
+  // Write prompt message to stdout.
+  process.stdout.write(`${message} `);
+  // Read and return user's input.
+  return process.stdin.read() || defaultValue;
+}
+
+/**
  * Console is a subset implementation of MDN's Console API.
  */
-class Console {
+export class Console {
   // Holds timers initialized by console.
   // https://developer.mozilla.org/en-US/docs/Web/API/Console/time
   #timers = new Map();
@@ -363,4 +377,4 @@ class Console {
   }
 }
 
-export { Console };
+export default { Console, prompt };
