@@ -276,7 +276,9 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
  */
 export function prompt(message = 'Prompt', defaultValue = null) {
   // Write prompt message to stdout.
-  process.stdout.write(`${message} `);
+  process.stdout.write(
+    `${message} ${defaultValue ? `[${defaultValue}] ` : ''}`
+  );
   // Read and return user's input.
   return process.stdin.read() || defaultValue;
 }
