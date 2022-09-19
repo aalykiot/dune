@@ -26,6 +26,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use tools::bundle;
+use tools::compile;
 use tools::upgrade;
 
 #[derive(Parser)]
@@ -62,6 +63,19 @@ enum Commands {
         reload: bool,
         #[clap(long, help = "Minify the generated bundle")]
         minify: bool,
+    },
+    #[clap(about = "Compile script to standalone executable")]
+    Compile {
+        #[clap(forbid_empty_values = true, help = "The entry point script")]
+        entry: String,
+        #[clap(
+            short,
+            long,
+            help = "The filename of the generated standalone executable"
+        )]
+        output: Option<String>,
+        #[clap(short, long, help = "Reload every URL import (cache is ignored)")]
+        reload: bool,
     },
     #[clap(about = "Upgrade to the latest dune version")]
     Upgrade,
@@ -105,23 +119,49 @@ fn upgrade_command() {
     }
 }
 
-fn bundle_command(entry: String, output: Option<String>, reload: bool, minify: bool) {
-    match bundle::run_bundle(&entry, reload, minify) {
-        Ok(source) => {
-            // If output is specified write source there, otherwise print it to screen.
-            match output {
-                Some(output) => {
-                    // Make sure output has a .js extension.
-                    let path = Path::new(&output).with_extension("js");
-                    // Write source to output.
-                    if let Err(e) = fs::write(path, source) {
-                        eprintln!("{}", generic_error(e.to_string()));
-                    }
-                }
-                None => println!("{}", source),
+fn output_bundle(source: String, output: Option<String>) {
+    // If output is specified write source there, otherwise print it to screen.
+    match output {
+        Some(output) => {
+            // Make sure output has a .js extension.
+            let path = Path::new(&output).with_extension("js");
+            // Write source to output.
+            match fs::create_dir_all(path.parent().unwrap()).map(|_| fs::write(path, source)) {
+                Ok(_) => {}
+                Err(e) => eprintln!("{}", generic_error(e.to_string())),
             };
         }
+        None => println!("{}", source),
+    };
+}
+
+fn bundle_command(entry: String, output: Option<String>, reload: bool, minify: bool) {
+    match bundle::run_bundle(&entry, reload, minify) {
+        Ok(source) => output_bundle(source, output),
         Err(e) => eprintln!("{:?}", generic_error(e.to_string())),
+    }
+}
+
+fn compile_command(entry: String, output: Option<String>, reload: bool) {
+    match compile::run_compile(&entry, output, reload) {
+        Ok(_) => {}
+        Err(e) => eprintln!("{:?}", generic_error(e.to_string())),
+    }
+}
+
+fn run_with_zero_arguments(source: Option<String>) {
+    match source {
+        Some(source) => {
+            // Create a new JS runtime.
+            let mut runtime = JsRuntime::new();
+            let mod_result = runtime.execute_module("dune:standalone/main", Some(&source));
+
+            match mod_result {
+                Ok(_) => runtime.run_event_loop(),
+                Err(e) => eprintln!("{:?}", e),
+            };
+        }
+        None => repl::start(JsRuntime::new()),
     }
 }
 
@@ -151,10 +191,12 @@ fn main() {
         setup_panic_hook();
     }
 
-    // If no arguments specified, start the REPL.
+    // If no arguments specified, try run in standalone mode or start REPL.
     if env::args().count() == 1 {
-        // Start REPL.
-        repl::start(JsRuntime::new());
+        match compile::extract_standalone() {
+            Ok(source) => run_with_zero_arguments(source),
+            Err(e) => eprintln!("{:?}", generic_error(e.to_string())),
+        }
         return;
     }
 
@@ -174,6 +216,11 @@ fn main() {
             reload,
             minify,
         } => bundle_command(entry, output, reload, minify),
+        Commands::Compile {
+            entry,
+            output,
+            reload,
+        } => compile_command(entry, output, reload),
         Commands::Upgrade => upgrade_command(),
         Commands::Repl => repl_command(),
     }
