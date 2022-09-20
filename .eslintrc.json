@@ -12,7 +12,8 @@
   "globals": {
     "global": "readonly",
     "globalThis": "readonly",
-    "process": true
+    "process": true,
+    "prompt": true
   },
   "rules": {}
 }
