@@ -190,6 +190,8 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `notEmpty(arrayValue)`: asserts that array is not empty.
 - [x] `throws(fn, error)`: asserts that function throws expected exception.
 
-## License
+## Contributing
 
-This project is licensed under the <a href="./LICENSE.md">MIT</a> license.
+Contributions are always welcome!
+
+See [CONTRIBUTING.md](https://github.com/aalykiot/dune/blob/main/CONTRIBUTING.md) for ways to get started.
