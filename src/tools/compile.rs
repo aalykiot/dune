@@ -44,7 +44,7 @@ pub fn run_compile(entry: &str, output: Option<String>, reload: bool) -> Result<
         fs::create_dir_all(parent)?;
     }
 
-    // Write standalone to destination output
+    // Write standalone to destination output.
     fs::write(&output, buffer)?;
 
     // On Unix change standalone's permissions to 0o777.
