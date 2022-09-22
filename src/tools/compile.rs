@@ -16,13 +16,11 @@ pub fn run_compile(entry: &str, output: Option<String>, reload: bool) -> Result<
     let bundle = run_bundle(entry, reload, true)?;
     let bundle_size = bundle.as_bytes().len();
 
-    let dune_exe_dir = dirs::home_dir().unwrap().join(".dune/bin/");
-
-    let exe_name = "dune";
+    let exe_path = std::env::current_exe()?;
     let exe_extension = if cfg!(windows) { "exe" } else { "" };
 
     // Open dune's base binary.
-    let mut f = File::open(dune_exe_dir.join(exe_name).with_extension(exe_extension))?;
+    let mut f = File::open(exe_path)?;
     let mut buffer = Vec::new();
 
     // Read the whole binary file.
