@@ -50,6 +50,7 @@ dns-lookup = "1.0.8"
 mio = { version = "0.8.4", features = ["os-poll", "net"] }
 clap = { version = "3.2.19", features = ["derive"] }
 tempdir = "0.3.7"
+zstd = "0.11"
 
 [dev-dependencies]
 assert_fs = "1.0.7"

@@ -12,9 +12,10 @@ use std::path::Path;
 const SIGNATURE: &[u8; 8] = b"4tr31d1s";
 
 pub fn run_compile(entry: &str, output: Option<String>, reload: bool) -> Result<()> {
-    // Create a JavaScript bundle.
+    // Create a JavaScript bundle and compress it using the zstd algorithm.
     let bundle = run_bundle(entry, reload, true)?;
-    let bundle_size = bundle.as_bytes().len();
+    let bundle = zstd::bulk::compress(bundle.as_bytes(), 0)?;
+    let bundle_size = bundle.len().to_be_bytes();
 
     let exe_path = std::env::current_exe()?;
     let exe_extension = if cfg!(windows) { "exe" } else { "" };
@@ -26,8 +27,8 @@ pub fn run_compile(entry: &str, output: Option<String>, reload: bool) -> Result<
     // Read the whole binary file.
     f.read_to_end(&mut buffer)?;
 
-    buffer.append(&mut bundle.as_bytes().to_vec());
-    buffer.append(&mut bundle_size.to_be_bytes().to_vec());
+    buffer.append(&mut bundle.to_vec());
+    buffer.append(&mut bundle_size.to_vec());
     buffer.append(&mut SIGNATURE.to_vec());
 
     // Compute the output destination.
@@ -81,6 +82,11 @@ pub fn extract_standalone() -> Result<Option<String>> {
     // Move cursor and read the embedded JavaScript bundle.
     file_reader.seek(SeekFrom::End(-(16 + bundle_size as i64)))?;
     file_reader.read_exact(&mut bundle)?;
+
+    // Note: Since zstd compression has a 3.14 compress ration using a destination
+    // buffer x4 times larger than the original should be fine and not cause
+    // us any problems during the decompression process.
+    let bundle = zstd::bulk::decompress(&bundle, bundle_size * 4)?;
 
     Ok(Some(String::from_utf8(bundle).unwrap()))
 }
