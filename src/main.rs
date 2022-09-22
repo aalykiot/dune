@@ -149,20 +149,15 @@ fn compile_command(entry: String, output: Option<String>, reload: bool) {
     }
 }
 
-fn run_with_zero_arguments(source: Option<String>) {
-    match source {
-        Some(source) => {
-            // Create a new JS runtime.
-            let mut runtime = JsRuntime::new();
-            let mod_result = runtime.execute_module("dune:standalone/main", Some(&source));
+fn run_standalone(source: String) {
+    // Create a new JS runtime.
+    let mut runtime = JsRuntime::new();
+    let mod_result = runtime.execute_module("dune:standalone/main", Some(&source));
 
-            match mod_result {
-                Ok(_) => runtime.run_event_loop(),
-                Err(e) => eprintln!("{:?}", e),
-            };
-        }
-        None => repl::start(JsRuntime::new()),
-    }
+    match mod_result {
+        Ok(_) => runtime.run_event_loop(),
+        Err(e) => eprintln!("{:?}", e),
+    };
 }
 
 /// Custom hook on panics (copied from Deno).
@@ -191,37 +186,42 @@ fn main() {
         setup_panic_hook();
     }
 
-    // If no arguments specified, try run in standalone mode or start REPL.
-    if env::args().count() == 1 {
-        match compile::extract_standalone() {
-            Ok(source) => run_with_zero_arguments(source),
-            Err(e) => eprintln!("{:?}", generic_error(e.to_string())),
+    let standalone = compile::extract_standalone();
+
+    // Check for errors during standalone extraction.
+    if let Err(e) = standalone {
+        eprintln!("{:?}", generic_error(e.to_string()));
+        std::process::exit(1);
+    };
+
+    match standalone.unwrap() {
+        Some(source) => run_standalone(source),
+        None if env::args().count() == 1 => repl::start(JsRuntime::new()),
+        None => {
+            // Use clap to parse the arguments.
+            let cli = Cli::parse();
+
+            match cli.command {
+                Commands::Run {
+                    script,
+                    reload,
+                    seed,
+                    unstable,
+                } => run_command(script, reload, seed, unstable),
+                Commands::Bundle {
+                    entry,
+                    output,
+                    reload,
+                    minify,
+                } => bundle_command(entry, output, reload, minify),
+                Commands::Compile {
+                    entry,
+                    output,
+                    reload,
+                } => compile_command(entry, output, reload),
+                Commands::Upgrade => upgrade_command(),
+                Commands::Repl => repl_command(),
+            }
         }
-        return;
-    }
-
-    // Otherwise, use clap to parse the arguments.
-    let cli = Cli::parse();
-
-    match cli.command {
-        Commands::Run {
-            script,
-            reload,
-            seed,
-            unstable,
-        } => run_command(script, reload, seed, unstable),
-        Commands::Bundle {
-            entry,
-            output,
-            reload,
-            minify,
-        } => bundle_command(entry, output, reload, minify),
-        Commands::Compile {
-            entry,
-            output,
-            reload,
-        } => compile_command(entry, output, reload),
-        Commands::Upgrade => upgrade_command(),
-        Commands::Repl => repl_command(),
-    }
+    };
 }
