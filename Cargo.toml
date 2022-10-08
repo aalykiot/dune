@@ -44,7 +44,7 @@ swc_ecma_transforms_typescript = "0.154.11"
 swc_ecma_visit = "0.77.3"
 swc_bundler = "0.187.11"
 swc_ecma_ast = "0.91.3"
-swc_atoms = "0.4.14"
+swc_atoms = "0.4.18"
 serde = { version = "1.0.142", features = ["derive"] }
 dns-lookup = "1.0.8"
 mio = { version = "0.8.4", features = ["os-poll", "net"] }
