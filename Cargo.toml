@@ -27,7 +27,7 @@ rustyline-derive = "0.7.0"
 lazy_static = "1.4.0"
 sha = "1.0.3"
 nanoid = "0.4.0"
-regex = "1.5.5"
+regex = "1.6.0"
 dirs = "4.0.0"
 path-absolutize = "3.0.12"
 ureq = { version = "2.4.0", features = ["charset"] }
