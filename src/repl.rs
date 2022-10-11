@@ -210,10 +210,15 @@ pub fn start(mut runtime: JsRuntime) {
         println!("Welcome to Dune v{}", env!("CARGO_PKG_VERSION"));
         let prompt = "> ".to_string();
 
+        // Note: In order to wake-up the event-loop (so the main thread can evaluate the JS expression) in
+        // case it's stack in the poll phase waiting for new I/O will call the `handle.interrupt()`
+        // method that sends a wake-up signal across the main thread.
+
         loop {
             match editor.readline(&prompt) {
                 Ok(line) if line == ".exit" => {
                     sender.send(ReplMessage::Terminate).unwrap();
+                    handle.interrupt();
                     break;
                 }
                 Ok(line) => {
@@ -222,19 +227,20 @@ pub fn start(mut runtime: JsRuntime) {
                     // Evaluate current expression.
                     let message = ReplMessage::Evaluate(line.trim_end().into());
                     sender.send(message).unwrap();
+                    handle.interrupt();
                 }
                 Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
                     sender.send(ReplMessage::Terminate).unwrap();
+                    handle.interrupt();
                     break;
                 }
                 Err(e) => {
                     eprintln!("{}", e);
                     sender.send(ReplMessage::Terminate).unwrap();
+                    handle.interrupt();
                     break;
                 }
             }
-            // Interrupt event-loop if it's blocked in the poll phase.
-            handle.interrupt();
         }
         // Save REPL's history.
         fs::create_dir_all(history_file_path.parent().unwrap()).unwrap();
