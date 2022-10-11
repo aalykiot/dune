@@ -40,7 +40,6 @@ pub fn run_upgrade() -> Result<()> {
 
     // Get handles to temp and home directories.
     let temp_dir = TempDir::new("dune_zip_binary")?;
-    let dune_exe_dir = dirs::home_dir().unwrap().join(".dune/bin/");
 
     // Write binary to disk.
     fs::write(temp_dir.path().join(&archive), binary)?;
@@ -71,7 +70,7 @@ pub fn run_upgrade() -> Result<()> {
     }
 
     let next = temp_dir.path().join(exe_name).with_extension(exe_extension);
-    let current = dune_exe_dir.join(exe_name).with_extension(exe_extension);
+    let current = std::env::current_exe()?;
 
     if cfg!(windows) {
         // On windows you cannot replace the currently running executable.

@@ -226,16 +226,9 @@ impl std::ops::DerefMut for ModuleMap {
 pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath> {
     // Look the params and choose a loader.
     let loader: Box<dyn ModuleLoader> = {
-        // Regex to match valid URLs based on VB.NET's URL validation.
-        // http://urlregex.com/
-        lazy_static! {
-            static ref URL_REGEX: Regex =
-                Regex::new(r"(http(s)?://)?([\w-]+\.)+[\w-]+[.com]+(/[/?%&=]*)?").unwrap();
-        }
-
         let is_core_module_import = CORE_MODULES.contains_key(specifier);
-        let is_url_import =
-            URL_REGEX.is_match(specifier) || (base.is_some() && URL_REGEX.is_match(base.unwrap()));
+        let is_url_import = Url::parse(specifier).is_ok();
+        let is_url_import = is_url_import || (base.is_some() && Url::parse(base.unwrap()).is_ok());
 
         match (is_core_module_import, is_url_import) {
             (true, _) => Box::new(CoreModuleLoader),
