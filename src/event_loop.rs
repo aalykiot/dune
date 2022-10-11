@@ -155,9 +155,9 @@ pub struct EventLoop {
     check_queue: Vec<Index>,
     close_queue: Vec<(Index, Option<OnClose>)>,
     thread_pool: ThreadPool,
+    thread_pool_tasks: usize,
     event_dispatcher: Arc<Mutex<mpsc::Sender<Event>>>,
     event_queue: mpsc::Receiver<Event>,
-    pending_tasks: u32,
     network_events: Registry,
     poll: Poll,
     waker: Arc<Waker>,
@@ -191,9 +191,9 @@ impl EventLoop {
             check_queue: Vec::new(),
             close_queue: Vec::new(),
             thread_pool: ThreadPool::new(4),
+            thread_pool_tasks: 0,
             event_dispatcher,
             event_queue,
-            pending_tasks: 0,
             poll,
             network_events: registry,
             waker: Arc::new(waker),
@@ -300,11 +300,12 @@ impl EventLoop {
     fn run_poll(&mut self) {
         // Based on what resources the event-loop is currently running will decide
         // how long we should wait on the this phase.
+        let refs = self.check_queue.len() + self.close_queue.len();
         let timeout = match self.timer_queue.iter().next() {
-            Some(_) if !self.check_queue.is_empty() => Some(Duration::ZERO),
+            Some(_) if refs > 0 => Some(Duration::ZERO),
             Some((t, _)) => Some(*t - Instant::now()),
-            None if self.pending_tasks > 0 => None,
-            None => Some(Duration::ZERO),
+            None if refs > 0 => Some(Duration::ZERO),
+            None => None,
         };
 
         let mut events = Events::with_capacity(1024);
@@ -398,9 +399,8 @@ impl EventLoop {
             let task_wrap = resource.downcast_mut::<TaskWrap>().unwrap();
             let callback = task_wrap.inner.take().unwrap();
             (callback)(self.handle(), result);
-
-            self.pending_tasks -= 1;
         }
+        self.thread_pool_tasks -= 1;
     }
 
     /// Tries to write to a (ready) TCP socket.
@@ -669,7 +669,7 @@ impl EventLoop {
             }
         });
 
-        self.pending_tasks += 1;
+        self.thread_pool_tasks += 1;
     }
 
     /// Registers interest for connecting to a TCP socket.
@@ -773,7 +773,7 @@ impl EventLoop {
     /// Removes a check callback from the event-loop.
     fn check_remove_req(&mut self, index: Index) {
         self.resources.remove(&index);
-        self.timer_queue.retain(|_, v| *v != index);
+        self.check_queue.retain(|v| *v != index);
     }
 }
 

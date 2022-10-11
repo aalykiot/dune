@@ -16,6 +16,9 @@ Cargo.lock
 # Node.js modules
 node_modules/
 
+# VsCode configuration
+.vscode/
+
 # Custom
-/temp
-/.cache
+temp/
+.cache/
