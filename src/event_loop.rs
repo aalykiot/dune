@@ -218,7 +218,7 @@ impl EventLoop {
 
     /// Returns if there are pending events still ongoing.
     pub fn has_pending_events(&self) -> bool {
-        !(self.resources.is_empty() && self.action_queue_empty.get())
+        !(self.resources.is_empty() && self.action_queue_empty.get() && self.thread_pool_tasks == 0)
     }
 
     /// Performs a single tick of the event-loop.
@@ -300,12 +300,15 @@ impl EventLoop {
     fn run_poll(&mut self) {
         // Based on what resources the event-loop is currently running will decide
         // how long we should wait on the this phase.
-        let refs = self.check_queue.len() + self.close_queue.len();
-        let timeout = match self.timer_queue.iter().next() {
-            Some(_) if refs > 0 => Some(Duration::ZERO),
-            Some((t, _)) => Some(*t - Instant::now()),
-            None if refs > 0 => Some(Duration::ZERO),
-            None => None,
+        let timeout = if self.has_pending_events() {
+            let refs = self.check_queue.len() + self.close_queue.len();
+            match self.timer_queue.iter().next() {
+                _ if refs > 0 => Some(Duration::ZERO),
+                Some((t, _)) => Some(*t - Instant::now()),
+                None => None,
+            }
+        } else {
+            Some(Duration::ZERO)
         };
 
         let mut events = Events::with_capacity(1024);
