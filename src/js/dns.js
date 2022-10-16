@@ -8,6 +8,14 @@
 
 const binding = process.binding('dns');
 
+const IP_ADDRESS_V4 = new RegExp(
+  '(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])'
+);
+
+const IP_ADDRESS_V6 = new RegExp(
+  '((([0-9a-fA-F]){1,4})\\:){7}([0-9a-fA-F]){1,4}'
+);
+
 /**
  * Resolves a host name into the first found A (IPv4) or AAAA (IPv6) record.
  *
@@ -18,6 +26,16 @@ export async function lookup(hostname) {
   // Check the data argument type.
   if (!hostname || typeof hostname !== 'string') {
     throw new TypeError(`The "hostname" argument must be of type string.`);
+  }
+
+  // Check if the hostname is already an IPv4 address.
+  if (IP_ADDRESS_V4.test(hostname)) {
+    return [{ family: 'IPv4', address: hostname }];
+  }
+
+  // Check if the hostname is already an IPv6 address.
+  if (IP_ADDRESS_V6.test(hostname)) {
+    return [{ family: 'IPv6', address: hostname }];
   }
 
   return binding.lookup(hostname);
