@@ -175,6 +175,14 @@ EventEmitter.prototype.listenerCount = function listenerCount(event) {
 EventEmitter.prototype.emit = function emit(event, a1, a2, a3, a4, a5) {
   var evt = prefix ? prefix + event : event;
 
+  // If there is no 'error' event listener then throw.
+  if (evt === 'error' && a1 && !this._events[evt]) {
+    if (a1 instanceof Error) {
+      throw a1;
+    }
+    throw new Error(a1);
+  }
+
   if (!this._events[evt]) return false;
 
   var listeners = this._events[evt],
