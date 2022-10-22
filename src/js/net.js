@@ -66,7 +66,7 @@ export function createServer(onConnection) {
 }
 
 /**
- * A Socket object is a wrapper for a raw TCP socket.
+ * A Socket object is a JS wrapper around a low-level TCP socket.
  */
 export class Socket extends EventEmitter {
   #id;
@@ -82,6 +82,7 @@ export class Socket extends EventEmitter {
    */
   constructor() {
     super();
+    this.#connecting = 0;
     this.bytesRead = 0;
     this.bytesWritten = 0;
     this.remotePort = undefined;
@@ -92,12 +93,13 @@ export class Socket extends EventEmitter {
    * Initiates a connection on a given remote host.
    *
    * @param  {...any} args
-   * @returns {Promise<Undefined>}
+   * @returns {Promise<*>}
    */
   async connect(...args) {
     // Parse arguments.
     const [port, hostUnchecked, onConnection] = parseOptionsArgs(args);
-    const hostname = hostUnchecked || '127.0.0.1';
+    const hostname = hostUnchecked || '0.0.0.0';
+    this.#connecting += 1;
 
     // Check the port parameter type.
     if (Number.isNaN(Number.parseInt(port))) {
@@ -117,8 +119,8 @@ export class Socket extends EventEmitter {
     }
 
     // Check if a connection is happening.
-    if (this.#connecting) {
-      this._throw(new Error('Socket is trying to connect.'));
+    if (this.#connecting > 1) {
+      throw new Error('Socket is trying to connect.');
     }
 
     // Subscribe to the emitter, the on-connect callback if specified.
@@ -140,7 +142,7 @@ export class Socket extends EventEmitter {
       const socketInfo = await binding.connect(host, port);
 
       this.#id = socketInfo.id;
-      this.#connecting = false;
+      this.#connecting -= 1;
       this.#writable = true;
       this.#host = socketInfo.host;
       this.remoteAddress = socketInfo.remote.address;
@@ -148,9 +150,10 @@ export class Socket extends EventEmitter {
 
       this.emit('connect', socketInfo);
       binding.readStart(this.#id, this._onSocketRead.bind(this));
+
       return socketInfo;
-    } catch (e) {
-      this._throw(e);
+    } catch (err) {
+      this.emit('error', err);
     }
   }
 
@@ -163,18 +166,11 @@ export class Socket extends EventEmitter {
     return this.#host;
   }
 
-  _throw(err) {
-    // Use event-emitter to throw connection errors (if registered).
-    if (this.listenerCount('error') > 0) {
-      return this.emit('error', err);
-    }
-    throw err;
-  }
-
   _onSocketRead(err, arrayBufferView) {
     // Check for read errors.
     if (err) {
-      this._throw(err);
+      this.emit('error', err);
+      return;
     }
 
     // Check if the remote host closed the connection.
@@ -290,7 +286,7 @@ export class Socket extends EventEmitter {
    */
   _reset() {
     this.#id = undefined;
-    this.#connecting = false;
+    this.#connecting = 0;
     this.#writable = false;
     this.#encoding = undefined;
     this.bytesRead = 0;
@@ -325,10 +321,6 @@ export class Socket extends EventEmitter {
       queue.push(promise);
     });
 
-    this.on('error', (e) => {
-      throw e;
-    });
-
     this.on('end', () => (done = true));
 
     while (!done) {
@@ -343,7 +335,7 @@ export class Socket extends EventEmitter {
 /**
  * A Server object is a wrapper around a TCP listener.
  */
-class Server extends EventEmitter {
+export class Server extends EventEmitter {
   #id;
   #host;
   #connections;
@@ -412,8 +404,8 @@ class Server extends EventEmitter {
 
       // Everything OK, emit the listening event.
       this.emit('listening', this.#host);
-    } catch (e) {
-      this._throw(e);
+    } catch (err) {
+      this.emit('error', err);
     }
   }
 
@@ -457,18 +449,11 @@ class Server extends EventEmitter {
     this.emit('close');
   }
 
-  _throw(err) {
-    // Use event-emitter to throw errors (if registered).
-    if (this.listenerCount('error') > 0) {
-      return this.emit('error', err);
-    }
-    throw err;
-  }
-
   _onNewConnection(err, sockInfo) {
     // Check for socket connection errors.
     if (err) {
-      this._throw(err);
+      this.emit('error', err);
+      return;
     }
 
     // Create a new socket instance.
@@ -502,10 +487,6 @@ class Server extends EventEmitter {
       const promise = makeDeferredPromise();
       idx++;
       queue.push(promise);
-    });
-
-    this.on('error', (e) => {
-      throw e;
     });
 
     this.on('close', () => (done = true));
