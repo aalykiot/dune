@@ -96,7 +96,7 @@ impl JsError {
                 let stack: Option<v8::Local<v8::String>> = stack.and_then(|s| s.try_into().ok());
                 stack.map(|s| s.to_rust_string_lossy(scope))
             })
-            .map(|stack| stack.unwrap())
+            .map(|stack| stack.unwrap_or_default())
             .ok();
 
         JsError {
