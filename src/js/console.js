@@ -8,7 +8,7 @@
 /* eslint-disable no-control-regex */
 
 import { performance } from 'perf_hooks';
-import { green, yellow, cyan, bright_black } from 'colors';
+import { green, yellow, cyan, red, bright_black } from 'colors';
 
 // Returns a string with as many spaces as the parameter specified.
 function pre(amount) {
@@ -200,6 +200,31 @@ function stringifyArrayBuffer(value) {
   return `ArrayBuffer { byteLength: ${stringify(value.byteLength)} }`;
 }
 
+function isPromise(value) {
+  return value instanceof Promise;
+}
+
+function stringifyPromise(value) {
+  // We have to use a Rust binding to inspect the contents of a promise
+  // object because JS doesn't expose that kind of functionality.
+  const binding = process.binding('promise');
+  const { state, value: promiseValue } = binding.peek(value);
+
+  if (state === 'PENDING') {
+    return `Promise { ${cyan('<pending>')} }`;
+  }
+
+  const output = stringify(promiseValue, undefined, 1);
+  const end = `${output.length > 50 ? '\n' : ' '}}`;
+
+  const prefix =
+    state === 'FULFILLED'
+      ? `${output.length > 50 ? '\n  ' : ''}`
+      : `${output.length > 50 ? '\n  ' : ''}${red('<rejected>')} `;
+
+  return 'Promise { ' + prefix + output + end;
+}
+
 /**
  * Specifically stringifies JavaScript objects.
  *
@@ -234,6 +259,10 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
 
   if (isError(value)) {
     return stringifyError(value);
+  }
+
+  if (isPromise(value)) {
+    return stringifyPromise(value);
   }
 
   // It's an object type that console does not support.

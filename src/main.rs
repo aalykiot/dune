@@ -9,6 +9,7 @@ mod modules;
 mod net;
 mod perf_hooks;
 mod process;
+mod promise;
 mod repl;
 mod runtime;
 mod stdio;

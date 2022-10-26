@@ -3,6 +3,7 @@ use crate::file;
 use crate::net;
 use crate::perf_hooks;
 use crate::process;
+use crate::promise;
 use crate::stdio;
 use crate::timers;
 use lazy_static::lazy_static;
@@ -21,6 +22,7 @@ lazy_static! {
             ("perf_hooks", perf_hooks::initialize),
             ("dns", dns::initialize),
             ("net", net::initialize),
+            ("promise", promise::initialize),
         ];
         HashMap::from_iter(bindings.into_iter())
     };
