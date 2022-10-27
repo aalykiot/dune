@@ -15,6 +15,11 @@ function pre(amount) {
   return ' '.repeat(amount);
 }
 
+// Small util for objects that might not have a `.toString` method.
+function objectToString(value) {
+  return Object.prototype.toString.call(value);
+}
+
 /**
  * Stringifies almost all JavaScript built-in types.
  *
@@ -266,8 +271,8 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
   }
 
   // It's an object type that console does not support.
-  if (value.toString() !== '[object Object]') {
-    const type = value.toString().replace('[object ', '').replace(']', '');
+  if (objectToString(value) !== "[object Object]") {
+    const type = objectToString(value).replace("[object ", "").replace("]", "");
     return `${type} {}`;
   }
 
@@ -284,16 +289,20 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
     );
   }
 
+  // Output the class name if the object is a class instance.
+  const className = value?.constructor?.name;
+  const prefix = !className || className === 'Object' ? '' : className + ' ';
+
   // Apply multi-line formatting on long properties.
   if (entries.map((v) => v.trim()).join('').length > 50) {
-    const start = '{\n';
+    const start = `${prefix}{\n`;
     const end = `\n${pre((depth - 1) * 2)}}`;
     return `${start}${entries.join(',\n')}${end}`;
   }
 
   // Inline formatting.
   const entriesPretty = entries.map((v) => v.trim());
-  return entries.length > 0 ? `{ ${entriesPretty.join(', ')} }` : `{}`;
+  return `${prefix}${entries.length > 0 ? `{ ${entriesPretty.join(', ')} }` : `{}`}`;
 }
 
 /**

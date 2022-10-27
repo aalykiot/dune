@@ -22,3 +22,6 @@ node_modules/
 # Custom
 temp/
 .cache/
+
+# NPM
+package-lock.json
