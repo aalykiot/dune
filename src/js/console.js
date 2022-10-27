@@ -58,9 +58,8 @@ function isArray(value) {
 }
 
 function stringifyArray(arr, seen, depth) {
-  // Checks if all the elements in the array have the same type.
-  const firstElementType = typeof arr[0];
-  const isUniform = arr.every((elem) => typeof elem === firstElementType);
+  // Special formatting required if array has only numbers.
+  const hasOnlyNumbers = arr.every((elem) => typeof elem === 'number');
 
   const entries = [];
   for (const elem of arr) {
@@ -71,7 +70,7 @@ function stringifyArray(arr, seen, depth) {
   if (entries.join('').length > 50) {
     const start = '[\n';
     const end = `\n${pre((depth - 1) * 2)}]`;
-    const entriesPretty = prettifyArray(entries, depth, isUniform);
+    const entriesPretty = prettifyArray(entries, depth, hasOnlyNumbers);
     return `${start}${entriesPretty}${end}`;
   }
 
@@ -95,7 +94,7 @@ function isTypedArray(value) {
   }
 }
 
-function prettifyArray(arr, depth = 0, isUniform) {
+function prettifyArray(arr, depth = 0, hasOnlyNumbers) {
   // Remove the color characters so we can calculate the AVG and MAX correctly.
   const uncolored = arr.map(
     (elem) => elem.replace(/\u001b\[[0-9;]*m/g, '').length
@@ -118,7 +117,7 @@ function prettifyArray(arr, depth = 0, isUniform) {
   const alignColumn = (elem, i) => {
     const length = elem.replace(/\u001b\[[0-9;]*m/g, '').length;
     const shift = maxElementsPerRow === 1 ? 0 : maxElementLength - length;
-    if (isUniform) {
+    if (hasOnlyNumbers) {
       return i === arr.length - 1
         ? pre(shift) + elem
         : pre(shift) + elem + ', ';
@@ -271,8 +270,8 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
   }
 
   // It's an object type that console does not support.
-  if (objectToString(value) !== "[object Object]") {
-    const type = objectToString(value).replace("[object ", "").replace("]", "");
+  if (objectToString(value) !== '[object Object]') {
+    const type = objectToString(value).replace('[object ', '').replace(']', '');
     return `${type} {}`;
   }
 
@@ -302,7 +301,9 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
 
   // Inline formatting.
   const entriesPretty = entries.map((v) => v.trim());
-  return `${prefix}${entries.length > 0 ? `{ ${entriesPretty.join(', ')} }` : `{}`}`;
+  const content = entries.length > 0 ? `{ ${entriesPretty.join(', ')} }` : `{}`;
+
+  return `${prefix}${content}`;
 }
 
 /**
