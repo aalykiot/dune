@@ -25,6 +25,9 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
+/// A vector with JS callbacks and parameters.
+type NextTickQueue = Vec<(v8::Global<v8::Function>, Vec<v8::Global<v8::Value>>)>;
+
 /// An abstract interface for something that should run in respond to an
 /// async task, scheduled previously and is now completed.
 pub trait JsFuture {
@@ -45,6 +48,8 @@ pub struct JsRuntimeState {
     pub startup_moment: Instant,
     /// Specifies the timestamp which the current process began in Unix time.
     pub time_origin: u128,
+    /// Holds callbacks scheduled by nextTick.
+    pub next_tick_queue: NextTickQueue,
     /// Holds exceptions from promises with no rejection handler.
     pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
     /// Runtime options.
@@ -106,6 +111,7 @@ impl JsRuntime {
 
         let mut isolate = v8::Isolate::new(v8::CreateParams::default());
 
+        isolate.set_microtasks_policy(v8::MicrotasksPolicy::Explicit);
         isolate.set_capture_stack_trace_for_uncaught_exceptions(true, 10);
         isolate.set_promise_reject_callback(promise_reject_cb);
         isolate.set_host_import_module_dynamically_callback(host_import_module_dynamically_cb);
@@ -135,6 +141,7 @@ impl JsRuntime {
             pending_futures: Vec::new(),
             startup_moment: Instant::now(),
             time_origin,
+            next_tick_queue: Vec::new(),
             promise_exceptions: HashMap::new(),
             options,
         })));
@@ -244,6 +251,9 @@ impl JsRuntime {
 
     /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
+        // Run the default MicrotaskQueue/NextTickQueue until they get empty.
+        run_next_tick_callbacks(&mut self.handle_scope());
+
         while self.event_loop.has_pending_events()
             || self.has_promise_rejections()
             || self.isolate.has_pending_background_tasks()
@@ -272,9 +282,12 @@ impl JsRuntime {
         let futures: Vec<Box<dyn JsFuture>> =
             state_rc.borrow_mut().pending_futures.drain(..).collect();
 
-        // Run all pending js tasks.
-        for mut future in futures {
-            future.run(scope);
+        // NOTE: After every future executes (aka v8's call stack gets empty) we will drain
+        // the MicrotaskQueue and then the NextTickQueue.
+
+        for mut fut in futures {
+            fut.run(scope);
+            run_next_tick_callbacks(scope);
         }
     }
 
@@ -400,4 +413,34 @@ impl JsRuntime {
         let state = state.borrow();
         state.context.clone()
     }
+}
+
+/// Runs callbacks stored in the next-tick queue.
+fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
+    let state_rc = JsRuntime::state(scope);
+    let callbacks: NextTickQueue = state_rc.borrow_mut().next_tick_queue.drain(..).collect();
+
+    let undefined = v8::undefined(scope);
+    let tc_scope = &mut v8::TryCatch::new(scope);
+
+    for (cb, params) in callbacks {
+        // Create a local handle for the callback and its parameters.
+        let cb = v8::Local::new(tc_scope, cb);
+        let args: Vec<v8::Local<v8::Value>> = params
+            .iter()
+            .map(|arg| v8::Local::new(tc_scope, arg))
+            .collect();
+
+        cb.call(tc_scope, undefined.into(), &args);
+
+        // On exception, report it and exit.
+        if tc_scope.has_caught() {
+            let exception = tc_scope.exception().unwrap();
+            let exception = JsError::from_v8_exception(tc_scope, exception, None);
+            println!("{:?}", exception);
+            std::process::exit(1);
+        }
+    }
+
+    tc_scope.perform_microtask_checkpoint();
 }
