@@ -40,6 +40,16 @@ process.kill = (pid, signal = 'SIGKILL') => {
   kill(pid, signal);
 };
 
+const nextTick = cloneFunction(process.nextTick);
+
+process.nextTick = (callback, ...args) => {
+  // Check if callback is a valid function.
+  if (typeof callback !== 'function') {
+    throw new TypeError(`The "callback" argument must be of type function.`);
+  }
+  nextTick(() => callback(...args));
+};
+
 // Setting up STDOUT, STDIN and STDERR streams.
 
 Object.defineProperty(process, 'stdout', {

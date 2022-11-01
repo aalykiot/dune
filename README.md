@@ -82,6 +82,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `exit([code])`: exits the program with the given code.
 - [ ] `getActiveResourcesInfo()`: an array of strings containing the types of the active resources that are currently keeping the event loop alive.
 - [x] `memoryUsage()`: an object describing the memory usage.
+- [x] `nextTick(cb, [...args])`: adds callback to the "next tick queue".
 - [x] `pid`: PID of the process.
 - [x] `platform`: a string identifying the operating system platform.
 - [x] `uptime()`: a number describing the amount of time (in seconds) the process is running.

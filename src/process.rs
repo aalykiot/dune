@@ -65,6 +65,9 @@ pub fn initialize<'s>(
     // `process.memoryUsage()` - an object describing the memory usage.
     set_function_to(scope, process, "memoryUsage", memory_usage);
 
+    // `process.nextTick()` - adds callback to the "next tick queue".
+    set_function_to(scope, process, "nextTick", next_tick);
+
     // `process.pid` - PID of the current process.
     let id = v8::Number::new(scope, std::process::id() as f64);
     set_property_to(scope, process, "pid", id.into());
@@ -147,6 +150,32 @@ fn memory_usage(
     set_property_to(scope, memory_usage, "external", external.into());
 
     rv.set(memory_usage.into());
+}
+
+/// Adds callback to the "next tick queue".
+fn next_tick(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+    // Make a global handle out the the function.
+    let callback = v8::Local::<v8::Function>::try_from(args.get(0)).unwrap();
+    let callback = v8::Global::new(scope, callback);
+
+    // Convert params argument (Array<Local<Value>>) to Rust vector.
+    let params = match v8::Local::<v8::Array>::try_from(args.get(3)) {
+        Ok(params) => {
+            (0..params.length()).fold(Vec::<v8::Global<v8::Value>>::new(), |mut acc, i| {
+                let param = params.get_index(scope, i).unwrap();
+                acc.push(v8::Global::new(scope, param));
+                acc
+            })
+        }
+        Err(_) => vec![],
+    };
+
+    let state_rc = JsRuntime::state(scope);
+
+    state_rc
+        .borrow_mut()
+        .next_tick_queue
+        .push((callback, params));
 }
 
 /// A number describing the amount of time (in seconds) the process is running.
