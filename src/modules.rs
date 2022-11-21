@@ -7,12 +7,15 @@ use crate::loaders::ModuleLoader;
 use crate::loaders::UrlModuleLoader;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
+use anyhow::anyhow;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
+use std::path::Path;
 use url::Url;
 
 lazy_static! {
@@ -315,4 +318,60 @@ pub fn fetch_module_tree<'a>(
     }
 
     Some(module)
+}
+
+/// A single import mapping (specifier, target).
+type ImportMapEntry = (String, String);
+
+/// Key-Value entries representing WICG import-maps.
+#[derive(Debug, Clone)]
+pub struct ImportMap {
+    map: Vec<ImportMapEntry>,
+}
+
+impl ImportMap {
+    /// Creates an ImportMap from JSON text.
+    pub fn parse_from_json(text: &str) -> Result<ImportMap> {
+        // Parse JSON string into serde value.
+        let json: Value = serde_json::from_str(&text)?;
+        let imports = json["imports"].to_owned();
+
+        if imports.is_null() || !imports.is_object() {
+            return Err(anyhow!("Import map's 'imports' must be an object"));
+        }
+
+        let map: HashMap<String, String> = serde_json::from_value(imports)?;
+        let mut map: Vec<ImportMapEntry> = Vec::from_iter(map.into_iter());
+
+        // Note: We're sorting the imports because we need to support "Packages"
+        // via trailing slashes, so the lengthier mapping should always be selected.
+        //
+        // https://github.com/WICG/import-maps#packages-via-trailing-slashes
+
+        map.sort_by(|a, b| b.0.cmp(&a.0));
+
+        Ok(ImportMap { map })
+    }
+
+    /// Tries to match a specifier against an import-map entry.
+    pub fn lookup(&self, specifier: &str) -> Option<String> {
+        // Find a mapping if exists.
+        let (base, target) = match self.map.iter().find(|(k, _)| specifier.starts_with(k)) {
+            Some(mapping) => mapping,
+            None => return None,
+        };
+
+        // Note: The reason we need this additional check below with the specifier's
+        // extension (if exists) is to be able to support extension-less imports.
+        //
+        // https://github.com/WICG/import-maps#extension-less-imports
+
+        match Path::new(specifier).extension() {
+            Some(ext) => match Path::new(specifier) == Path::new(base).with_extension(ext) {
+                true => None,
+                false => Some(specifier.replacen(base, target, 1)),
+            },
+            None => Some(specifier.replacen(base, target, 1)),
+        }
+    }
 }
