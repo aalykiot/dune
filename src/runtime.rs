@@ -14,6 +14,7 @@ use crate::modules::fetch_module_tree;
 use crate::modules::load_import;
 use crate::modules::resolve_import;
 use crate::modules::DynamicImportFuture;
+use crate::modules::ImportMap;
 use crate::modules::ModuleMap;
 use anyhow::bail;
 use anyhow::Error;
@@ -65,6 +66,8 @@ pub struct JsRuntimeOptions {
     pub reload: bool,
     // Enables unstable features and APIs.
     pub unstable: bool,
+    // Holds user defined import maps.
+    pub import_map: Option<ImportMap>,
 }
 
 pub struct JsRuntime {

@@ -227,10 +227,16 @@ impl std::ops::DerefMut for ModuleMap {
 
 /// Resolves an import using the appropriate loader.
 pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath> {
+    // Use import-maps if exists.
+    // let specifier = match import_map {
+    //     Some(map) => map.lookup(specifier).unwrap_or(specifier.into()),
+    //     None => specifier.into(),
+    // };
+
     // Look the params and choose a loader.
     let loader: Box<dyn ModuleLoader> = {
         let is_core_module_import = CORE_MODULES.contains_key(specifier);
-        let is_url_import = Url::parse(specifier).is_ok();
+        let is_url_import = Url::parse(&specifier).is_ok();
         let is_url_import = is_url_import || (base.is_some() && Url::parse(base.unwrap()).is_ok());
 
         match (is_core_module_import, is_url_import) {
@@ -241,7 +247,7 @@ pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath>
     };
 
     // Resolve module.
-    loader.resolve(base, specifier)
+    loader.resolve(base, &specifier)
 }
 
 /// Loads an import using the appropriate loader.

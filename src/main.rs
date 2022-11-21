@@ -18,9 +18,11 @@ mod tools;
 mod typescript;
 
 use crate::errors::generic_error;
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use errors::unwrap_or_exit;
 use modules::resolve_import;
+use modules::ImportMap;
 use runtime::JsRuntime;
 use runtime::JsRuntimeOptions;
 use std::env;
@@ -53,6 +55,8 @@ enum Commands {
         seed: Option<i64>,
         #[clap(long, help = "Enable unstable features and APIs")]
         unstable: bool,
+        #[clap(long, help = " Load import map file from local file")]
+        import_map: Option<String>,
     },
     #[clap(about = "Bundle everything into a single file")]
     Bundle {
@@ -84,7 +88,24 @@ enum Commands {
     Repl,
 }
 
-fn run_command(script: String, reload: bool, seed: Option<i64>, unstable: bool) {
+fn new_import_map(filepath: Option<String>) -> Option<ImportMap> {
+    let filepath = filepath.unwrap_or("import-map.json".into());
+    match fs::read_to_string(filepath) {
+        Ok(contents) => Some(unwrap_or_exit(ImportMap::parse_from_json(&contents))),
+        Err(_) => None,
+    }
+}
+
+fn run_command(
+    script: String,
+    reload: bool,
+    seed: Option<i64>,
+    unstable: bool,
+    import_map: Option<String>,
+) {
+    // First, load import-maps if specified.
+    let import_map = new_import_map(import_map);
+
     // NOTE: The following code tries to resolve the given filename
     // to an absolute path. If the first time fails we will append `./` to
     // it first, and retry the resolution in case the user forgot to specify it.
@@ -96,6 +117,7 @@ fn run_command(script: String, reload: bool, seed: Option<i64>, unstable: bool) 
         seed,
         reload,
         unstable,
+        import_map,
     };
 
     // Create new JS runtime.
@@ -208,7 +230,8 @@ fn main() {
                     reload,
                     seed,
                     unstable,
-                } => run_command(script, reload, seed, unstable),
+                    import_map,
+                } => run_command(script, reload, seed, unstable, import_map),
                 Commands::Bundle {
                     entry,
                     output,
