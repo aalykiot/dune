@@ -64,9 +64,7 @@ pub struct JsRuntimeOptions {
     pub seed: Option<i64>,
     // Reloads every URL import.
     pub reload: bool,
-    // Enables unstable features and APIs.
-    pub unstable: bool,
-    // Holds user defined import maps.
+    // Holds user defined import maps for module loading.
     pub import_map: Option<ImportMap>,
 }
 
@@ -201,15 +199,17 @@ impl JsRuntime {
         filename: &str,
         source: Option<&str>,
     ) -> Result<v8::Global<v8::Value>, Error> {
+        let scope = &mut self.handle_scope();
+        let import_map = JsRuntime::state(scope).borrow().options.import_map.clone();
+
         // The following code allows the runtime to load the core JavaScript
         // environment (lib/main.js) that does not have a valid
         // filename since it's loaded from memory.
         let filename = match source.is_some() {
             true => filename.to_string(),
-            false => unwrap_or_exit(resolve_import(None, filename)),
+            false => unwrap_or_exit(resolve_import(None, filename, import_map)),
         };
 
-        let scope = &mut self.handle_scope();
         let tc_scope = &mut v8::TryCatch::new(scope);
 
         let module = match fetch_module_tree(tc_scope, &filename, source) {

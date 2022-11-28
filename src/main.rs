@@ -18,8 +18,9 @@ mod tools;
 mod typescript;
 
 use crate::errors::generic_error;
-use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::arg;
+use clap::ArgMatches;
+use clap::Command;
 use errors::unwrap_or_exit;
 use modules::resolve_import;
 use modules::ImportMap;
@@ -32,91 +33,33 @@ use tools::bundle;
 use tools::compile;
 use tools::upgrade;
 
-#[derive(Parser)]
-#[clap(
-    name = "dune",
-    about = "A hobby runtime for JavaScript and TypeScript",
-    version
-)]
-struct Cli {
-    #[clap(subcommand)]
-    command: Commands,
-}
+fn run_command(mut args: ArgMatches) {
+    // Extract options from cli arguments.
+    let script = args.remove_one::<String>("SCRIPT").unwrap();
+    let reload = args.remove_one::<bool>("reload").unwrap_or_default();
+    let import_map = args.remove_one::<String>("import-map");
+    let seed = args
+        .remove_one::<String>("seed")
+        .map(|val| val.parse::<i64>().unwrap_or_default());
 
-#[derive(Clone, Subcommand)]
-enum Commands {
-    #[clap(about = "Run a JavaScript or TypeScript program")]
-    Run {
-        #[clap(forbid_empty_values = true, help = "The script that will run")]
-        script: String,
-        #[clap(short, long, help = "Reload every URL import (cache is ignored)")]
-        reload: bool,
-        #[clap(long, help = "Make the Math.random() method predictable")]
-        seed: Option<i64>,
-        #[clap(long, help = "Enable unstable features and APIs")]
-        unstable: bool,
-        #[clap(long, help = " Load import map file from local file")]
-        import_map: Option<String>,
-    },
-    #[clap(about = "Bundle everything into a single file")]
-    Bundle {
-        #[clap(forbid_empty_values = true, help = "The entry point script")]
-        entry: String,
-        #[clap(short, long, help = "The filename of the generated bundle")]
-        output: Option<String>,
-        #[clap(short, long, help = "Reload every URL import (cache is ignored)")]
-        reload: bool,
-        #[clap(long, help = "Minify the generated bundle")]
-        minify: bool,
-    },
-    #[clap(about = "Compile script to standalone executable")]
-    Compile {
-        #[clap(forbid_empty_values = true, help = "The entry point script")]
-        entry: String,
-        #[clap(
-            short,
-            long,
-            help = "The filename of the generated standalone executable"
-        )]
-        output: Option<String>,
-        #[clap(short, long, help = "Reload every URL import (cache is ignored)")]
-        reload: bool,
-    },
-    #[clap(about = "Upgrade to the latest dune version")]
-    Upgrade,
-    #[clap(about = "Start the REPL (read, eval, print, loop)")]
-    Repl,
-}
-
-fn new_import_map(filepath: Option<String>) -> Option<ImportMap> {
-    let filepath = filepath.unwrap_or("import-map.json".into());
-    match fs::read_to_string(filepath) {
+    // Load import-maps if specified.
+    let import_map = import_map.unwrap_or("import-map.json".into());
+    let import_map = match fs::read_to_string(import_map) {
         Ok(contents) => Some(unwrap_or_exit(ImportMap::parse_from_json(&contents))),
         Err(_) => None,
-    }
-}
-
-fn run_command(
-    script: String,
-    reload: bool,
-    seed: Option<i64>,
-    unstable: bool,
-    import_map: Option<String>,
-) {
-    // First, load import-maps if specified.
-    let import_map = new_import_map(import_map);
+    };
 
     // NOTE: The following code tries to resolve the given filename
     // to an absolute path. If the first time fails we will append `./` to
     // it first, and retry the resolution in case the user forgot to specify it.
     let filename = unwrap_or_exit(
-        resolve_import(None, &script).or_else(|_| resolve_import(None, &format!("./{}", script))),
+        resolve_import(None, &script, import_map.clone())
+            .or_else(|_| resolve_import(None, &format!("./{}", script), import_map.clone())),
     );
 
     let options = JsRuntimeOptions {
         seed,
         reload,
-        unstable,
         import_map,
     };
 
@@ -158,14 +101,25 @@ fn output_bundle(source: String, output: Option<String>) {
     };
 }
 
-fn bundle_command(entry: String, output: Option<String>, reload: bool, minify: bool) {
+fn bundle_command(mut args: ArgMatches) {
+    // Extract options from cli arguments.
+    let entry = args.remove_one::<String>("ENTRY").unwrap();
+    let output = args.remove_one::<String>("output");
+    let reload = args.remove_one::<bool>("reload").unwrap_or_default();
+    let minify = args.remove_one::<bool>("minify").unwrap_or_default();
+
     match bundle::run_bundle(&entry, reload, minify) {
         Ok(source) => output_bundle(source, output),
         Err(e) => eprintln!("{:?}", generic_error(e.to_string())),
     }
 }
 
-fn compile_command(entry: String, output: Option<String>, reload: bool) {
+fn compile_command(mut args: ArgMatches) {
+    // Extract options from cli arguments.
+    let entry = args.remove_one::<String>("ENTRY").unwrap();
+    let output = args.remove_one::<String>("output");
+    let reload = args.remove_one::<bool>("reload").unwrap_or_default();
+
     match compile::run_compile(&entry, output, reload) {
         Ok(_) => {}
         Err(e) => eprintln!("{:?}", generic_error(e.to_string())),
@@ -181,6 +135,7 @@ fn run_standalone(source: String) {
         Ok(_) => runtime.run_event_loop(),
         Err(e) => eprintln!("{:?}", e),
     };
+    std::process::exit(0);
 }
 
 /// Custom hook on panics (copied from Deno).
@@ -209,43 +164,58 @@ fn main() {
         setup_panic_hook();
     }
 
-    let standalone = compile::extract_standalone();
-
-    // Check for errors during standalone extraction.
-    if let Err(e) = standalone {
-        eprintln!("{:?}", generic_error(e.to_string()));
-        std::process::exit(1);
-    };
-
-    match standalone.unwrap() {
-        Some(source) => run_standalone(source),
-        None if env::args().count() == 1 => repl::start(JsRuntime::new()),
-        None => {
-            // Use clap to parse the arguments.
-            let cli = Cli::parse();
-
-            match cli.command {
-                Commands::Run {
-                    script,
-                    reload,
-                    seed,
-                    unstable,
-                    import_map,
-                } => run_command(script, reload, seed, unstable, import_map),
-                Commands::Bundle {
-                    entry,
-                    output,
-                    reload,
-                    minify,
-                } => bundle_command(entry, output, reload, minify),
-                Commands::Compile {
-                    entry,
-                    output,
-                    reload,
-                } => compile_command(entry, output, reload),
-                Commands::Upgrade => upgrade_command(),
-                Commands::Repl => repl_command(),
-            }
+    // Try run dune as a compiled standalone program.
+    match compile::extract_standalone() {
+        Ok(Some(source)) => run_standalone(source),
+        Err(e) => {
+            eprintln!("{:?}", generic_error(e.to_string()));
+            std::process::exit(1);
         }
+        _ => {}
     };
+
+    let mut cli = Command::new("dune")
+        .version(env!("CARGO_PKG_VERSION"))
+        .about("A hobby runtime for JavaScript and TypeScript")
+        .subcommand(
+            Command::new("run")
+                .about("Run a JavaScript or TypeScript program")
+                .arg_required_else_help(true)
+                .arg(arg!(<SCRIPT> "The script that will run").required(true))
+                .arg(arg!(-r --reload "Reload every URL import (cache is ignored)"))
+                .arg(arg!(--seed <NUMBER> "Make the Math.random() method predictable"))
+                .arg(arg!(--"import-map" <FILE> "Load import map file from local file")),
+        )
+        .subcommand(
+            Command::new("bundle")
+                .about("Bundle everything into a single file")
+                .arg_required_else_help(true)
+                .arg(arg!(<ENTRY> "The entry point script").required(true))
+                .arg(arg!(-o --output <FILE> "The filename of the generated bundle"))
+                .arg(arg!(-r --reload "Reload every URL import (cache is ignored)"))
+                .arg(arg!(--minify "Minify the generated bundle"))
+                .arg(arg!(--"import-map" <FILE> "Load import map file from local file")),
+        )
+        .subcommand(
+            Command::new("compile")
+                .about("Compile script to standalone executable")
+                .arg_required_else_help(true)
+                .arg(arg!(<ENTRY> "The entry point script").required(true))
+                .arg(arg!(-o --output <FILE> "The filename of the generated standalone executable"))
+                .arg(arg!(-r --reload "Reload every URL import (cache is ignored)"))
+                .arg(arg!(--"import-map" <FILE> "Load import map file from local file")),
+        )
+        .subcommand(Command::new("upgrade").about("Upgrade to the latest dune version"))
+        .subcommand(Command::new("repl").about("Start the REPL (read, eval, print, loop)"))
+        .get_matches();
+
+    let (cmd, args) = cli.remove_subcommand().unwrap_or_default();
+
+    match (cmd.as_str(), args) {
+        ("run", args) => run_command(args),
+        ("bundle", args) => bundle_command(args),
+        ("compile", args) => compile_command(args),
+        ("upgrade", _) => upgrade_command(),
+        _ => repl_command(),
+    }
 }

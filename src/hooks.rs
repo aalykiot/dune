@@ -16,6 +16,7 @@ pub fn module_resolve_cb<'a>(
     let state = JsRuntime::state(scope);
     let state = state.borrow();
 
+    let import_map = state.options.import_map.clone();
     let referrer = v8::Global::new(scope, referrer);
 
     // The following should never fail (that's why we use unwrap) since any errors should
@@ -28,7 +29,7 @@ pub fn module_resolve_cb<'a>(
         .unwrap();
 
     let specifier = specifier.to_rust_string_lossy(scope);
-    let specifier = unwrap_or_exit(resolve_import(Some(&dependant), &specifier));
+    let specifier = unwrap_or_exit(resolve_import(Some(&dependant), &specifier, import_map));
 
     // This call should always give us back the module. Any errors will be caught
     // on the `fetch_module_tree` step.
@@ -93,8 +94,9 @@ fn import_meta_resolve(
 
     let base = args.data().unwrap().to_rust_string_lossy(scope);
     let specifier = args.get(0).to_rust_string_lossy(scope);
+    let import_map = JsRuntime::state(scope).borrow().options.import_map.clone();
 
-    match resolve_import(Some(&base), &specifier) {
+    match resolve_import(Some(&base), &specifier, import_map) {
         Ok(path) => rv.set(v8::String::new(scope, &path).unwrap().into()),
         Err(e) => throw_type_error(scope, &e.to_string()),
     };

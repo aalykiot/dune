@@ -103,9 +103,9 @@ impl ModuleMap {
         specifier: &str,
         promise: v8::Global<v8::PromiseResolver>,
     ) {
-        // Try to resolve the import.
+        let import_map = JsRuntime::state(scope).borrow().options.import_map.clone();
         let specifier = match base {
-            Some(base) => match resolve_import(Some(base), specifier) {
+            Some(base) => match resolve_import(Some(base), specifier, import_map) {
                 Ok(specifier) => specifier,
                 Err(e) => {
                     let exception = v8::String::new(scope, &e.to_string()).unwrap();
@@ -226,16 +226,20 @@ impl std::ops::DerefMut for ModuleMap {
 }
 
 /// Resolves an import using the appropriate loader.
-pub fn resolve_import(base: Option<&str>, specifier: &str) -> Result<ModulePath> {
-    // Use import-maps if exists.
-    // let specifier = match import_map {
-    //     Some(map) => map.lookup(specifier).unwrap_or(specifier.into()),
-    //     None => specifier.into(),
-    // };
+pub fn resolve_import(
+    base: Option<&str>,
+    specifier: &str,
+    import_map: Option<ImportMap>,
+) -> Result<ModulePath> {
+    // Use import-maps if available.
+    let specifier = match import_map {
+        Some(map) => map.lookup(specifier).unwrap_or(specifier.into()),
+        None => specifier.into(),
+    };
 
     // Look the params and choose a loader.
     let loader: Box<dyn ModuleLoader> = {
-        let is_core_module_import = CORE_MODULES.contains_key(specifier);
+        let is_core_module_import = CORE_MODULES.contains_key(specifier.as_str());
         let is_url_import = Url::parse(&specifier).is_ok();
         let is_url_import = is_url_import || (base.is_some() && Url::parse(base.unwrap()).is_ok());
 
@@ -300,6 +304,8 @@ pub fn fetch_module_tree<'a>(
         None => return None,
     };
 
+    let import_map = state.borrow().options.import_map.clone();
+
     // Add ES module to map.
     state
         .borrow_mut()
@@ -315,7 +321,11 @@ pub fn fetch_module_tree<'a>(
 
         // Transform v8's ModuleRequest into Rust string.
         let specifier = request.get_specifier().to_rust_string_lossy(scope);
-        let specifier = unwrap_or_exit(resolve_import(Some(filename), &specifier));
+        let specifier = unwrap_or_exit(resolve_import(
+            Some(filename),
+            &specifier,
+            import_map.clone(),
+        ));
 
         // Resolve subtree of modules.
         if !state.borrow().modules.contains_key(&specifier) {
