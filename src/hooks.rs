@@ -19,17 +19,14 @@ pub fn module_resolve_cb<'a>(
     let import_map = state.options.import_map.clone();
     let referrer = v8::Global::new(scope, referrer);
 
-    // The following should never fail (that's why we use unwrap) since any errors should
-    // have been caught at the `fetch_module_tree` step.
     let dependant = state
         .modules
         .iter()
         .find(|(_, module)| **module == referrer)
-        .map(|(path, _)| path.clone())
-        .unwrap();
+        .map(|(path, _)| path.clone());
 
     let specifier = specifier.to_rust_string_lossy(scope);
-    let specifier = unwrap_or_exit(resolve_import(Some(&dependant), &specifier, import_map));
+    let specifier = unwrap_or_exit(resolve_import(dependant.as_deref(), &specifier, import_map));
 
     // This call should always give us back the module. Any errors will be caught
     // on the `fetch_module_tree` step.
@@ -92,7 +89,7 @@ fn import_meta_resolve(
         return;
     }
 
-    let base = args.data().unwrap().to_rust_string_lossy(scope);
+    let base = args.data().to_rust_string_lossy(scope);
     let specifier = args.get(0).to_rust_string_lossy(scope);
     let import_map = JsRuntime::state(scope).borrow().options.import_map.clone();
 
@@ -138,17 +135,14 @@ pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
 }
 
 /// Called when we require the embedder to load a module.
-/// https://docs.rs/v8/0.49.0/v8/type.HostImportModuleDynamicallyCallback.html
-pub extern "C" fn host_import_module_dynamically_cb(
-    context: v8::Local<v8::Context>,
-    _: v8::Local<v8::Data>,
-    base: v8::Local<v8::Value>,
-    specifier: v8::Local<v8::String>,
+/// https://docs.rs/v8/0.56.1/v8/trait.HostImportModuleDynamicallyCallback.html
+pub fn host_import_module_dynamically_cb<'s>(
+    scope: &mut v8::HandleScope<'s>,
+    _: v8::Local<'s, v8::Data>,
+    base: v8::Local<'s, v8::Value>,
+    specifier: v8::Local<'s, v8::String>,
     _: v8::Local<v8::FixedArray>,
-) -> *mut v8::Promise {
-    // SAFETY: `CallbackScope` can be safely constructed from `Local<Context>`
-    let scope = &mut unsafe { v8::CallbackScope::new(context) };
-
+) -> Option<v8::Local<'s, v8::Promise>> {
     // Get module base and specifier as strings.
     let base = base.to_rust_string_lossy(scope);
     let specifier = specifier.to_rust_string_lossy(scope);
@@ -159,14 +153,16 @@ pub extern "C" fn host_import_module_dynamically_cb(
 
     let global_promise = v8::Global::new(scope, promise_resolver);
     let state_rc = JsRuntime::state(scope);
+    let import_map = state_rc.borrow().options.import_map.clone();
 
     // Register a new dynamic import.
     state_rc.borrow_mut().modules.new_dynamic_import(
         scope,
         Some(&base),
         &specifier,
+        import_map,
         global_promise,
     );
 
-    &*promise as *const _ as *mut _
+    Some(promise)
 }

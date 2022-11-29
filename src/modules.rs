@@ -101,20 +101,17 @@ impl ModuleMap {
         scope: &mut v8::HandleScope<'s>,
         base: Option<&str>,
         specifier: &str,
+        import_map: Option<ImportMap>,
         promise: v8::Global<v8::PromiseResolver>,
     ) {
-        let import_map = JsRuntime::state(scope).borrow().options.import_map.clone();
-        let specifier = match base {
-            Some(base) => match resolve_import(Some(base), specifier, import_map) {
-                Ok(specifier) => specifier,
-                Err(e) => {
-                    let exception = v8::String::new(scope, &e.to_string()).unwrap();
-                    let exception = v8::Exception::error(scope, exception);
-                    promise.open(scope).reject(scope, exception);
-                    return;
-                }
-            },
-            None => specifier.into(),
+        let specifier = match resolve_import(base, specifier, import_map) {
+            Ok(specifier) => specifier,
+            Err(e) => {
+                let exception = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, exception);
+                promise.open(scope).reject(scope, exception);
+                return;
+            }
         };
 
         // Check if we have the requested module to our cache.
@@ -154,20 +151,16 @@ impl JsFuture for DynamicImportFuture {
             return;
         }
 
-        // Create module's origin.
-        let origin = create_origin(scope, &self.specifier, true);
-
         // Otherwise, get the result and deserialize it.
         let source = result.unwrap();
         let source: String = bincode::deserialize(&source).unwrap();
-        let source = v8::String::new(scope, &source).unwrap();
-        let source = v8::script_compiler::Source::new(source, Some(&origin));
 
         // Create a try-catch scope.
         let tc_scope = &mut v8::TryCatch::new(scope);
 
-        // Compile source to a v8 module.
-        let module = match v8::script_compiler::compile_module(tc_scope, source) {
+        // Compile source and resolve dependencies.
+        // TODO(aalykiot): Make the dependency resolution async.
+        let module = match fetch_module_tree(tc_scope, &self.specifier, Some(&source)) {
             Some(module) => module,
             None => {
                 let exception = tc_scope.exception().unwrap();
@@ -176,7 +169,7 @@ impl JsFuture for DynamicImportFuture {
             }
         };
 
-        // Instantiate ES module.
+        // Instantiate ES module (also resolves module's dependencies).
         if module
             .instantiate_module(tc_scope, module_resolve_cb)
             .is_none()
@@ -195,14 +188,6 @@ impl JsFuture for DynamicImportFuture {
             self.promise.open(tc_scope).reject(tc_scope, exception);
             return;
         }
-
-        // Update the ES modules map (for future requests).
-        let state_rc = JsRuntime::state(tc_scope);
-        let mut state = state_rc.borrow_mut();
-
-        state
-            .modules
-            .new_es_module(tc_scope, &self.specifier, module);
 
         // Note: Since this is a dynamic import will resolve the promise
         // with the module's namespace object instead of it's evaluation result.

@@ -89,7 +89,7 @@ impl JsRuntime {
             " --harmony-import-assertions",
             " --turbo_fast_api_calls",
             " --no-validate-asm",
-            " --noexperimental-async-stack-tagging-api"
+            " --harmony-change-array-by-copy"
         );
 
         if options.seed.is_some() {
@@ -351,7 +351,7 @@ impl JsRuntime {
                 // (will use the cache to resolve the import later).
                 state
                     .modules
-                    .new_dynamic_import(scope, None, &specifier, promise);
+                    .new_dynamic_import(scope, None, &specifier, None, promise);
 
                 continue;
             }
