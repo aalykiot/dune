@@ -151,18 +151,26 @@ pub fn host_import_module_dynamically_cb<'s>(
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
     let promise = promise_resolver.get_promise(scope);
 
-    let global_promise = v8::Global::new(scope, promise_resolver);
     let state_rc = JsRuntime::state(scope);
     let import_map = state_rc.borrow().options.import_map.clone();
 
+    let specifier = match resolve_import(Some(&base), &specifier, import_map) {
+        Ok(specifier) => specifier,
+        Err(e) => {
+            let exception = v8::String::new(scope, &e.to_string()[18..]).unwrap();
+            let exception = v8::Exception::error(scope, exception);
+            promise_resolver.reject(scope, exception.into());
+            return Some(promise);
+        }
+    };
+
+    let global_promise = v8::Global::new(scope, promise_resolver);
+
     // Register a new dynamic import.
-    state_rc.borrow_mut().modules.new_dynamic_import(
-        scope,
-        Some(&base),
-        &specifier,
-        import_map,
-        global_promise,
-    );
+    state_rc
+        .borrow_mut()
+        .modules
+        .new_dynamic_import(scope, &specifier, global_promise);
 
     Some(promise)
 }

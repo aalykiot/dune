@@ -99,30 +99,18 @@ impl ModuleMap {
     pub fn new_dynamic_import<'s>(
         &mut self,
         scope: &mut v8::HandleScope<'s>,
-        base: Option<&str>,
         specifier: &str,
-        import_map: Option<ImportMap>,
         promise: v8::Global<v8::PromiseResolver>,
     ) {
-        let specifier = match resolve_import(base, specifier, import_map) {
-            Ok(specifier) => specifier,
-            Err(e) => {
-                let exception = v8::String::new(scope, &e.to_string()).unwrap();
-                let exception = v8::Exception::error(scope, exception);
-                promise.open(scope).reject(scope, exception);
-                return;
-            }
-        };
-
         // Check if we have the requested module to our cache.
-        if let Some(module) = self.modules.get(&specifier) {
+        if let Some(module) = self.modules.get(specifier) {
             let module = v8::Local::new(scope, module);
             let namespace = module.get_module_namespace();
             promise.open(scope).resolve(scope, namespace);
             return;
         }
 
-        self.dynamic_imports.push((specifier.clone(), promise));
+        self.dynamic_imports.push((specifier.to_string(), promise));
     }
 
     /// Returns the main module.

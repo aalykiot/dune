@@ -349,9 +349,7 @@ impl JsRuntime {
             if state.modules.dynamic_imports_seen.contains(&specifier) {
                 // Reschedule since another import with the same specifier is pending
                 // (will use the cache to resolve the import later).
-                state
-                    .modules
-                    .new_dynamic_import(scope, None, &specifier, None, promise);
+                state.modules.new_dynamic_import(scope, &specifier, promise);
 
                 continue;
             }
