@@ -1,5 +1,6 @@
 use crate::modules::load_import;
 use crate::modules::resolve_import;
+use crate::modules::ImportMap;
 use crate::modules::CORE_MODULES;
 use anyhow::Error;
 use anyhow::Result;
@@ -28,7 +29,14 @@ use swc_ecma_parser::parse_file_as_module;
 use swc_ecma_parser::EsConfig;
 use swc_ecma_parser::Syntax;
 
-pub fn run_bundle(entry: &str, skip_cache: bool, minify: bool) -> Result<String> {
+#[derive(Debug, Default, Clone)]
+pub struct Options {
+    pub skip_cache: bool,
+    pub minify: bool,
+    pub import_map: Option<ImportMap>,
+}
+
+pub fn run_bundle(entry: &str, options: &Options) -> Result<String> {
     // Create SWC globals and an LRC sourcemap.
     let globals = Globals::default();
     let cm = Lrc::new(SourceMap::new(FilePathMapping::empty()));
@@ -43,9 +51,9 @@ pub fn run_bundle(entry: &str, skip_cache: bool, minify: bool) -> Result<String>
         cm.clone(),
         Loader {
             cm: cm.clone(),
-            skip_cache,
+            options,
         },
-        Resolver,
+        Resolver { options },
         Config {
             external_modules,
             require: false,
@@ -70,7 +78,7 @@ pub fn run_bundle(entry: &str, skip_cache: bool, minify: bool) -> Result<String>
     {
         let mut emitter = Emitter {
             cfg: swc_ecma_codegen::Config {
-                minify,
+                minify: options.minify,
                 ..Default::default()
             },
             cm: cm.clone(),
@@ -84,7 +92,7 @@ pub fn run_bundle(entry: &str, skip_cache: bool, minify: bool) -> Result<String>
     // Build source from bytes.
     let mut source = String::from_utf8(buf).unwrap();
 
-    if !minify {
+    if !options.minify {
         // Decorate output with the following messages.
         let messages = vec![
             format!("// Dune v{}\n", env!("CARGO_PKG_VERSION")),
@@ -98,12 +106,12 @@ pub fn run_bundle(entry: &str, skip_cache: bool, minify: bool) -> Result<String>
     Ok(source)
 }
 
-struct Loader {
+struct Loader<'s> {
     cm: Lrc<SourceMap>,
-    skip_cache: bool,
+    options: &'s Options,
 }
 
-impl Load for Loader {
+impl<'s> Load for Loader<'s> {
     fn load(&self, file: &FileName) -> Result<ModuleData, Error> {
         // We only dealing with `Real` filenames.
         let specifier = match file {
@@ -112,7 +120,7 @@ impl Load for Loader {
         };
 
         // Try load the module's source-code.
-        let source = load_import(&specifier, self.skip_cache)?;
+        let source = load_import(&specifier, self.options.skip_cache)?;
         let path = FileName::Real(specifier.into());
         let fm = self.cm.new_source_file(path, source);
 
@@ -141,9 +149,11 @@ impl Load for Loader {
     }
 }
 
-struct Resolver;
+struct Resolver<'a> {
+    options: &'a Options,
+}
 
-impl Resolve for Resolver {
+impl<'a> Resolve for Resolver<'a> {
     fn resolve(&self, base: &FileName, specifier: &str) -> Result<FileName, Error> {
         // We only dealing with `Real` filenames.
         let base = match base {
@@ -153,7 +163,12 @@ impl Resolve for Resolver {
 
         // Try resolve the specifier.
         Ok(FileName::Real(
-            Path::new(&resolve_import(base, specifier, None)?).to_path_buf(),
+            Path::new(&resolve_import(
+                base,
+                specifier,
+                self.options.import_map.clone(),
+            )?)
+            .to_path_buf(),
         ))
     }
 }

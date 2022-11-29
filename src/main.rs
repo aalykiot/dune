@@ -105,10 +105,24 @@ fn bundle_command(mut args: ArgMatches) {
     // Extract options from cli arguments.
     let entry = args.remove_one::<String>("ENTRY").unwrap();
     let output = args.remove_one::<String>("output");
-    let reload = args.remove_one::<bool>("reload").unwrap_or_default();
+    let skip_cache = args.remove_one::<bool>("reload").unwrap_or_default();
     let minify = args.remove_one::<bool>("minify").unwrap_or_default();
+    let import_map = args.remove_one::<String>("import-map");
 
-    match bundle::run_bundle(&entry, reload, minify) {
+    // Load import-maps if specified.
+    let import_map = import_map.unwrap_or("import-map.json".into());
+    let import_map = match fs::read_to_string(import_map) {
+        Ok(contents) => Some(unwrap_or_exit(ImportMap::parse_from_json(&contents))),
+        Err(_) => None,
+    };
+
+    let options = bundle::Options {
+        skip_cache,
+        minify,
+        import_map,
+    };
+
+    match bundle::run_bundle(&entry, &options) {
         Ok(source) => output_bundle(source, output),
         Err(e) => eprintln!("{:?}", generic_error(e.to_string())),
     }
@@ -118,9 +132,23 @@ fn compile_command(mut args: ArgMatches) {
     // Extract options from cli arguments.
     let entry = args.remove_one::<String>("ENTRY").unwrap();
     let output = args.remove_one::<String>("output");
-    let reload = args.remove_one::<bool>("reload").unwrap_or_default();
+    let skip_cache = args.remove_one::<bool>("reload").unwrap_or_default();
+    let import_map = args.remove_one::<String>("import-map");
 
-    match compile::run_compile(&entry, output, reload) {
+    // Load import-maps if specified.
+    let import_map = import_map.unwrap_or("import-map.json".into());
+    let import_map = match fs::read_to_string(import_map) {
+        Ok(contents) => Some(unwrap_or_exit(ImportMap::parse_from_json(&contents))),
+        Err(_) => None,
+    };
+
+    let options = compile::Options {
+        skip_cache,
+        minify: true,
+        import_map,
+    };
+
+    match compile::run_compile(&entry, output, &options) {
         Ok(_) => {}
         Err(e) => eprintln!("{:?}", generic_error(e.to_string())),
     }

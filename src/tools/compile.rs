@@ -1,3 +1,4 @@
+use crate::bundle;
 use crate::bundle::run_bundle;
 use anyhow::Result;
 use std::convert::TryInto;
@@ -11,9 +12,11 @@ use std::path::Path;
 
 const SIGNATURE: &[u8; 8] = b"4tr31d1s";
 
-pub fn run_compile(entry: &str, output: Option<String>, reload: bool) -> Result<()> {
+pub type Options = bundle::Options;
+
+pub fn run_compile(entry: &str, output: Option<String>, options: &Options) -> Result<()> {
     // Create a JavaScript bundle and compress it using the zstd algorithm.
-    let bundle = run_bundle(entry, reload, true)?;
+    let bundle = run_bundle(entry, options)?;
     let bundle = zstd::bulk::compress(bundle.as_bytes(), 0)?;
     let bundle_size = bundle.len().to_be_bytes();
 
