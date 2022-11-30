@@ -14,6 +14,7 @@ use crate::modules::fetch_module_tree;
 use crate::modules::load_import;
 use crate::modules::resolve_import;
 use crate::modules::DynamicImportFuture;
+use crate::modules::ImportMap;
 use crate::modules::ModuleMap;
 use anyhow::bail;
 use anyhow::Error;
@@ -63,8 +64,8 @@ pub struct JsRuntimeOptions {
     pub seed: Option<i64>,
     // Reloads every URL import.
     pub reload: bool,
-    // Enables unstable features and APIs.
-    pub unstable: bool,
+    // Holds user defined import maps for module loading.
+    pub import_map: Option<ImportMap>,
 }
 
 pub struct JsRuntime {
@@ -88,7 +89,7 @@ impl JsRuntime {
             " --harmony-import-assertions",
             " --turbo_fast_api_calls",
             " --no-validate-asm",
-            " --noexperimental-async-stack-tagging-api"
+            " --harmony-change-array-by-copy"
         );
 
         if options.seed.is_some() {
@@ -198,15 +199,17 @@ impl JsRuntime {
         filename: &str,
         source: Option<&str>,
     ) -> Result<v8::Global<v8::Value>, Error> {
+        let scope = &mut self.handle_scope();
+        let import_map = JsRuntime::state(scope).borrow().options.import_map.clone();
+
         // The following code allows the runtime to load the core JavaScript
         // environment (lib/main.js) that does not have a valid
         // filename since it's loaded from memory.
         let filename = match source.is_some() {
             true => filename.to_string(),
-            false => unwrap_or_exit(resolve_import(None, filename)),
+            false => unwrap_or_exit(resolve_import(None, filename, import_map)),
         };
 
-        let scope = &mut self.handle_scope();
         let tc_scope = &mut v8::TryCatch::new(scope);
 
         let module = match fetch_module_tree(tc_scope, &filename, source) {
@@ -346,9 +349,7 @@ impl JsRuntime {
             if state.modules.dynamic_imports_seen.contains(&specifier) {
                 // Reschedule since another import with the same specifier is pending
                 // (will use the cache to resolve the import later).
-                state
-                    .modules
-                    .new_dynamic_import(scope, None, &specifier, promise);
+                state.modules.new_dynamic_import(scope, &specifier, promise);
 
                 continue;
             }

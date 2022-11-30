@@ -61,64 +61,70 @@ server.listen(3000, '127.0.0.1', () => {
 
 For more examples look at the <a href="./examples">examples</a> directory.
 
-## Target API
+## Available APIs
 
 ### Globals
 
-- [x] `global`: reference to the global object.
-- [x] `globalThis`: same as `global`.
-- [x] `console`: a subset of the WHATWG console.
-- [x] `prompt`: shows the given message and waits for the user's input.
+- [x] `global`: Reference to the global object.
+- [x] `globalThis`: Same as `global`.
+- [x] `console`: A subset of the WHATWG console.
+- [x] `prompt`: Shows the given message and waits for the user's input.
 - [x] `TextEncoder` / `TextDecoder`: WHATWG encoding API.
 - [x] `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: DOM style timers.
-- [x] `setImmediate` / `clearImmediate`: node.js like immediate timers.
-- [x] `process`: an object that provides info about the current dune process.
+- [x] `setImmediate` / `clearImmediate`: Node.js like immediate timers.
+- [x] `process`: An object that provides info about the current dune process.
+
+### Module Metadata
+
+- [x] `import.meta.url`: A string representation of the fully qualified module URL.
+- [x] `import.meta.main`: A flag that indicates if the current module is the main module.
+- [x] `import.meta.resolve(specifier)`: A function that returns resolved specifier.
 
 ### Process
 
-- [x] `argv`: an array containing the command-line arguments passed when the dune process was launched.
-- [x] `cwd()`: current working directory.
-- [x] `env`: an object containing the user environment.
-- [x] `exit([code])`: exits the program with the given code.
-- [ ] `getActiveResourcesInfo()`: an array of strings containing the types of the active resources that are currently keeping the event loop alive.
-- [x] `memoryUsage()`: an object describing the memory usage.
-- [x] `nextTick(cb, [...args])`: adds callback to the "next tick queue".
+- [x] `argv`: An array containing the command-line arguments passed when the dune process was launched.
+- [x] `cwd()`: Current working directory.
+- [x] `env`: An object containing the user environment.
+- [x] `exit([code])`: Exits the program with the given code.
+- [ ] `getActiveResourcesInfo()`: An array of strings containing the types of the active resources that are currently keeping the event loop alive.
+- [x] `memoryUsage()`: An object describing the memory usage.
+- [x] `nextTick(cb, [...args])`: Adds callback to the "next tick queue".
 - [x] `pid`: PID of the process.
-- [x] `platform`: a string identifying the operating system platform.
-- [x] `uptime()`: a number describing the amount of time (in seconds) the process is running.
-- [x] `version`: the dune version.
-- [x] `versions`: an object listing the version strings of dune and its dependencies.
-- [x] `binding(module)`: exposes modules with bindings to Rust.
-- [x] `kill(pid, [signal])`: sends the signal to the process identified by pid.
-- [x] `stdout`: points to system's `stdout` stream.
-- [x] `stdin`: points to system's `stdin` stream.
-- [x] `stderr`: points to system's `stderr` stream.
+- [x] `platform`: A string identifying the operating system platform.
+- [x] `uptime()`: A number describing the amount of time (in seconds) the process is running.
+- [x] `version`: The dune version.
+- [x] `versions`: An object listing the version strings of dune and its dependencies.
+- [x] `binding(module)`: Exposes modules with bindings to Rust.
+- [x] `kill(pid, [signal])`: Sends the signal to the process identified by pid.
+- [x] `stdout`: Points to system's `stdout` stream.
+- [x] `stdin`: Points to system's `stdin` stream.
+- [x] `stderr`: Points to system's `stderr` stream.
 
 ### File System
 
 > This module should also include a `Sync` method for every async operation available.
 
-- [x] `copyFile(src, dest)`: copies `src` to `dest`.
-- [ ] `createReadStream(path, [options])`: creates a readable IO stream. 🚧
-- [ ] `createWriteStream(path, [options])`: creates a writable IO stream. 🚧
-- [x] `open(path, [mode])`: asynchronous file open.
-- [x] `mkdir(path, [options])`: creates a directory.
-- [x] `readFile(path, [options])`: reads the entire contents of a file.
-- [x] `rmdir(path, [options])`: deletes a directory (must be empty).
-- [x] `readdir(path)`: reads the contents of a directory.
-- [x] `rm(path, [options])`: removes files and directories.
-- [x] `stat(path)`: retrieves statistics for the file.
-- [x] `writeFile(String|Uint8Array , data, [options])`: writes data to the file, replacing the file if it already exists.
+- [x] `copyFile(src, dest)`: Copies `src` to `dest`.
+- [ ] `createReadStream(path, [options])`: Creates a readable IO stream. 🚧
+- [ ] `createWriteStream(path, [options])`: Creates a writable IO stream. 🚧
+- [x] `open(path, [mode])`: Asynchronous file open.
+- [x] `mkdir(path, [options])`: Creates a directory.
+- [x] `readFile(path, [options])`: Reads the entire contents of a file.
+- [x] `rmdir(path, [options])`: Deletes a directory (must be empty).
+- [x] `readdir(path)`: Reads the contents of a directory.
+- [x] `rm(path, [options])`: Removes files and directories.
+- [x] `stat(path)`: Retrieves statistics for the file.
+- [x] `writeFile(String|Uint8Array , data, [options])`: Writes data to the file, replacing the file if it already exists.
 
 ### File
 
-- [x] `fd`: the numeric file descriptor.
-- [x] `close()`: closes the file.
-- [ ] `createReadStream()`: creates a readable IO stream. 🚧
-- [ ] `createWriteStream()`: creates a writable IO stream. 🚧
-- [x] `read([size, [offset]])`: reads data from the file.
-- [x] `stat()`: retrieves statistics for the file.
-- [x] `write(String|Uint8Array, [offset])`: writes data to the file.
+- [x] `fd`: The numeric file descriptor.
+- [x] `close()`: Closes the file.
+- [ ] `createReadStream()`: Creates a readable IO stream. 🚧
+- [ ] `createWriteStream()`: Creates a writable IO stream. 🚧
+- [x] `read([size, [offset]])`: Reads data from the file.
+- [x] `stat()`: Retrieves statistics for the file.
+- [x] `write(String|Uint8Array, [offset])`: Writes data to the file.
 
 ### Net
 
@@ -160,36 +166,36 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 ### Performance Measurement
 
-- [x] `timeOrigin`: specifies the millisecond timestamp at which the current process began.
-- [x] `now()`: returns the millisecond timestamp, where 0 represents the start of the current process.
+- [x] `timeOrigin`: Specifies the millisecond timestamp at which the current process began.
+- [x] `now()`: Returns the millisecond timestamp, where 0 represents the start of the current process.
 
 ### Assert
 
 > The assertion API is copied from: https://assert-js.norbert.tech/
 
-- [x] `true(value)`: asserts that value is equal to true.
-- [x] `false(value)`: asserts that value is equal to false.
-- [x] `instanceOf(value, class)`: asserts that value is an instance of specific class.
-- [x] `integer(value)`: asserts that value is valid integer.
-- [x] `number(value)`: asserts that value is valid number (integer, float).
-- [x] `oddNumber(value)`: asserts that value is odd number.
-- [x] `evenNumber(value)`: asserts that value is event number.
-- [x] `greaterThan(value, limit)`: asserts that number is greater than.
-- [x] `greaterThanOrEqual(value, limit)`: asserts that number is greater than or equal.
-- [x] `lessThan(value, limit)`: asserts that number is less than.
-- [x] `lessThanOrEqual(value, limit)`: asserts that number is less than or equal.
-- [x] `string(value)`: asserts that value is valid string.
-- [x] `boolean(value)`: asserts that value is valid boolean.
-- [x] `equal(actual, expected)`: asserts that value is equal to expected value.
-- [x] `objectEqual(actual, expected)`: asserts that value is equal to expected value.
-- [x] `object(value)`: asserts that value is valid object.
-- [x] `hasFunction(name, object)`: asserts that object has function.
-- [x] `hasProperty(name, object)`: asserts that object has property.
-- [x] `isFunction(fn)`: asserts that value is valid function.
-- [x] `array(value)`: asserts that value is valid array.
-- [x] `count(expected, arrayValue)`: asserts that array have specific number of elements.
-- [x] `notEmpty(arrayValue)`: asserts that array is not empty.
-- [x] `throws(fn, error)`: asserts that function throws expected exception.
+- [x] `true(value)`: Asserts that value is equal to true.
+- [x] `false(value)`: Asserts that value is equal to false.
+- [x] `instanceOf(value, class)`: Asserts that value is an instance of specific class.
+- [x] `integer(value)`: Asserts that value is valid integer.
+- [x] `number(value)`: Asserts that value is valid number (integer, float).
+- [x] `oddNumber(value)`: Asserts that value is odd number.
+- [x] `evenNumber(value)`: Asserts that value is event number.
+- [x] `greaterThan(value, limit)`: Asserts that number is greater than.
+- [x] `greaterThanOrEqual(value, limit)`: Asserts that number is greater than or equal.
+- [x] `lessThan(value, limit)`: Asserts that number is less than.
+- [x] `lessThanOrEqual(value, limit)`: Asserts that number is less than or equal.
+- [x] `string(value)`: Asserts that value is valid string.
+- [x] `boolean(value)`: Asserts that value is valid boolean.
+- [x] `equal(actual, expected)`: Asserts that value is equal to expected value.
+- [x] `objectEqual(actual, expected)`: Asserts that value is equal to expected value.
+- [x] `object(value)`: Asserts that value is valid object.
+- [x] `hasFunction(name, object)`: Asserts that object has function.
+- [x] `hasProperty(name, object)`: Asserts that object has property.
+- [x] `isFunction(fn)`: Asserts that value is valid function.
+- [x] `array(value)`: Asserts that value is valid array.
+- [x] `count(expected, arrayValue)`: Asserts that array have specific number of elements.
+- [x] `notEmpty(arrayValue)`: Asserts that array is not empty.
+- [x] `throws(fn, error)`: Asserts that function throws expected exception.
 
 ## Contributing
 

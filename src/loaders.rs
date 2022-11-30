@@ -188,7 +188,7 @@ impl ModuleLoader for UrlModuleLoader {
             .join(DUNE_ROOT)
             .join(DUNE_CACHE_DIR);
 
-        if fs::create_dir_all(&cache_dir).is_err() {
+        if fs::create_dir_all(cache_dir).is_err() {
             bail!(generic_error("Failed to create module caching directory"))
         }
 
