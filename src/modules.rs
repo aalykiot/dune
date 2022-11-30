@@ -14,6 +14,7 @@ use regex::Regex;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::env;
 use std::fs;
 use std::path::Path;
 use url::Url;
@@ -345,10 +346,16 @@ impl ImportMap {
     /// Tries to match a specifier against an import-map entry.
     pub fn lookup(&self, specifier: &str) -> Option<String> {
         // Find a mapping if exists.
-        let (base, target) = match self.map.iter().find(|(k, _)| specifier.starts_with(k)) {
-            Some(mapping) => mapping,
+        let (base, mut target) = match self.map.iter().find(|(k, _)| specifier.starts_with(k)) {
+            Some(mapping) => mapping.to_owned(),
             None => return None,
         };
+
+        // The following code treats "./" as an alias for the CWD.
+        if target.starts_with("./") {
+            let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
+            target = target.replacen(".", &cwd, 1);
+        }
 
         // Note: The reason we need this additional check below with the specifier's
         // extension (if exists) is to be able to support extension-less imports.
@@ -356,11 +363,11 @@ impl ImportMap {
         // https://github.com/WICG/import-maps#extension-less-imports
 
         match Path::new(specifier).extension() {
-            Some(ext) => match Path::new(specifier) == Path::new(base).with_extension(ext) {
-                true => None,
-                false => Some(specifier.replacen(base, target, 1)),
+            Some(ext) => match Path::new(specifier) == Path::new(&base).with_extension(ext) {
+                false => Some(specifier.replacen(&base, &target, 1)),
+                _ => None,
             },
-            None => Some(specifier.replacen(base, target, 1)),
+            None => Some(specifier.replacen(&base, &target, 1)),
         }
     }
 }
