@@ -354,7 +354,7 @@ impl ImportMap {
         // The following code treats "./" as an alias for the CWD.
         if target.starts_with("./") {
             let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
-            target = target.replacen(".", &cwd, 1);
+            target = target.replacen('.', &cwd, 1);
         }
 
         // Note: The reason we need this additional check below with the specifier's
