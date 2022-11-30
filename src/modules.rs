@@ -206,7 +206,7 @@ pub fn resolve_import(
 ) -> Result<ModulePath> {
     // Use import-maps if available.
     let specifier = match import_map {
-        Some(map) => map.lookup(specifier).unwrap_or(specifier.into()),
+        Some(map) => map.lookup(specifier).unwrap_or_else(|| specifier.into()),
         None => specifier.into(),
     };
 
@@ -322,7 +322,7 @@ impl ImportMap {
     /// Creates an ImportMap from JSON text.
     pub fn parse_from_json(text: &str) -> Result<ImportMap> {
         // Parse JSON string into serde value.
-        let json: Value = serde_json::from_str(&text)?;
+        let json: Value = serde_json::from_str(text)?;
         let imports = json["imports"].to_owned();
 
         if imports.is_null() || !imports.is_object() {

@@ -33,6 +33,14 @@ use tools::bundle;
 use tools::compile;
 use tools::upgrade;
 
+fn load_import_map(filename: Option<String>) -> Option<ImportMap> {
+    let filename = filename.unwrap_or_else(|| "import-map.json".into());
+    match fs::read_to_string(filename) {
+        Ok(contents) => Some(unwrap_or_exit(ImportMap::parse_from_json(&contents))),
+        Err(_) => None,
+    }
+}
+
 fn run_command(mut args: ArgMatches) {
     // Extract options from cli arguments.
     let script = args.remove_one::<String>("SCRIPT").unwrap();
@@ -42,12 +50,7 @@ fn run_command(mut args: ArgMatches) {
         .remove_one::<String>("seed")
         .map(|val| val.parse::<i64>().unwrap_or_default());
 
-    // Load import-maps if specified.
-    let import_map = import_map.unwrap_or("import-map.json".into());
-    let import_map = match fs::read_to_string(import_map) {
-        Ok(contents) => Some(unwrap_or_exit(ImportMap::parse_from_json(&contents))),
-        Err(_) => None,
-    };
+    let import_map = load_import_map(import_map);
 
     // NOTE: The following code tries to resolve the given filename
     // to an absolute path. If the first time fails we will append `./` to
@@ -107,14 +110,9 @@ fn bundle_command(mut args: ArgMatches) {
     let output = args.remove_one::<String>("output");
     let skip_cache = args.remove_one::<bool>("reload").unwrap_or_default();
     let minify = args.remove_one::<bool>("minify").unwrap_or_default();
-    let import_map = args.remove_one::<String>("import-map");
 
-    // Load import-maps if specified.
-    let import_map = import_map.unwrap_or("import-map.json".into());
-    let import_map = match fs::read_to_string(import_map) {
-        Ok(contents) => Some(unwrap_or_exit(ImportMap::parse_from_json(&contents))),
-        Err(_) => None,
-    };
+    let import_map = args.remove_one::<String>("import-map");
+    let import_map = load_import_map(import_map);
 
     let options = bundle::Options {
         skip_cache,
@@ -133,14 +131,9 @@ fn compile_command(mut args: ArgMatches) {
     let entry = args.remove_one::<String>("ENTRY").unwrap();
     let output = args.remove_one::<String>("output");
     let skip_cache = args.remove_one::<bool>("reload").unwrap_or_default();
-    let import_map = args.remove_one::<String>("import-map");
 
-    // Load import-maps if specified.
-    let import_map = import_map.unwrap_or("import-map.json".into());
-    let import_map = match fs::read_to_string(import_map) {
-        Ok(contents) => Some(unwrap_or_exit(ImportMap::parse_from_json(&contents))),
-        Err(_) => None,
-    };
+    let import_map = args.remove_one::<String>("import-map");
+    let import_map = load_import_map(import_map);
 
     let options = compile::Options {
         skip_cache,
