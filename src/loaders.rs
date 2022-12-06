@@ -2,7 +2,8 @@ use crate::errors::generic_error;
 use crate::modules::ModulePath;
 use crate::modules::ModuleSource;
 use crate::modules::CORE_MODULES;
-use crate::typescript;
+use crate::transpilers::Jsx;
+use crate::transpilers::TypeScript;
 use anyhow::bail;
 use anyhow::Result;
 use colored::*;
@@ -24,7 +25,7 @@ pub trait ModuleLoader {
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath>;
 }
 
-static EXTENSIONS: &[&str] = &["js", "ts", "tsx", "json"];
+static EXTENSIONS: &[&str] = &["js", "jsx", "ts", "tsx", "json"];
 
 #[derive(Default)]
 pub struct FsModuleLoader;
@@ -138,13 +139,17 @@ impl ModuleLoader for FsModuleLoader {
             ))),
         };
 
-        let path_extension = path.extension().unwrap();
+        let path_extension = path.extension().unwrap().to_str().unwrap();
+        let fname = path.to_str();
 
-        // Check if it's a TypeScript import.
-        match path_extension == "ts" || path_extension == "tsx" {
-            true => typescript::transpile(path.to_str(), &source)
+        // Use a preprocessor if necessary.
+        match path_extension {
+            "ts" => TypeScript::compile(fname, &source).map_err(|e| generic_error(e.to_string())),
+            "jsx" => Jsx::compile(fname, &source).map_err(|e| generic_error(e.to_string())),
+            "tsx" => Jsx::compile(fname, &source)
+                .and_then(|output| TypeScript::compile(fname, &output))
                 .map_err(|e| generic_error(e.to_string())),
-            false => Ok(source),
+            _ => Ok(source),
         }
     }
 }
@@ -212,10 +217,17 @@ impl ModuleLoader for UrlModuleLoader {
             Err(_) => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
         };
 
-        // Check if it's a TypeScript import.
-        let source = match specifier.ends_with(".ts") || specifier.ends_with(".tsx") {
-            true => typescript::transpile(Some(specifier), &source)?,
-            false => source,
+        // Use a preprocessor if necessary.
+        let source = match (
+            specifier.ends_with(".jsx"),
+            specifier.ends_with(".ts"),
+            specifier.ends_with(".tsx"),
+        ) {
+            (true, _, _) => Jsx::compile(Some(specifier), &source)?,
+            (_, true, _) => TypeScript::compile(Some(specifier), &source)?,
+            (_, _, true) => Jsx::compile(Some(specifier), &source)
+                .and_then(|output| TypeScript::compile(Some(specifier), &output))?,
+            _ => source,
         };
 
         fs::write(&module_path, &source)?;
