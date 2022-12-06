@@ -15,7 +15,7 @@ mod runtime;
 mod stdio;
 mod timers;
 mod tools;
-mod typescript;
+mod transpilers;
 
 use crate::errors::generic_error;
 use clap::arg;
