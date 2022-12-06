@@ -44,7 +44,7 @@ impl TypeScript {
             None => FileName::Anon,
         };
 
-        let fm = cm.new_source_file(filename.clone(), source.into());
+        let fm = cm.new_source_file(filename, source.into());
 
         // Initialize the TypeScript lexer.
         let lexer = Lexer::new(
@@ -96,9 +96,9 @@ impl TypeScript {
     }
 }
 
-pub struct JSX;
+pub struct Jsx;
 
-impl JSX {
+impl Jsx {
     /// Compiles JSX code into JavaScript.
     pub fn compile(filename: Option<&str>, source: &str) -> Result<String> {
         let globals = Globals::default();
@@ -110,7 +110,7 @@ impl JSX {
             None => FileName::Anon,
         };
 
-        let fm = cm.new_source_file(filename.clone(), source.into());
+        let fm = cm.new_source_file(filename, source.into());
 
         // NOTE: We're using a TypeScript lexer to parse JSX because it's a super-set
         // of JavaScript and we also want to support .tsx files.

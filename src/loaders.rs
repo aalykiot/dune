@@ -2,8 +2,8 @@ use crate::errors::generic_error;
 use crate::modules::ModulePath;
 use crate::modules::ModuleSource;
 use crate::modules::CORE_MODULES;
+use crate::transpilers::Jsx;
 use crate::transpilers::TypeScript;
-use crate::transpilers::JSX;
 use anyhow::bail;
 use anyhow::Result;
 use colored::*;
@@ -145,9 +145,9 @@ impl ModuleLoader for FsModuleLoader {
         // Use a preprocessor if necessary.
         match path_extension {
             "ts" => TypeScript::compile(fname, &source).map_err(|e| generic_error(e.to_string())),
-            "jsx" => JSX::compile(fname, &source).map_err(|e| generic_error(e.to_string())),
-            "tsx" => JSX::compile(fname, &source)
-                .and_then(|s| TypeScript::compile(fname, &s))
+            "jsx" => Jsx::compile(fname, &source).map_err(|e| generic_error(e.to_string())),
+            "tsx" => Jsx::compile(fname, &source)
+                .and_then(|output| TypeScript::compile(fname, &output))
                 .map_err(|e| generic_error(e.to_string())),
             _ => Ok(source),
         }
@@ -223,10 +223,10 @@ impl ModuleLoader for UrlModuleLoader {
             specifier.ends_with(".ts"),
             specifier.ends_with(".tsx"),
         ) {
-            (true, _, _) => JSX::compile(Some(specifier), &source)?,
+            (true, _, _) => Jsx::compile(Some(specifier), &source)?,
             (_, true, _) => TypeScript::compile(Some(specifier), &source)?,
-            (_, _, true) => JSX::compile(Some(specifier), &source)
-                .and_then(|s| TypeScript::compile(Some(specifier), &s))?,
+            (_, _, true) => Jsx::compile(Some(specifier), &source)
+                .and_then(|output| TypeScript::compile(Some(specifier), &output))?,
             _ => source,
         };
 
