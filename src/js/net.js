@@ -6,7 +6,6 @@
 // https://nodejs.org/dist/latest-v18.x/docs/api/net.html
 
 import dns from 'dns';
-import assert from 'assert';
 import { EventEmitter } from 'events';
 
 const binding = process.binding('net');
@@ -57,9 +56,8 @@ export function createConnection(...args) {
 export function createServer(onConnection) {
   // Create the server instance.
   const server = new Server();
-  // Check onConnection callback.
-  if (onConnection) {
-    assert(typeof onConnection === 'function');
+  // Properly schedule the onConnection handler.
+  if (onConnection && typeof onConnection === 'function') {
     server.on('connection', onConnection);
   }
   return server;
@@ -124,8 +122,7 @@ export class Socket extends EventEmitter {
     }
 
     // Subscribe to the emitter, the on-connect callback if specified.
-    if (onConnection) {
-      assert(typeof onConnection === 'function');
+    if (onConnection && typeof onConnection === 'function') {
       this.on('connect', onConnection);
     }
 
@@ -208,19 +205,15 @@ export class Socket extends EventEmitter {
    *
    * @param {String|Uint8Array} data
    * @param {String} [encoding]
-   * @param {Function} [onWrite]
    * @returns {Promise<Number>}
    */
-  async write(data, encoding, onWrite) {
+  async write(data, encoding) {
     // Check the data argument type.
     if (!(data instanceof Uint8Array) && typeof data !== 'string') {
       throw new TypeError(
         `The "data" argument must be of type string or Uint8Array.`
       );
     }
-
-    // Check the type of the onWrite param.
-    if (onWrite) assert(typeof onWrite === 'function');
 
     // Check if the socket is connected.
     if (!this.#id) {
@@ -239,8 +232,6 @@ export class Socket extends EventEmitter {
     const bytesWritten = await binding.write(this.#id, bytes);
 
     this.bytesWritten += bytesWritten;
-
-    if (onWrite) onWrite(bytesWritten);
 
     return bytesWritten;
   }
@@ -375,8 +366,7 @@ export class Server extends EventEmitter {
     }
 
     // Subscribe to the emitter, the on-connect callback if specified.
-    if (onListening) {
-      assert(typeof onListening === 'function');
+    if (onListening && typeof onListening === 'function') {
       this.on('listening', onListening);
     }
 
@@ -427,23 +417,13 @@ export class Server extends EventEmitter {
 
   /**
    * Stops the server from accepting new connections.
-   *
-   * @param {Function} [onClose]
    */
-  async close(onClose) {
+  async close() {
     // Check if the server is already closed.
     if (!this.#id) {
       throw new Error('Server is already closed.');
     }
-
-    // Check the type of onClose.
-    if (onClose) {
-      assert(typeof onClose === 'function');
-      this.once('close', () => onClose());
-    }
-
     await binding.close(this.#id);
-
     this.emit('close');
   }
 

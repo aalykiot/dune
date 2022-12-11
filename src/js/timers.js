@@ -3,8 +3,6 @@
 // The Timers API provides functionality to allow developers to create DOM style timers.
 // https://www.w3schools.com/js/js_timing.asp
 
-import assert from 'assert';
-
 const TIMEOUT_MAX = Math.pow(2, 31) - 1;
 
 const binding = process.binding('timers');
@@ -39,7 +37,9 @@ export function setTimeout(callback, delay, ...args) {
     delay = 1;
   }
 
-  assert(typeof callback === 'function');
+  if (typeof callback !== 'function') {
+    throw new TypeError('The "callback" argument must be of type function.');
+  }
 
   // Pin down the correct ID value.
   const id = nextId++;
@@ -91,7 +91,9 @@ export function setInterval(callback, delay, ...args) {
     delay = 1;
   }
 
-  assert(typeof callback === 'function');
+  if (typeof callback !== 'function') {
+    throw new TypeError('The "callback" argument must be of type function.');
+  }
 
   // Pin down the correct ID value.
   const id = nextId++;
@@ -123,7 +125,9 @@ export function clearInterval(id) {
  */
 export function setImmediate(callback, ...args) {
   // Check arg type.
-  assert(typeof callback === 'function');
+  if (typeof callback !== 'function') {
+    throw new TypeError('The "callback" argument must be of type function.');
+  }
 
   // Pin down the correct ID value.
   const id = nextId++;
