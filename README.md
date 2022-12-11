@@ -200,31 +200,24 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 ### Assert
 
-> The assertion API is copied from: https://assert-js.norbert.tech/
+> The assertion API is copied from: https://github.com/browserify/commonjs-assert
 
-- [x] `true(value)`: Asserts that value is equal to true.
-- [x] `false(value)`: Asserts that value is equal to false.
-- [x] `instanceOf(value, class)`: Asserts that value is an instance of specific class.
-- [x] `integer(value)`: Asserts that value is valid integer.
-- [x] `number(value)`: Asserts that value is valid number (integer, float).
-- [x] `oddNumber(value)`: Asserts that value is odd number.
-- [x] `evenNumber(value)`: Asserts that value is event number.
-- [x] `greaterThan(value, limit)`: Asserts that number is greater than.
-- [x] `greaterThanOrEqual(value, limit)`: Asserts that number is greater than or equal.
-- [x] `lessThan(value, limit)`: Asserts that number is less than.
-- [x] `lessThanOrEqual(value, limit)`: Asserts that number is less than or equal.
-- [x] `string(value)`: Asserts that value is valid string.
-- [x] `boolean(value)`: Asserts that value is valid boolean.
-- [x] `equal(actual, expected)`: Asserts that value is equal to expected value.
-- [x] `objectEqual(actual, expected)`: Asserts that value is equal to expected value.
-- [x] `object(value)`: Asserts that value is valid object.
-- [x] `hasFunction(name, object)`: Asserts that object has function.
-- [x] `hasProperty(name, object)`: Asserts that object has property.
-- [x] `isFunction(fn)`: Asserts that value is valid function.
-- [x] `array(value)`: Asserts that value is valid array.
-- [x] `count(expected, arrayValue)`: Asserts that array have specific number of elements.
-- [x] `notEmpty(arrayValue)`: Asserts that array is not empty.
-- [x] `throws(fn, error)`: Asserts that function throws expected exception.
+- [x] `fail(message?)`: Throws an AssertionError with the provided error message or a default error message.
+- [x] `AssertionError`: Indicates the failure of an assertion.
+- [x] `ok(value, message?)`: Tests if value is truthy.
+- [x] `equal(actual, expected, message?)`: An alias of `strictEqual()`.
+- [x] `notEqual(actual, expected, message?)`: An alias of `notStrictEqual()`.
+- [x] `deepEqual(actual, expected, message?)`: An alias of `deepStrictEqual()`.
+- [x] `notDeepEqual(actual, expected, message?)`: An alias of `notDeepStrictEqual()`.
+- [x] `deepStrictEqual(actual, expected, message?)`: Tests for deep equality between the actual and expected parameters.
+- [x] `notDeepStrictEqual(actual, expected, message?)`: Tests for deep strict inequality.
+- [x] `strictEqual(actual, expected, message?)`: Tests strict equality between the actual and expected parameters.
+- [x] `notStrictEqual(actual, expected, message?)`: Tests strict inequality between the actual and expected parameters.
+- [x] `throws(fn, error?, message?)`: Expects the function fn to throw an error.
+- [x] `rejects(asyncFn, error?, message?)`: It will check that the promise is rejected.
+- [x] `doesNotThrow(fn, error?, message?)`: Asserts that the function fn does not throw an error.
+- [x] `doesNotReject(asyncFn, error?, message?)`: It will check that the promise is not rejected.
+- [x] `ifError(value)`: Throws value if value is not undefined or null.
 
 ## Contributing
 

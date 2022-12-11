@@ -39,8 +39,7 @@ export function setTimeout(callback, delay, ...args) {
     delay = 1;
   }
 
-  // Check if callback is a valid function.
-  assert.isFunction(callback);
+  assert(typeof callback === 'function');
 
   // Pin down the correct ID value.
   const id = nextId++;
@@ -68,13 +67,9 @@ export function setTimeout(callback, delay, ...args) {
  */
 
 export function clearTimeout(id) {
-  // Check parameter's type.
-  assert.integer(id);
-
-  if (activeTimers.has(id)) {
-    binding.removeTimeout(activeTimers.get(id));
-    activeTimers.delete(id);
-  }
+  if (!activeTimers.has(id)) return;
+  binding.removeTimeout(activeTimers.get(id));
+  activeTimers.delete(id);
 }
 
 /**
@@ -96,8 +91,7 @@ export function setInterval(callback, delay, ...args) {
     delay = 1;
   }
 
-  // Check if callback is a valid function.
-  assert.isFunction(callback);
+  assert(typeof callback === 'function');
 
   // Pin down the correct ID value.
   const id = nextId++;
@@ -129,7 +123,7 @@ export function clearInterval(id) {
  */
 export function setImmediate(callback, ...args) {
   // Check arg type.
-  assert.isFunction(callback);
+  assert(typeof callback === 'function');
 
   // Pin down the correct ID value.
   const id = nextId++;
@@ -150,13 +144,9 @@ export function setImmediate(callback, ...args) {
  * @param {Number} id
  */
 export function clearImmediate(id) {
-  // Check parameter's type.
-  assert.integer(id);
-
-  if (activeTimers.has(id)) {
-    binding.removeImmediate(activeTimers.get(id));
-    activeTimers.delete(id);
-  }
+  if (!activeTimers.has(id)) return;
+  binding.removeImmediate(activeTimers.get(id));
+  activeTimers.delete(id);
 }
 
 export default {

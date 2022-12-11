@@ -59,7 +59,7 @@ export function createServer(onConnection) {
   const server = new Server();
   // Check onConnection callback.
   if (onConnection) {
-    assert.isFunction(onConnection);
+    assert(typeof onConnection === 'function');
     server.on('connection', onConnection);
   }
   return server;
@@ -125,7 +125,7 @@ export class Socket extends EventEmitter {
 
     // Subscribe to the emitter, the on-connect callback if specified.
     if (onConnection) {
-      assert.isFunction(onConnection);
+      assert(typeof onConnection === 'function');
       this.on('connect', onConnection);
     }
 
@@ -220,9 +220,7 @@ export class Socket extends EventEmitter {
     }
 
     // Check the type of the onWrite param.
-    if (onWrite) {
-      assert.isFunction(onWrite);
-    }
+    if (onWrite) assert(typeof onWrite === 'function');
 
     // Check if the socket is connected.
     if (!this.#id) {
@@ -378,7 +376,7 @@ export class Server extends EventEmitter {
 
     // Subscribe to the emitter, the on-connect callback if specified.
     if (onListening) {
-      assert.isFunction(onListening);
+      assert(typeof onListening === 'function');
       this.on('listening', onListening);
     }
 
@@ -440,7 +438,7 @@ export class Server extends EventEmitter {
 
     // Check the type of onClose.
     if (onClose) {
-      assert.isFunction(onClose);
+      assert(typeof onClose === 'function');
       this.once('close', () => onClose());
     }
 
