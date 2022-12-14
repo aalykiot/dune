@@ -20,7 +20,7 @@ nix = { version = "0.26.1", features=["signal"] }
 v8 = { version = "0.58.0", default-features = false }
 clap = "4.0.27"
 threadpool = "1.8.1"
-anyhow = "1.0.52"
+anyhow = "1.0.66"
 colored = "2.0.0"
 path-clean = "0.1.0"
 rustyline = "10.0.0"
