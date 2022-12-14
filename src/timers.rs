@@ -87,6 +87,14 @@ fn create_timeout(
                 params: Rc::clone(&params),
             };
             state.pending_futures.push(Box::new(future));
+
+            // Important: For non-repeatable timers we have to send an interrupt
+            // signal to the event-loop to prevent the scenario when the even-loop
+            // will idle in the poll phase waiting for I/O while the timer's JS future
+            // is pending in the runtime level.
+            if !repeatable {
+                state.interrupt_handle.interrupt();
+            }
         }
     };
 
