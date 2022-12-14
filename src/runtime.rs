@@ -44,7 +44,7 @@ pub struct JsRuntimeState {
     pub modules: ModuleMap,
     /// A handle to the runtime's event-loop.
     pub handle: LoopHandle,
-    /// A handle to the event-loop that can interrupt the poll (wait) phase.
+    /// A handle to the event-loop that can interrupt the poll-phase.
     pub interrupt_handle: LoopInterruptHandle,
     /// Holds JS pending futures scheduled by the event-loop.
     pub pending_futures: Vec<Box<dyn JsFuture>>,
