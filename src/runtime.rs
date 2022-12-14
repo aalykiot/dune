@@ -4,6 +4,7 @@ use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::event_loop::EventLoop;
 use crate::event_loop::LoopHandle;
+use crate::event_loop::LoopInterruptHandle;
 use crate::event_loop::TaskResult;
 use crate::hooks::host_import_module_dynamically_cb;
 use crate::hooks::host_initialize_import_meta_object_cb;
@@ -43,6 +44,8 @@ pub struct JsRuntimeState {
     pub modules: ModuleMap,
     /// A handle to the runtime's event-loop.
     pub handle: LoopHandle,
+    /// A handle to the event-loop that can interrupt the poll-phase.
+    pub interrupt_handle: LoopInterruptHandle,
     /// Holds JS pending futures scheduled by the event-loop.
     pub pending_futures: Vec<Box<dyn JsFuture>>,
     /// Indicates the start time of the process.
@@ -139,6 +142,7 @@ impl JsRuntime {
             context,
             modules: ModuleMap::default(),
             handle: event_loop.handle(),
+            interrupt_handle: event_loop.interrupt_handle(),
             pending_futures: Vec::new(),
             startup_moment: Instant::now(),
             time_origin,
