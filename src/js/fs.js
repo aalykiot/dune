@@ -197,49 +197,31 @@ export class File {
   /**
    * The File objects should be asynchronously iterable.
    */
-  [Symbol.asyncIterator]() {
-    return {
-      handle: this._handle,
-      offset: 0,
+  async *[Symbol.asyncIterator]() {
+    let offset = 0;
+    while (true) {
+      // Try read some bytes from the file.
+      const bytes = await this.read(BUFFER_SIZE, offset);
+      offset += bytes.length;
 
-      async next() {
-        // Try read some bytes from the file.
-        const bytes = await binding.read(this.handle, BUFFER_SIZE, this.offset);
-        const bytes_u8 = new Uint8Array(bytes);
-
-        // Update offset.
-        this.offset += bytes_u8.length;
-
-        return {
-          done: bytes_u8.length === 0,
-          value: bytes_u8,
-        };
-      },
-    };
+      if (bytes.length === 0) break;
+      yield bytes;
+    }
   }
 
   /**
    * The File objects should be iterable.
    */
-  [Symbol.iterator]() {
-    return {
-      handle: this._handle,
-      offset: 0,
+  *[Symbol.iterator]() {
+    let offset = 0;
+    while (true) {
+      // Try read some bytes from the file.
+      const bytes = this.readSync(BUFFER_SIZE, offset);
+      offset += bytes.length;
 
-      next() {
-        // Try read some bytes from the file.
-        const bytes = binding.readSync(this.handle, BUFFER_SIZE, this.offset);
-        const bytes_u8 = new Uint8Array(bytes);
-
-        // Update offset.
-        this.offset += bytes_u8.length;
-
-        return {
-          done: bytes_u8.length === 0,
-          value: bytes_u8,
-        };
-      },
-    };
+      if (bytes.length === 0) break;
+      yield bytes;
+    }
   }
 }
 
@@ -604,9 +586,9 @@ export function rmdirSync(path, options = {}, __retries = 0) {
 
 /**
  * Reads asynchronously the contents of a directory.
- * 
+ *
  * @param {String} path
- * @returns {Promise<String[]>}  
+ * @returns {Promise<String[]>}
  */
 export async function readdir(path) {
   // Check the path argument type.
@@ -619,11 +601,11 @@ export async function readdir(path) {
 
 /**
  * Reads the contents of a directory.
- * 
+ *
  * @param {String} path
  * @returns {String[]}
  */
- export function readdirSync(path) {
+export function readdirSync(path) {
   // Check the path argument type.
   if (typeof path !== 'string') {
     throw new TypeError('The "path" argument must be of type string.');
