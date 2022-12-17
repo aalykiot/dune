@@ -199,7 +199,7 @@ impl ModuleLoader for UrlModuleLoader {
 
         // Hash URL using sha1.
         let hash = Sha1::default().digest(specifier.as_bytes()).to_hex();
-        let module_path = cache_dir.join(&hash);
+        let module_path = cache_dir.join(hash);
 
         if !self.skip_cache {
             // Check cache, and load file.

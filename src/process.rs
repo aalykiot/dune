@@ -124,7 +124,7 @@ fn cwd(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, mut rv: v8
 fn exit(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Exit the program when value is not valid i32.
     match args.get(0).to_int32(scope) {
-        Some(code) => std::process::exit(code.value() as i32),
+        Some(code) => std::process::exit(code.value()),
         None => std::process::exit(0),
     }
 }

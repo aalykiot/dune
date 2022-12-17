@@ -75,11 +75,11 @@ pub fn run_upgrade() -> Result<()> {
     if cfg!(windows) {
         // On windows you cannot replace the currently running executable.
         // so first we rename it to dune.outdated.exe
-        fs::rename(&current, &current.with_extension("outdated.exe"))?;
+        fs::rename(&current, current.with_extension("outdated.exe"))?;
     }
 
     // Copy new binary to dune's execution path.
-    fs::copy(&next, &current)?;
+    fs::copy(next, &current)?;
 
     Ok(())
 }
