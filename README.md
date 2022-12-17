@@ -54,9 +54,8 @@ const server = net.createServer(async (socket) => {
   await socket.destroy();
 });
 
-server.listen(3000, '127.0.0.1', () => {
-  console.log('Server is listening on port 3000...');
-});
+console.log('Server is listening on port 3000...');
+await server.listen(3000, '127.0.0.1');
 ```
 
 JSX/TSX files are also supported for server side rendering.
@@ -158,27 +157,24 @@ For more examples look at the <a href="./examples">examples</a> directory.
 ### Net
 
 - [x] `createServer(connectionListener?)`: Creates a new TCP server.
-- [x] `createConnection(options, connectionListener?)`: Creates unix socket connection to a remote host.
+- [x] `createConnection(options)`: Creates unix socket connection to a remote host.
 
 ### Net.Server
 
-> Net.Server is a class extending `EventEmitter`.
+> Net.Server implements @@asyncIterator.
 
-- [x] `listen(port, host?, callback?)`: Begin accepting connections on the specified port and host.
+- [x] `accept()`: Waits for a TCP client to connect and accepts the connection.
+- [x] `listen(port, host?)`: Begin accepting connections on the specified port and host.
 - [x] `close()`: Stops the server from accepting new connections and keeps existing connections.
 - [x] `address()`: Returns the bound address.
-- [x] `getConnections()`: Get the number of concurrent connections on the server.
-- [x] `Event: 'listening'`: Emitted when the server has been bound after calling `server.listen`.
-- [x] `Event: 'connection'`: Emitted when a new connection is made.
-- [x] `Event: 'close'`: Emitted when the server closes.
-- [x] `Event: 'error'`: Emitted when an error occurs.
 
 ### Net.Socket
 
-> Net.Socket is a class extending `EventEmitter`.
+> Net.Socket implements @@asyncIterator.
 
-- [x] `connect(options, connectionListener?)`: Opens the connection for a given socket.
+- [x] `connect(options)`: Opens the connection for a given socket.
 - [x] `setEncoding(encoding)`: Set the encoding for the socket.
+- [x] `read()`: Reads the data out of the socket.
 - [x] `write(data)`: Sends data on the socket.
 - [x] `end(data?)`: Half-closes the socket. i.e., it sends a FIN packet.
 - [x] `destroy()`: Closes and discards the TCP socket stream.
@@ -187,11 +183,6 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `remotePort`: The numeric representation of the remote port.
 - [x] `bytesRead`: The amount of received bytes.
 - [x] `bytesWritten`: The amount of bytes sent.
-- [x] `Event: 'connect'`: Emitted when a socket connection is successfully established.
-- [x] `Event: 'data'`: Emitted when data is received.
-- [x] `Event: 'end'`: Emitted when the other end of the socket sends a FIN packet.
-- [x] `Event: 'error'`: Emitted when an error occurs.
-- [x] `Event: 'close'`: Emitted once the socket is fully closed.
 
 ### Performance Measurement
 
