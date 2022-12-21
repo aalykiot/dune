@@ -168,7 +168,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `close()`: Stops the server from accepting new connections and keeps existing connections.
 - [x] `Event: 'listening'`: Emitted when the server has been bound after calling `server.listen`.
 - [x] `Event: 'connection'`: Emitted when a new connection is made.
-- [x] `Event: 'close'`: Emitted when the server closes.
+- [x] `Event: 'close'`: Emitted when the server stops accepting new connections.
 - [x] `Event: 'error'`: Emitted when an error occurs.
 
 ### Net.Socket

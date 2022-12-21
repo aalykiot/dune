@@ -6,6 +6,7 @@
 // https://nodejs.org/dist/latest-v18.x/docs/api/net.html
 
 import dns from 'dns';
+import assert from 'assert';
 import { EventEmitter } from 'events';
 
 const binding = process.binding('net');
@@ -55,9 +56,12 @@ export function createConnection(...args) {
  * @returns Server
  */
 export function createServer(onConnection) {
-  // Create the server instance.
+  // Instantiate a new TCP server.
   const server = new Server();
-  server.onConnection = onConnection;
+  if (onConnection) {
+    assert.isFunction(onConnection);
+    server.onConnection = onConnection;
+  }
   return server;
 }
 
@@ -401,6 +405,7 @@ export class Server extends EventEmitter {
 
     this.#id = socketInfo.id;
     this.#host = socketInfo.host;
+
     this.emit('listening', this.#host);
 
     return this.#host;
@@ -443,6 +448,7 @@ export class Server extends EventEmitter {
       throw new Error('Server is already closed.');
     }
     await binding.close(this.#id);
+    this.emit('close');
   }
 
   /**
@@ -479,7 +485,6 @@ export class Server extends EventEmitter {
     socket[kSetSocketIdUnchecked](id);
     socket.remoteAddress = remoteAddress;
     socket.remotePort = remotePort;
-    socket.on('close', () => this._connections--);
 
     if (this.onConnection) {
       this.onConnection(socket);
