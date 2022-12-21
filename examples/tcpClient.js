@@ -5,29 +5,27 @@ const HTTP_REQUEST =
 
 // 1. Using events to handle data.
 
-const client = await net.createConnection({
+const client = net.createConnection({
   host: '104.21.45.178',
   port: 80,
 });
 
 client.setEncoding('utf-8');
 
+client.on('connect', () => client.write(HTTP_REQUEST));
+
 client.on('data', (data) => console.log(data));
 
 client.on('close', () => console.log('Connection closed.'));
 
-await client.write(HTTP_REQUEST);
-
 // 2. Using async iterators to handle data
 
-const client2 = await net.createConnection({
-  host: '104.21.45.178',
-  port: 80,
-});
+const client2 = new net.Socket();
+
+await client2.connect(80, '104.21.45.178');
+await client2.write(HTTP_REQUEST);
 
 client2.setEncoding('utf-8');
-
-await client2.write(HTTP_REQUEST);
 
 for await (const data of client2) {
   console.log(data);

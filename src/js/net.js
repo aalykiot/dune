@@ -40,11 +40,11 @@ function makeDeferredPromise() {
  * Initiates a connection to a given remote host.
  *
  * @param {Object} options
- * @returns Promise<Socket>
+ * @returns Socket
  */
-export async function createConnection(...args) {
+export function createConnection(...args) {
   const socket = new Socket();
-  await socket.connect(...args);
+  socket.connect(...args);
   return socket;
 }
 
