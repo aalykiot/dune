@@ -454,15 +454,6 @@ export class Server extends EventEmitter {
     return this.#host;
   }
 
-  /**
-   * Returns the number of concurrent connections on the server.
-   *
-   * @returns Number
-   */
-  getConnections() {
-    return this._connections;
-  }
-
   _asyncDispatch(socket) {
     if (this.#pullQueue.length === 0) {
       this.#pushQueue.push(socket);
