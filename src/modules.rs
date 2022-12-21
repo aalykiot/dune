@@ -219,7 +219,7 @@ pub fn resolve_import(
 
         match (is_core_module_import, is_url_import) {
             (true, _) => Box::new(CoreModuleLoader),
-            (_, true) => Box::new(UrlModuleLoader::default()),
+            (_, true) => Box::<UrlModuleLoader>::default(),
             _ => Box::new(FsModuleLoader),
         }
     };

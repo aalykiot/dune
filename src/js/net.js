@@ -14,7 +14,7 @@ const binding = process.binding('net');
 function parseOptionsArgs(args) {
   // Use options overloading.
   if (typeof args[0] === 'object') {
-    return [args[0]?.port, args[0]?.host, args[1]];
+    return [args[0]?.port, args[0]?.host];
   }
   return args;
 }
@@ -29,17 +29,18 @@ function toUint8Array(data, encoding) {
 function makeDeferredPromise() {
   // Extract the resolve method from the promise.
   const promiseExt = {};
-  const promise = new Promise((r) => (promiseExt.resolve = r));
-  // Attach it to the promise.
-  promise.resolve = promiseExt.resolve;
-  return promise;
+  const promise = new Promise((resolve, reject) => {
+    promiseExt.resolve = resolve;
+    promiseExt.reject = reject;
+  });
+
+  return { promise, promiseExt };
 }
 
 /**
  * Initiates a connection to a given remote host.
  *
  * @param {Object} options
- * @param {Function} [onConnection]
  * @returns Socket
  */
 export function createConnection(...args) {
@@ -55,15 +56,16 @@ export function createConnection(...args) {
  * @returns Server
  */
 export function createServer(onConnection) {
-  // Create the server instance.
+  // Instantiate a new TCP server.
   const server = new Server();
-  // Check onConnection callback.
   if (onConnection) {
     assert.isFunction(onConnection);
-    server.on('connection', onConnection);
+    server.onConnection = onConnection;
   }
   return server;
 }
+
+const kSetSocketIdUnchecked = Symbol('kSetSocketIdUnchecked');
 
 /**
  * A Socket object is a JS wrapper around a low-level TCP socket.
@@ -74,6 +76,8 @@ export class Socket extends EventEmitter {
   #connecting;
   #encoding;
   #writable;
+  #pushQueue;
+  #pullQueue;
 
   /**
    * Creates a new Socket instance.
@@ -82,7 +86,9 @@ export class Socket extends EventEmitter {
    */
   constructor() {
     super();
-    this.#connecting = 0;
+    this.#pushQueue = [];
+    this.#pullQueue = [];
+    this.#connecting = false;
     this.bytesRead = 0;
     this.bytesWritten = 0;
     this.remotePort = undefined;
@@ -93,101 +99,54 @@ export class Socket extends EventEmitter {
    * Initiates a connection on a given remote host.
    *
    * @param  {...any} args
-   * @returns {Promise<*>}
+   * @returns {Promise<object>}
    */
   async connect(...args) {
     // Parse arguments.
-    const [port, hostUnchecked, onConnection] = parseOptionsArgs(args);
+    const [port, hostUnchecked] = parseOptionsArgs(args);
     const hostname = hostUnchecked || '0.0.0.0';
-    this.#connecting += 1;
 
-    // Check the port parameter type.
+    if (this.#connecting) {
+      throw new Error('Socket is trying to connect.');
+    }
+
     if (Number.isNaN(Number.parseInt(port))) {
       throw new TypeError(`The "port" option must be castable to number.`);
     }
 
-    // Check the host parameter type.
     if (hostname && typeof hostname !== 'string') {
       throw new TypeError(`The "host" option must be of type string.`);
     }
 
-    // Check if socket is already connected.
     if (this.#id) {
       throw new Error(
         `Socket is already connected to <${this.remoteAddress}:${this.remotePort}>.`
       );
     }
 
-    // Check if a connection is happening.
-    if (this.#connecting > 1) {
-      throw new Error('Socket is trying to connect.');
-    }
+    this.#connecting = true;
 
-    // Subscribe to the emitter, the on-connect callback if specified.
-    if (onConnection) {
-      assert.isFunction(onConnection);
-      this.on('connect', onConnection);
-    }
+    // Use DNS lookup to resolve the hostname.
+    const addresses = await dns.lookup(hostname);
 
-    try {
-      // Use DNS lookup to resolve the hostname.
-      const addresses = await dns.lookup(hostname);
+    // Prefer IPv4 address.
+    const remoteHost = addresses.some((addr) => addr.family === 'IPv4')
+      ? addresses.filter((addr) => addr.family === 'IPv4')[0].address
+      : addresses[0].address;
 
-      // Prefer IPv4 address.
-      const host = addresses.some((addr) => addr.family === 'IPv4')
-        ? addresses.filter((addr) => addr.family === 'IPv4')[0].address
-        : addresses[0].address;
+    const { id, host, remote } = await binding.connect(remoteHost, port);
 
-      // Try to connect to the remote host.
-      const socketInfo = await binding.connect(host, port);
+    this.#id = id;
+    this.#connecting = false;
+    this.#writable = true;
+    this.#host = host;
+    this.remoteAddress = remote.address;
+    this.remotePort = remote.port;
+    this.emit('connect', { host, remote });
 
-      this.#id = socketInfo.id;
-      this.#connecting -= 1;
-      this.#writable = true;
-      this.#host = socketInfo.host;
-      this.remoteAddress = socketInfo.remote.address;
-      this.remotePort = socketInfo.remote.port;
+    binding.readStart(this.#id, this._onAvailableSocketData.bind(this));
 
-      this.emit('connect', socketInfo);
-      binding.readStart(this.#id, this._onSocketRead.bind(this));
-
-      return socketInfo;
-    } catch (err) {
-      this.emit('error', err);
-    }
-  }
-
-  /**
-   * Returns the bound address, the address family name and port of the socket.
-   *
-   * @returns {Object}
-   */
-  address() {
-    return this.#host;
-  }
-
-  _onSocketRead(err, arrayBufferView) {
-    // Check for read errors.
-    if (err) {
-      this.emit('error', err);
-      return;
-    }
-
-    // Check if the remote host closed the connection.
-    if (arrayBufferView.byteLength === 0) {
-      this.destroy();
-      return this.emit('end');
-    }
-
-    this.bytesRead += arrayBufferView.byteLength;
-
-    // Transform ArrayBuffer into a Uint8Array we can use.
-    const data = new Uint8Array(arrayBufferView);
-    const data_transform = this.#encoding
-      ? new TextDecoder(this.#encoding).decode(new Uint8Array(data))
-      : data;
-
-    this.emit('data', data_transform);
+    return { host, remote };
   }
 
   /**
@@ -204,14 +163,41 @@ export class Socket extends EventEmitter {
   }
 
   /**
+   * Returns a promise which is fulfilled when the TCP stream can return a chunk.
+   *
+   * @returns {Promise<Uint8Array|string>}
+   */
+  read() {
+    // Check if the socket is connected to a host.
+    if (!this.#id) {
+      throw new Error(`Socket is not connected to a remote host.`);
+    }
+
+    // HACK: The following is used to handle uncaught errors thrown
+    // from the event-emitter when no one is subscribed to the `error` event.
+    if (this.listenerCount('error') === 0) this.on('error', () => {});
+
+    // No available value to read wet.
+    if (this.#pushQueue.length === 0) {
+      const { promise, promiseExt } = makeDeferredPromise();
+      this.#pullQueue.push(promiseExt);
+      return promise;
+    }
+
+    const value = this.#pushQueue.shift();
+    const action = value instanceof Error ? Promise.reject : Promise.resolve;
+
+    return action.call(Promise, value);
+  }
+
+  /**
    * Writes contents to a TCP socket stream.
    *
    * @param {String|Uint8Array} data
    * @param {String} [encoding]
-   * @param {Function} [onWrite]
    * @returns {Promise<Number>}
    */
-  async write(data, encoding, onWrite) {
+  async write(data, encoding = 'utf-8') {
     // Check the data argument type.
     if (!(data instanceof Uint8Array) && typeof data !== 'string') {
       throw new TypeError(
@@ -219,17 +205,10 @@ export class Socket extends EventEmitter {
       );
     }
 
-    // Check the type of the onWrite param.
-    if (onWrite) {
-      assert.isFunction(onWrite);
-    }
-
-    // Check if the socket is connected.
     if (!this.#id) {
       throw new Error(`Socket is not connected to a remote host.`);
     }
 
-    // Check if socket is half-closed.
     if (!this.#writable) {
       throw new Error(`The socket stream is not writable.`);
     }
@@ -241,8 +220,6 @@ export class Socket extends EventEmitter {
     const bytesWritten = await binding.write(this.#id, bytes);
 
     this.bytesWritten += bytesWritten;
-
-    if (onWrite) onWrite(bytesWritten);
 
     return bytesWritten;
   }
@@ -259,12 +236,12 @@ export class Socket extends EventEmitter {
     if (!this.#id) {
       throw new Error(`Socket is not connected to a remote host.`);
     }
-    // If data is specified, write it to stream.
+    // If data is given, write to stream.
     if (data) {
       await this.write(data, encoding);
     }
-    await binding.shutdown(this.#id);
     this.#writable = false;
+    await binding.shutdown(this.#id);
   }
 
   /**
@@ -275,147 +252,10 @@ export class Socket extends EventEmitter {
     if (!this.#id) {
       throw new Error('Socket is not connected to a remote host.');
     }
-    // Close the socket.
     await binding.close(this.#id);
+
     this.emit('close');
     this._reset();
-  }
-
-  /**
-   * Resets socket's internal state (not to be called manually).
-   */
-  _reset() {
-    this.#id = undefined;
-    this.#connecting = 0;
-    this.#writable = false;
-    this.#encoding = undefined;
-    this.bytesRead = 0;
-    this.bytesWritten = 0;
-    this.remotePort = undefined;
-    this.remoteAddress = undefined;
-  }
-
-  /**
-   * Hard sets the ID of the socket (ONLY for internal use).
-   *
-   * @param {Number} id
-   */
-  _set_socket_id_unchecked(id) {
-    this.#id = id;
-    this.#writable = true;
-    binding.readStart(this.#id, this._onSocketRead.bind(this));
-  }
-
-  /**
-   * Socket should be an async iterator.
-   */
-  async *[Symbol.asyncIterator]() {
-    const queue = [makeDeferredPromise()];
-    let done = false;
-    let idx = 0;
-
-    this.on('data', (data) => {
-      queue[idx].resolve(data);
-      const promise = makeDeferredPromise();
-      idx++;
-      queue.push(promise);
-    });
-
-    this.on('end', () => (done = true));
-
-    while (!done) {
-      const data = await queue[0];
-      queue.shift();
-      idx--;
-      yield data;
-    }
-  }
-}
-
-/**
- * A Server object is a wrapper around a TCP listener.
- */
-export class Server extends EventEmitter {
-  #id;
-  #host;
-  #connections;
-
-  /**
-   * Creates a new Server instance.
-   *
-   * @returns {Server}
-   */
-  constructor() {
-    super();
-    this.#connections = 0;
-  }
-
-  /**
-   * Starts listening for incoming connections.
-   *
-   * @param  {...any} args
-   * @returns Promise<undefined>
-   */
-  async listen(...args) {
-    // Parse arguments.
-    const [port, hostUnchecked, onListening] = parseOptionsArgs(args);
-    const hostname = hostUnchecked || '127.0.0.1';
-
-    // Check the port parameter type.
-    if (Number.isNaN(Number.parseInt(port))) {
-      throw new TypeError(`The "port" option must be castable to number.`);
-    }
-
-    // Check the host parameter type.
-    if (hostname && typeof hostname !== 'string') {
-      throw new TypeError(`The "host" option must be of type string.`);
-    }
-
-    // Check if the server already is on listening state.
-    if (this.#id) {
-      throw new Error(`Server is already listening for connections.`);
-    }
-
-    // Subscribe to the emitter, the on-connect callback if specified.
-    if (onListening) {
-      assert.isFunction(onListening);
-      this.on('listening', onListening);
-    }
-
-    try {
-      // Use DNS lookup to resolve the local listening interface.
-      const addresses = await dns.lookup(hostname);
-
-      // Prefer IPv4 address.
-      const host = addresses.some((addr) => addr.family === 'IPv4')
-        ? addresses.filter((addr) => addr.family === 'IPv4')[0].address
-        : addresses[0].address;
-
-      // Bind server to address, and start listening for connections.
-      const socketInfo = binding.listen(
-        host,
-        port,
-        this._onNewConnection.bind(this)
-      );
-
-      // Update internal state.
-      this.#id = socketInfo.id;
-      this.#host = socketInfo.host;
-
-      // Everything OK, emit the listening event.
-      this.emit('listening', this.#host);
-    } catch (err) {
-      this.emit('error', err);
-    }
-  }
-
-  /**
-   * Returns the number of concurrent connections on the server.
-   *
-   * @returns Number
-   */
-  getConnections() {
-    return this.#connections;
   }
 
   /**
@@ -428,74 +268,244 @@ export class Server extends EventEmitter {
   }
 
   /**
-   * Stops the server from accepting new connections.
-   *
-   * @param {Function} [onClose]
+   * Resets socket's internal state (not to be called manually).
    */
-  async close(onClose) {
+  _reset() {
+    this.#pushQueue = [];
+    this.#pullQueue = [];
+    this.#connecting = false;
+    this.bytesRead = 0;
+    this.bytesWritten = 0;
+    this.remotePort = undefined;
+    this.remoteAddress = undefined;
+  }
+
+  _asyncDispatch(value) {
+    if (this.#pullQueue.length === 0) {
+      this.#pushQueue.push(value);
+      return;
+    }
+    const promise = this.#pullQueue.shift();
+    const action = value instanceof Error ? promise.reject : promise.resolve;
+    action(value);
+  }
+
+  _onAvailableSocketData(err, arrayBufferView) {
+    // Check for errors during socket read.
+    if (err) {
+      this._asyncDispatch(err);
+      this.emit('error', err);
+      return;
+    }
+
+    // Check if the remote host closed the connection.
+    if (arrayBufferView.byteLength === 0) {
+      this.emit('end');
+      this.destroy();
+      return;
+    }
+
+    this.bytesRead += arrayBufferView.byteLength;
+
+    // Transform ArrayBuffer into a Uint8Array we can use.
+    const data = new Uint8Array(arrayBufferView);
+    const data_transform = this.#encoding
+      ? new TextDecoder(this.#encoding).decode(new Uint8Array(data))
+      : data;
+
+    // Use the EE mode instead of the async-iterator.
+    if (this.listenerCount('data') > 0) {
+      this.emit('data', data_transform);
+      return;
+    }
+
+    this._asyncDispatch(data_transform);
+  }
+
+  /**
+   * Hard-sets the ID of the socket (ONLY for internal use).
+   *
+   * @param {Number} id
+   */
+  [kSetSocketIdUnchecked](id) {
+    this.#id = id;
+    this.#writable = true;
+    binding.readStart(this.#id, this._onAvailableSocketData.bind(this));
+  }
+
+  /**
+   * The socket should be async iterable.
+   */
+  async *[Symbol.asyncIterator]() {
+    let data;
+    while ((data = await this.read())) {
+      yield data;
+    }
+  }
+}
+
+/**
+ * A Server object is a wrapper around a TCP listener.
+ */
+export class Server extends EventEmitter {
+  #id;
+  #host;
+  #pushQueue;
+  #pullQueue;
+
+  /**
+   * Creates a new Server instance.
+   *
+   * @returns {Server}
+   */
+  constructor() {
+    super();
+    this.onConnection = undefined;
+    this.#pushQueue = [];
+    this.#pullQueue = [];
+  }
+
+  /**
+   * Starts listening for incoming connections.
+   *
+   * @param  {...any} args
+   * @returns Promise<Object>
+   */
+  async listen(...args) {
+    // Parse arguments.
+    const [port, hostUnchecked] = parseOptionsArgs(args);
+    const hostname = hostUnchecked || '127.0.0.1';
+
+    if (Number.isNaN(Number.parseInt(port))) {
+      throw new TypeError(`The "port" option must be castable to number.`);
+    }
+
+    if (hostname && typeof hostname !== 'string') {
+      throw new TypeError(`The "host" option must be of type string.`);
+    }
+
+    if (this.#id) {
+      throw new Error(`Server is already listening for connections.`);
+    }
+
+    // Use DNS lookup to resolve the local listening interface.
+    const addresses = await dns.lookup(hostname);
+
+    // Prefer IPv4 address.
+    const host = addresses.some((addr) => addr.family === 'IPv4')
+      ? addresses.filter((addr) => addr.family === 'IPv4')[0].address
+      : addresses[0].address;
+
+    // Bind server to address, and start listening for connections.
+    const socketInfo = binding.listen(
+      host,
+      port,
+      this._onAvailableConnection.bind(this)
+    );
+
+    this.#id = socketInfo.id;
+    this.#host = socketInfo.host;
+
+    this.emit('listening', this.#host);
+
+    return this.#host;
+  }
+
+  /**
+   * Waits for a TCP client to connect and accepts the connection.
+   *
+   * @returns {Promise<Socket>}
+   */
+  accept() {
+    // Check if the server is listening.
+    if (!this.#id) {
+      throw new Error(`Server is not bound to a port.`);
+    }
+
+    // HACK: The following is used to handle uncaught errors thrown
+    // from the event-emitter when no one is subscribed to the `error` event.
+    if (this.listenerCount('error') === 0) this.on('error', () => {});
+
+    // No available connection yet.
+    if (this.#pushQueue.length === 0) {
+      const { promise, promiseExt } = makeDeferredPromise();
+      this.#pullQueue.push(promiseExt);
+      return promise;
+    }
+
+    const socket = this.#pushQueue.shift();
+    const action = socket instanceof Error ? Promise.reject : Promise.resolve;
+
+    return action.call(Promise, socket);
+  }
+
+  /**
+   * Stops the server from accepting new connections.
+   */
+  async close() {
     // Check if the server is already closed.
     if (!this.#id) {
       throw new Error('Server is already closed.');
     }
-
-    // Check the type of onClose.
-    if (onClose) {
-      assert.isFunction(onClose);
-      this.once('close', () => onClose());
-    }
-
     await binding.close(this.#id);
-
     this.emit('close');
   }
 
-  _onNewConnection(err, sockInfo) {
+  /**
+   * Returns the bound address, the address family name and port of the socket.
+   *
+   * @returns {Object}
+   */
+  address() {
+    return this.#host;
+  }
+
+  _asyncDispatch(socket) {
+    if (this.#pullQueue.length === 0) {
+      this.#pushQueue.push(socket);
+      return;
+    }
+    const promise = this.#pullQueue.shift();
+    const action = socket instanceof Error ? promise.reject : promise.resolve;
+    action(socket);
+  }
+
+  _onAvailableConnection(err, sockInfo) {
     // Check for socket connection errors.
     if (err) {
+      this._asyncDispatch(err);
       this.emit('error', err);
       return;
     }
 
     // Create a new socket instance.
     const socket = new Socket();
-    socket._set_socket_id_unchecked(sockInfo.id);
-    socket.remoteAddress = sockInfo.remoteAddress;
-    socket.remotePort = sockInfo.remotePort;
+    const { id, remoteAddress, remotePort } = sockInfo;
 
-    // Update active concurrent connections when socket is closed.
-    socket.on('close', () => {
-      this.#connections--;
-    });
+    socket[kSetSocketIdUnchecked](id);
+    socket.remoteAddress = remoteAddress;
+    socket.remotePort = remotePort;
 
-    // Update active concurrent connections.
-    this.#connections++;
+    if (this.onConnection) {
+      this.onConnection(socket);
+      return;
+    }
 
-    // Notify listeners for the new connection.
-    this.emit('connection', socket);
+    if (this.listenerCount('connection') > 0) {
+      this.emit('connection', socket);
+      return;
+    }
+
+    this._asyncDispatch(socket);
   }
 
   /**
-   * Server should be an async iterator.
+   * The server should be async iterable.
    */
   async *[Symbol.asyncIterator]() {
-    const queue = [makeDeferredPromise()];
-    let done = false;
-    let idx = 0;
-
-    this.on('connection', (socket) => {
-      queue[idx].resolve(socket);
-      const promise = makeDeferredPromise();
-      idx++;
-      queue.push(promise);
-    });
-
-    this.on('close', () => (done = true));
-
-    while (!done) {
-      const data = await queue[0];
-      queue.shift();
-      idx--;
-      yield data;
+    let socket;
+    while ((socket = await this.accept())) {
+      yield socket;
     }
   }
 }
