@@ -197,7 +197,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 > Streams are very different from Node.js and are based on [async-generators](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGeneratorFunction).
 
 - [x] `pipe(source, ...targets)`: An alias of `pipeline()`.
-- [x] `pipeline(source, ...targets)`: Pipe between streams while forwarding errors and properly cleaning up.
+- [x] `pipeline(source, ...targets)`: Pipes between streams while forwarding errors.
 - [x] `compose(...targets)`: Combines two or more streams into a Duplex stream.
 
 ### Performance Measurement
