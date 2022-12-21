@@ -192,6 +192,14 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `Event: 'error'`: Emitted when an error occurs.
 - [x] `Event: 'close'`: Emitted once the socket is fully closed.
 
+### Stream
+
+> Streams are very different from Node.js and are based on [async-generators](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGeneratorFunction).
+
+- [x] `pipe(source, ...targets)`: An alias of `pipeline()`.
+- [x] `pipeline(source, ...targets)`: Pipe between streams while forwarding errors and properly cleaning up.
+- [x] `compose(...targets)`: Combines two or more streams into a Duplex stream.
+
 ### Performance Measurement
 
 - [x] `timeOrigin`: Specifies the millisecond timestamp at which the current process began.
