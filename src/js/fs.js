@@ -604,9 +604,9 @@ export function rmdirSync(path, options = {}, __retries = 0) {
 
 /**
  * Reads asynchronously the contents of a directory.
- * 
+ *
  * @param {String} path
- * @returns {Promise<String[]>}  
+ * @returns {Promise<String[]>}
  */
 export async function readdir(path) {
   // Check the path argument type.
@@ -619,11 +619,11 @@ export async function readdir(path) {
 
 /**
  * Reads the contents of a directory.
- * 
+ *
  * @param {String} path
  * @returns {String[]}
  */
- export function readdirSync(path) {
+export function readdirSync(path) {
   // Check the path argument type.
   if (typeof path !== 'string') {
     throw new TypeError('The "path" argument must be of type string.');
@@ -719,6 +719,57 @@ export function rmSync(path, options = {}, __retries = 0) {
   }
 }
 
+/**
+ * Returns a new readable IO stream.
+ *
+ * @param {String} path
+ * @param {(String|Object)} options
+ * @returns {AsyncGeneratorFunction}
+ */
+export function createReadStream(path, options = {}) {
+  // Use passed encoding or default to UTF-8.
+  const encoding = typeof options === 'string' ? options : options.encoding;
+  const textDecoder = new TextDecoder(encoding || 'utf-8');
+
+  // Create the async generator.
+  return async function* readStream(signal) {
+    // Open file and handle broken pipeline clean-ups.
+    const file = await open(path, options?.mode);
+    signal.on('uncaughtStreamException', () => file.close());
+    // Start consuming chunks.
+    for await (const chunk of file) {
+      yield encoding ? textDecoder.decode(chunk) : chunk;
+    }
+    file.close();
+  };
+}
+
+/**
+ * Returns a new writable IO stream.
+ *
+ * @param {String} path
+ * @param {(String|Object)} options
+ * @returns {Object}
+ */
+export function createWriteStream(path, options = {}) {
+  // We want to open the file the moment the stream becomes active.
+  let _handle;
+  const encoding = typeof options === 'string' ? options : options.encoding;
+
+  // Every object with `.write()` and `.end()` is a writable stream.
+  return {
+    async write(chunk) {
+      if (!_handle) _handle = await open(path, options.mode || 'w');
+      const data = toUint8Array(chunk, encoding || 'utf-8');
+      await _handle.write(data);
+    },
+    async end(chunk) {
+      if (chunk) await this.write(chunk);
+      if (_handle) await _handle.close();
+    },
+  };
+}
+
 export default {
   File,
   open,
@@ -739,4 +790,6 @@ export default {
   readdirSync,
   rm,
   rmSync,
+  createReadStream,
+  createWriteStream,
 };
