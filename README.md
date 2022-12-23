@@ -134,8 +134,8 @@ For more examples look at the <a href="./examples">examples</a> directory.
 > This module should also include a `Sync` method for every async operation available.
 
 - [x] `copyFile(src, dest)`: Copies `src` to `dest`.
-- [ ] `createReadStream(path, options?)`: Creates a readable IO stream. 🚧
-- [ ] `createWriteStream(path, options?)`: Creates a writable IO stream. 🚧
+- [x] `createReadStream(path, options?)`: Returns a new readable IO stream.
+- [x] `createWriteStream(path, options?)`: Returns a new writable IO stream.
 - [x] `open(path, mode?)`: Asynchronous file open.
 - [x] `mkdir(path, options?)`: Creates a directory.
 - [x] `readFile(path, options?)`: Reads the entire contents of a file.
@@ -194,7 +194,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 ### Stream
 
-> Streams are very different from Node.js and are based on [async-generators](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGeneratorFunction).
+> Streams are very different from Node.js and are based on [async-generators](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGenerator).
 
 - [x] `pipe(source, ...targets)`: An alias of `pipeline()`.
 - [x] `pipeline(source, ...targets)`: Pipes between streams while forwarding errors.
