@@ -300,6 +300,7 @@ export class Socket extends EventEmitter {
 
     // Check if the remote host closed the connection.
     if (arrayBufferView.byteLength === 0) {
+      this._asyncDispatch(null);
       this.emit('end');
       this.destroy();
       return;
@@ -339,6 +340,7 @@ export class Socket extends EventEmitter {
   async *[Symbol.asyncIterator]() {
     let data;
     while ((data = await this.read())) {
+      if (!data) break;
       yield data;
     }
   }
