@@ -56,6 +56,7 @@ Object.defineProperty(process, 'stdout', {
   get() {
     return {
       write: process.binding('stdio').write,
+      end() {},
     };
   },
   configurable: true,
