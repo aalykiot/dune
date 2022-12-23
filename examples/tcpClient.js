@@ -18,7 +18,7 @@ client.on('data', (data) => console.log(data));
 
 client.on('close', () => console.log('Connection closed.'));
 
-// 2. Using async iterators to handle data
+// 2. Using async iterators to handle data.
 
 const client2 = new net.Socket();
 
