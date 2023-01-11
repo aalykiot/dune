@@ -16,6 +16,9 @@ name = "dune"
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.26.1", features=["signal"] }
 
+[target.'cfg(windows)'.dependencies]
+enable-ansi-support = "0.2.1"
+
 [dependencies]
 v8 = { version = "0.58.0", default-features = false }
 clap = "4.0.27"
