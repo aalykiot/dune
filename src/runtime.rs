@@ -258,16 +258,16 @@ impl JsRuntime {
 
     /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
-        // Run the default MicrotaskQueue/NextTickQueue until they get empty.
-        run_next_tick_callbacks(&mut self.handle_scope());
-
         while self.event_loop.has_pending_events()
             || self.has_promise_rejections()
             || self.isolate.has_pending_background_tasks()
             || self.has_pending_dynamic_imports()
+            || self.has_next_tick_callbacks()
         {
-            // Tick the event loop.
+            // Run next-tick callbacks and tick the event-loop.
+            run_next_tick_callbacks(&mut self.handle_scope());
             self.tick_event_loop();
+
             // Report (and exit) if any unhandled promise rejection has been caught.
             if self.has_promise_rejections() {
                 println!("{:?}", self.promise_rejections().remove(0));
@@ -306,6 +306,11 @@ impl JsRuntime {
     /// Returns if we have dynamic imports in pending state.
     pub fn has_pending_dynamic_imports(&mut self) -> bool {
         !self.get_state().borrow().modules.dynamic_imports.is_empty()
+    }
+
+    /// Returns if we have scheduled any next-tick callbacks.
+    pub fn has_next_tick_callbacks(&mut self) -> bool {
+        !self.get_state().borrow().next_tick_queue.is_empty()
     }
 
     /// Returns all promise unhandled rejections.
