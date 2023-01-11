@@ -5,7 +5,7 @@ Dune is an open-source, cross-platform, shell around the **V8** engine, written 
 Developed completely for fun and experimentation.
 
 ![GitHub](https://img.shields.io/github/license/aalykiot/dune?style=flat-square)
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/aalykiot/dune/ci?style=flat-square)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/aalykiot/dune/ci.yml?branch=main&style=flat-square)
 
 ## Installation
 
