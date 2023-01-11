@@ -455,6 +455,7 @@ dependencies = [
  "dirs 4.0.0",
  "dns-lookup",
  "downcast-rs",
+ "enable-ansi-support",
  "lazy_static",
  "mio",
  "nanoid",
@@ -491,6 +492,15 @@ name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
+
+[[package]]
+name = "enable-ansi-support"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa4ff3ae2a9aa54bf7ee0983e59303224de742818c1822d89f07da9856d9bc60"
+dependencies = [
+ "windows-sys 0.42.0",
+]
 
 [[package]]
 name = "encoding_rs"

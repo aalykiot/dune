@@ -185,6 +185,12 @@ fn main() {
         setup_panic_hook();
     }
 
+    #[cfg(target_family = "windows")]
+    {
+        // In shitty platforms like Windows we have to manually enable ANSI colors. ¯\_(ツ)_/¯
+        let _ = enable_ansi_support::enable_ansi_support();
+    }
+
     // Try run dune as a compiled standalone program.
     match compile::extract_standalone() {
         Ok(Some(source)) => run_standalone(source),
