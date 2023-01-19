@@ -259,6 +259,7 @@ impl JsRuntime {
 
     /// Runs a single tick of the event-loop.
     pub fn tick_event_loop(&mut self) {
+        run_next_tick_callbacks(&mut self.handle_scope());
         self.event_loop.tick();
         self.run_pending_futures();
         self.prepare_dynamic_imports();
@@ -266,14 +267,16 @@ impl JsRuntime {
 
     /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
+        // Run callbacks/promises from next-tick and micro-task queues.
+        run_next_tick_callbacks(&mut self.handle_scope());
+
         while self.event_loop.has_pending_events()
             || self.has_promise_rejections()
             || self.isolate.has_pending_background_tasks()
             || self.has_pending_dynamic_imports()
             || self.has_next_tick_callbacks()
         {
-            // Run next-tick callbacks and tick the event-loop.
-            run_next_tick_callbacks(&mut self.handle_scope());
+            // Tick the event-loop one cycle.
             self.tick_event_loop();
 
             // Report (and exit) if any unhandled promise rejection has been caught.
