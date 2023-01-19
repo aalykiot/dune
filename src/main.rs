@@ -46,9 +46,14 @@ fn run_command(mut args: ArgMatches) {
     let script = args.remove_one::<String>("SCRIPT").unwrap();
     let reload = args.remove_one::<bool>("reload").unwrap_or_default();
     let import_map = args.remove_one::<String>("import-map");
+
     let seed = args
         .remove_one::<String>("seed")
         .map(|val| val.parse::<i64>().unwrap_or_default());
+
+    let num_threads = args
+        .remove_one::<String>("threadpool-size")
+        .map(|val| val.parse::<usize>().unwrap_or_default());
 
     let import_map = load_import_map(import_map);
 
@@ -64,6 +69,7 @@ fn run_command(mut args: ArgMatches) {
         seed,
         reload,
         import_map,
+        num_threads,
     };
 
     // Create new JS runtime.
@@ -211,7 +217,8 @@ fn main() {
                 .arg(arg!(<SCRIPT> "The script that will run").required(true))
                 .arg(arg!(-r --reload "Reload every URL import (cache is ignored)"))
                 .arg(arg!(--seed <NUMBER> "Make the Math.random() method predictable"))
-                .arg(arg!(--"import-map" <FILE> "Load import map file from local file")),
+                .arg(arg!(--"import-map" <FILE> "Load import map file from local file"))
+                .arg(arg!(--"threadpool-size" <NUMBER> "Set the number of threads used for I/O")),
         )
         .subcommand(
             Command::new("bundle")
