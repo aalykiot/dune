@@ -9,6 +9,8 @@ use mio::Poll;
 use mio::Registry;
 use mio::Token;
 use mio::Waker;
+use rayon::ThreadPool;
+use rayon::ThreadPoolBuilder;
 use std::any::type_name;
 use std::borrow::Cow;
 use std::cell::Cell;
@@ -20,13 +22,14 @@ use std::io::Read;
 use std::io::Write;
 use std::net::Shutdown;
 use std::net::SocketAddr;
+use std::num::NonZeroUsize;
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::thread;
 use std::time::Duration;
 use std::time::Instant;
-use threadpool::ThreadPool;
 
 /// Wrapper type for resource identification.
 pub type Index = u32;
@@ -169,11 +172,18 @@ pub struct EventLoop {
 
 impl EventLoop {
     /// Creates a new event-loop instance.
-    pub fn new() -> Self {
+    pub fn new(num_threads: usize) -> Self {
+        // Number of threads should always be a positive non-zero number.
+        assert!(num_threads > 0);
+
         let (action_dispatcher, action_queue) = mpsc::channel();
         let (event_dispatcher, event_queue) = mpsc::channel();
 
-        // Wrap event_dispatcher into a Arc<Mutex>.
+        let thread_pool = ThreadPoolBuilder::new()
+            .num_threads(num_threads)
+            .build()
+            .unwrap();
+
         let event_dispatcher = Arc::new(Mutex::new(event_dispatcher));
 
         // Create network handles.
@@ -190,7 +200,7 @@ impl EventLoop {
             action_dispatcher: Rc::new(action_dispatcher),
             check_queue: Vec::new(),
             close_queue: Vec::new(),
-            thread_pool: ThreadPool::new(4),
+            thread_pool,
             thread_pool_tasks: 0,
             event_dispatcher,
             event_queue,
@@ -462,16 +472,22 @@ impl EventLoop {
         }
 
         // Connection is OK, let's write some bytes...
+        let (data, on_write) = match tcp_wrap.write_queue.pop_front() {
+            Some(value) => value,
+            None => return,
+        };
 
-        if !tcp_wrap.write_queue.is_empty() {
-            // Get data and on_write callback.
-            let (data, on_write) = tcp_wrap.write_queue.pop_front().unwrap();
+        match tcp_wrap.socket.write(&data) {
+            Ok(n) => (on_write)(handle, index, Result::Ok(n)),
+            Err(err) => (on_write)(handle, index, Result::Err(err.into())),
+        };
 
-            // Try write some bytes to the socket.
-            match tcp_wrap.socket.write(&data) {
-                Ok(bytes_written) => (on_write)(handle, index, Result::Ok(bytes_written)),
-                Err(err) => (on_write)(handle, index, Result::Err(err.into())),
-            };
+        // Unregister write interest if the write_queue is empty.
+        if tcp_wrap.write_queue.is_empty() {
+            let token = Token(tcp_wrap.id as usize);
+            self.network_events
+                .reregister(&mut tcp_wrap.socket, token, Interest::READABLE)
+                .unwrap();
         }
     }
 
@@ -496,9 +512,8 @@ impl EventLoop {
         // Cast resource to TcpStreamWrap.
         let tcp_wrap = resource.downcast_mut::<TcpStreamWrap>().unwrap();
 
-        // Prepare the read buffer.
-        let mut buffer = vec![0; 4096];
-        let mut bytes_read = 0;
+        let mut data = vec![];
+        let mut data_buf = [0; 4096];
 
         // This will help us catch errors and FIN packets.
         let mut read_error: Option<io::Error> = None;
@@ -506,20 +521,14 @@ impl EventLoop {
 
         // We can (maybe) read from the connection.
         loop {
-            match tcp_wrap.socket.read(&mut buffer[bytes_read..]) {
+            match tcp_wrap.socket.read(&mut data_buf) {
                 // Reading 0 bytes means the other side has closed the
                 // connection or is done writing.
                 Ok(0) => {
                     connection_closed = true;
                     break;
                 }
-                Ok(n) => {
-                    bytes_read += n;
-                    // If the buffer is not big enough, extend it.
-                    if bytes_read == buffer.len() {
-                        buffer.resize(buffer.len() + 1024, 0);
-                    }
-                }
+                Ok(n) => data.extend_from_slice(&data_buf[..n]),
                 // Would block "errors" are the OS's way of saying that the
                 // connection is not actually ready to perform this I/O operation.
                 Err(err) if err.kind() == io::ErrorKind::WouldBlock => break,
@@ -535,6 +544,7 @@ impl EventLoop {
 
         let on_read = match tcp_wrap.on_read.as_mut() {
             Some(on_read) => on_read,
+            None if !connection_closed => return,
             None => {
                 self.close_queue.push((index, None));
                 return;
@@ -548,16 +558,14 @@ impl EventLoop {
             return;
         }
 
-        buffer.resize(bytes_read, 0);
-
-        match buffer.len() {
+        match data.len() {
             // FIN packet.
-            0 => (on_read)(handle, index, Result::Ok(buffer)),
+            0 => (on_read)(handle, index, Result::Ok(data)),
             // We read some bytes.
-            _ if !connection_closed => (on_read)(handle, index, Result::Ok(buffer)),
+            _ if !connection_closed => (on_read)(handle, index, Result::Ok(data)),
             // FIN packet is included to the bytes we read.
             _ => {
-                (on_read)(handle.clone(), index, Result::Ok(buffer));
+                (on_read)(handle.clone(), index, Result::Ok(data));
                 (on_read)(handle, index, Result::Ok(vec![]));
             }
         };
@@ -661,7 +669,7 @@ impl EventLoop {
             self.resources.insert(index, Box::new(task_wrap));
         }
 
-        self.thread_pool.execute({
+        self.thread_pool.spawn({
             let waker = self.waker.clone();
             move || {
                 let result = (task)();
@@ -782,13 +790,10 @@ impl EventLoop {
 
 impl Default for EventLoop {
     fn default() -> Self {
-        Self::new()
-    }
-}
+        let default_pool_size = unsafe { NonZeroUsize::new_unchecked(4) };
+        let num_cores = thread::available_parallelism().unwrap_or(default_pool_size);
 
-impl std::ops::Drop for EventLoop {
-    fn drop(&mut self) {
-        self.thread_pool.join();
+        Self::new(num_cores.into())
     }
 }
 

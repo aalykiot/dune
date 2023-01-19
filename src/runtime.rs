@@ -20,6 +20,7 @@ use crate::modules::ModuleMap;
 use anyhow::bail;
 use anyhow::Error;
 use std::cell::RefCell;
+use std::cmp;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Once;
@@ -69,6 +70,8 @@ pub struct JsRuntimeOptions {
     pub reload: bool,
     // Holds user defined import maps for module loading.
     pub import_map: Option<ImportMap>,
+    // The numbers of threads used by the threadpool.
+    pub num_threads: Option<usize>,
 }
 
 pub struct JsRuntime {
@@ -129,7 +132,12 @@ impl JsRuntime {
             v8::Global::new(scope, context)
         };
 
-        let event_loop = EventLoop::new();
+        const MIN_POOL_SIZE: usize = 1;
+
+        let event_loop = match options.num_threads {
+            Some(n) => EventLoop::new(cmp::max(n, MIN_POOL_SIZE)),
+            None => EventLoop::default(),
+        };
 
         let time_origin = SystemTime::now()
             .duration_since(UNIX_EPOCH)
