@@ -1,5 +1,5 @@
+use crate::errors::generic_error;
 use crate::errors::unwrap_or_exit;
-use crate::errors::JsError;
 use crate::event_loop::LoopHandle;
 use crate::event_loop::TaskResult;
 use crate::loaders::CoreModuleLoader;
@@ -89,24 +89,24 @@ impl ModuleMap {
 
     // Inserts a compiled ES module to the map.
     pub fn insert(&mut self, path: &str, module: v8::Global<v8::Module>) {
-        // No main module has been set, so let's update it's value.
+        // No main module has been set, so let's update the value.
         if self.main.is_none() && (fs::metadata(path).is_ok() || path.starts_with("http")) {
             self.main = Some(path.into());
         }
         self.index.insert(path.into(), module);
     }
 
-    // Returns if there are still pending graphs to be loaded.
+    // Returns if there are still pending imports to be loaded.
     pub fn has_pending_imports(&self) -> bool {
         !self.pending.is_empty()
     }
 
-    // Gets a v8 module reference from me module-map.
+    // Returns a v8 module reference from me module-map.
     pub fn get(&self, key: &str) -> Option<v8::Global<v8::Module>> {
         self.index.get(key).map(|entry| entry.clone())
     }
 
-    // Gets a specifier given a v8 module.
+    // Returns a specifier given a v8 module.
     pub fn get_path(&self, module: v8::Global<v8::Module>) -> Option<ModulePath> {
         self.index
             .iter()
@@ -120,10 +120,10 @@ impl ModuleMap {
     }
 }
 
-pub enum ResolutionType {
-    // Indicates the graph loads static imports.
+pub enum ImportKind {
+    // Loading static imports.
     Static,
-    // Indicates the graph loads a dynamic import.
+    // Loading a dynamic import.
     Dynamic(v8::Global<v8::PromiseResolver>),
 }
 
@@ -145,8 +145,13 @@ pub struct EsModule {
 }
 
 impl EsModule {
-    // Loops throw dependencies to check if the module is ready.
+    // Traverses the dependency tree to check if the module is ready.
     pub fn fast_forward(&mut self) {
+        // If the module is ready, no need to check the sub-tree.
+        if self.status == ModuleStatus::Ready {
+            return;
+        }
+
         // Fast-forward all dependencies.
         self.dependencies
             .iter_mut()
@@ -158,7 +163,7 @@ impl EsModule {
             return;
         }
 
-        // At this point, the module is still been fetched...
+        // At this point, the module is still being fetched...
         if self.dependencies.is_empty() {
             return;
         }
@@ -188,7 +193,7 @@ impl JsFuture for EsModuleFuture {
         let source = match source {
             Ok(source) => bincode::deserialize::<String>(&source).unwrap(),
             Err(e) => {
-                eprintln!("{:?}", e);
+                eprintln!("{:?}", generic_error(e.to_string()));
                 std::process::exit(1);
             }
         };
@@ -205,8 +210,8 @@ impl JsFuture for EsModuleFuture {
             None => {
                 assert!(tc_scope.has_caught());
                 let exception = tc_scope.exception().unwrap();
-                let exception = JsError::from_v8_exception(tc_scope, exception, None);
-                eprintln!("{:?}", exception);
+                let exception = exception.to_rust_string_lossy(tc_scope);
+                eprintln!("{:?}", generic_error(exception));
                 std::process::exit(1);
             }
         };
@@ -237,7 +242,7 @@ impl JsFuture for EsModuleFuture {
             let specifier = match resolve_import(base, &specifier, import_map.clone()) {
                 Ok(specifier) => specifier,
                 Err(e) => {
-                    eprintln!("{:?}", e);
+                    eprintln!("{:?}", generic_error(e.to_string()));
                     std::process::exit(1);
                 }
             };

@@ -380,6 +380,8 @@ impl JsRuntime {
             false
         });
 
+        // Note: We have to drop the sate ref here to avoid borrow panics
+        // during the module instantiation/evaluation process.
         drop(state);
 
         // Execute the root module.
@@ -411,6 +413,9 @@ impl JsRuntime {
             }
         }
 
+        // Note: It's important to perform a microtask checkpoint at this
+        // point to allow resources behind a promise to be scheduled correctly
+        // to the event-loop.
         scope.perform_microtask_checkpoint();
     }
 
