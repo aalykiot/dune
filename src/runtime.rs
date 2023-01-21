@@ -5,6 +5,7 @@ use crate::event_loop::EventLoop;
 use crate::event_loop::LoopHandle;
 use crate::event_loop::LoopInterruptHandle;
 use crate::event_loop::TaskResult;
+use crate::hooks::host_import_module_dynamically_cb;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
 use crate::hooks::promise_reject_cb;
@@ -12,9 +13,9 @@ use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
 use crate::modules::load_import;
 use crate::modules::resolve_import;
-use crate::modules::EsModule;
 use crate::modules::EsModuleFuture;
 use crate::modules::ImportMap;
+use crate::modules::ModuleGraph;
 use crate::modules::ModuleMap;
 use crate::modules::ModuleStatus;
 use anyhow::bail;
@@ -122,7 +123,7 @@ impl JsRuntime {
         isolate.set_microtasks_policy(v8::MicrotasksPolicy::Explicit);
         isolate.set_capture_stack_trace_for_uncaught_exceptions(true, 10);
         isolate.set_promise_reject_callback(promise_reject_cb);
-        // isolate.set_host_import_module_dynamically_callback(host_import_module_dynamically_cb);
+        isolate.set_host_import_module_dynamically_callback(host_import_module_dynamically_cb);
 
         isolate
             .set_host_initialize_import_meta_object_callback(host_initialize_import_meta_object_cb);
@@ -257,21 +258,18 @@ impl JsRuntime {
             false => unwrap_or_exit(resolve_import(None, filename, None)),
         };
 
-        // Create an ES module instance.
-        let module = Rc::new(RefCell::new(EsModule {
-            path: path.clone(),
-            status: ModuleStatus::Fetching,
-            dependencies: vec![],
-        }));
+        // Create static import module graph.
+        let graph = ModuleGraph::static_import(&path);
+        let graph_rc = Rc::new(RefCell::new(graph));
 
-        state.module_map.pending.push(Rc::clone(&module));
+        state.module_map.pending.push(Rc::clone(&graph_rc));
         state.module_map.seen.insert(path.clone());
 
         // If we have a source, create the es-module future.
         if let Some(source) = source {
             state.pending_futures.push(Box::new(EsModuleFuture {
                 path,
-                module: Rc::clone(&module),
+                module: Rc::clone(&graph_rc.borrow().root_rc),
                 maybe_result: Some(Ok(bincode::serialize(&source).unwrap())),
             }));
             return Ok(());
@@ -293,7 +291,7 @@ impl JsRuntime {
                 let mut state = state_rc.borrow_mut();
                 let future = EsModuleFuture {
                     path,
-                    module: Rc::clone(&module),
+                    module: Rc::clone(&graph_rc.borrow().root_rc),
                     maybe_result,
                 };
                 state.pending_futures.push(Box::new(future));
@@ -301,7 +299,6 @@ impl JsRuntime {
         };
 
         state.handle.spawn(task, Some(task_cb));
-
         Ok(())
     }
 
@@ -364,19 +361,20 @@ impl JsRuntime {
         let state_rc = JsRuntime::state(scope);
         let mut state = state_rc.borrow_mut();
 
-        let mut ready_root_modules = vec![];
+        let mut ready_imports = vec![];
 
-        state.module_map.pending.retain(|root_rc| {
-            // Get a mut ref to the graph.
-            let mut root = root_rc.borrow_mut();
+        state.module_map.pending.retain(|graph_rc| {
+            // Get a usable ref to graph's root module.
+            let graph = graph_rc.borrow();
+            let mut graph_root = graph.root_rc.borrow_mut();
 
             // If the graph is still loading, fast-forward the dependencies.
-            if root.status != ModuleStatus::Ready {
-                root.fast_forward();
+            if graph_root.status != ModuleStatus::Ready {
+                graph_root.fast_forward();
                 return true;
             }
 
-            ready_root_modules.push(root.path.clone());
+            ready_imports.push(Rc::clone(&graph_rc));
             false
         });
 
@@ -384,10 +382,13 @@ impl JsRuntime {
         // during the module instantiation/evaluation process.
         drop(state);
 
-        // Execute the root module.
-        for path in ready_root_modules {
+        // Execute the root module from the graph.
+        for graph_rc in ready_imports {
             // Create a tc scope.
             let tc_scope = &mut v8::TryCatch::new(scope);
+
+            let graph = graph_rc.borrow();
+            let path = graph.root_rc.borrow().path.clone();
 
             let module = state_rc.borrow().module_map.get(&path).unwrap();
             let module = v8::Local::new(tc_scope, module);

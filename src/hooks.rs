@@ -1,6 +1,7 @@
 use crate::bindings::throw_type_error;
 use crate::errors::unwrap_or_exit;
 use crate::modules::resolve_import;
+use crate::modules::ModuleGraph;
 use crate::runtime::JsRuntime;
 
 /// Called during Module::instantiate_module.
@@ -125,67 +126,41 @@ pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
 
 // Called when we require the embedder to load a module.
 // https://docs.rs/v8/0.56.1/v8/trait.HostImportModuleDynamicallyCallback.html
-// pub fn host_import_module_dynamically_cb<'s>(
-//     scope: &mut v8::HandleScope<'s>,
-//     _: v8::Local<'s, v8::Data>,
-//     base: v8::Local<'s, v8::Value>,
-//     specifier: v8::Local<'s, v8::String>,
-//     _: v8::Local<v8::FixedArray>,
-// ) -> Option<v8::Local<'s, v8::Promise>> {
-//     // Get module base and specifier as strings.
-//     let base = base.to_rust_string_lossy(scope);
-//     let specifier = specifier.to_rust_string_lossy(scope);
+pub fn host_import_module_dynamically_cb<'s>(
+    scope: &mut v8::HandleScope<'s>,
+    _: v8::Local<'s, v8::Data>,
+    base: v8::Local<'s, v8::Value>,
+    specifier: v8::Local<'s, v8::String>,
+    _: v8::Local<v8::FixedArray>,
+) -> Option<v8::Local<'s, v8::Promise>> {
+    // Get module base and specifier as strings.
+    let base = base.to_rust_string_lossy(scope);
+    let specifier = specifier.to_rust_string_lossy(scope);
 
-//     // Create the import promise.
-//     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
-//     let promise = promise_resolver.get_promise(scope);
+    // Create the import promise.
+    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+    let promise = promise_resolver.get_promise(scope);
 
-//     let state_rc = JsRuntime::state(scope);
-//     let mut state = state_rc.borrow_mut();
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow_mut();
 
-//     let import_map = state.options.import_map.clone();
+    let import_map = state.options.import_map.clone();
 
-//     let specifier = match resolve_import(Some(&base), &specifier, import_map) {
-//         Ok(specifier) => specifier,
-//         Err(e) => {
-//             let exception = v8::String::new(scope, &e.to_string()[18..]).unwrap();
-//             let exception = v8::Exception::error(scope, exception);
-//             promise_resolver.reject(scope, exception);
-//             return Some(promise);
-//         }
-//     };
+    let specifier = match resolve_import(Some(&base), &specifier, import_map) {
+        Ok(specifier) => specifier,
+        Err(e) => {
+            let exception = v8::String::new(scope, &e.to_string()[18..]).unwrap();
+            let exception = v8::Exception::error(scope, exception);
+            promise_resolver.reject(scope, exception);
+            return Some(promise);
+        }
+    };
 
-//     let global_promise = v8::Global::new(scope, promise_resolver);
+    // Create a new module graph.
+    let global_promise = v8::Global::new(scope, promise_resolver);
+    let _ = ModuleGraph::dynamic_import(&specifier, global_promise);
 
-//     let seen_import = state
-//         .modules
-//         .new_dynamic_import(scope, &specifier, global_promise.clone());
+    // TODO...
 
-//     if !seen_import {
-//         // Use the event-loop to asynchronously load the requested module.
-//         let task = {
-//             let specifier = specifier.clone();
-//             move || match load_import(&specifier, true) {
-//                 Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
-//                 Err(e) => Some(Result::Err(e)),
-//             }
-//         };
-
-//         let task_cb = {
-//             let state_rc = state_rc.clone();
-//             move |_: LoopHandle, maybe_result: TaskResult| {
-//                 let mut state = state_rc.borrow_mut();
-//                 let future = EsModuleFuture {
-//                     specifier,
-//                     promise: Some(global_promise),
-//                     maybe_result,
-//                 };
-//                 state.pending_futures.push(Box::new(future));
-//             }
-//         };
-
-//         state.handle.spawn(task, Some(task_cb));
-//     };
-
-//     Some(promise)
-// }
+    Some(promise)
+}

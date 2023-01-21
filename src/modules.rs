@@ -73,7 +73,7 @@ pub struct ModuleMap {
     pub main: Option<ModulePath>,
     pub index: HashMap<ModulePath, v8::Global<v8::Module>>,
     pub seen: HashSet<ModulePath>,
-    pub pending: Vec<Rc<RefCell<EsModule>>>,
+    pub pending: Vec<Rc<RefCell<ModuleGraph>>>,
 }
 
 impl ModuleMap {
@@ -120,6 +120,7 @@ impl ModuleMap {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum ImportKind {
     // Loading static imports.
     Static,
@@ -175,6 +176,44 @@ impl EsModule {
             .any(|status| status != ModuleStatus::Ready)
         {
             self.status = ModuleStatus::Ready;
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ModuleGraph {
+    pub kind: ImportKind,
+    pub root_rc: Rc<RefCell<EsModule>>,
+}
+
+impl ModuleGraph {
+    // Initializes a new graph resolving a static import.
+    pub fn static_import(path: &str) -> ModuleGraph {
+        // Create an ES module instance.
+        let module = Rc::new(RefCell::new(EsModule {
+            path: path.into(),
+            status: ModuleStatus::Fetching,
+            dependencies: vec![],
+        }));
+
+        Self {
+            kind: ImportKind::Static,
+            root_rc: module,
+        }
+    }
+
+    // Initializes a new graph resolving a dynamic import.
+    pub fn dynamic_import(path: &str, promise: v8::Global<v8::PromiseResolver>) -> ModuleGraph {
+        // Create an ES module instance.
+        let module = Rc::new(RefCell::new(EsModule {
+            path: path.into(),
+            status: ModuleStatus::Fetching,
+            dependencies: vec![],
+        }));
+
+        Self {
+            kind: ImportKind::Dynamic(promise),
+            root_rc: module,
         }
     }
 }
