@@ -19,18 +19,13 @@ pub fn module_resolve_cb<'a>(
     let import_map = state.options.import_map.clone();
     let referrer = v8::Global::new(scope, referrer);
 
-    let dependant = state
-        .modules
-        .iter()
-        .find(|(_, module)| **module == referrer)
-        .map(|(path, _)| path.clone());
+    let dependant = state.module_map.get_path(referrer.clone());
 
     let specifier = specifier.to_rust_string_lossy(scope);
     let specifier = unwrap_or_exit(resolve_import(dependant.as_deref(), &specifier, import_map));
 
-    // This call should always give us back the module. Any errors will be caught
-    // on the `fetch_module_tree` step.
-    let module = state.modules.get(&specifier).unwrap().clone();
+    // This call should always give us back the module.
+    let module = state.module_map.get(&specifier).unwrap();
 
     Some(v8::Local::new(scope, module))
 }
@@ -50,14 +45,8 @@ pub extern "C" fn host_initialize_import_meta_object_cb(
     // Make the module global.
     let module = v8::Global::new(scope, module);
 
-    let url = state
-        .modules
-        .iter()
-        .find(|(_, m)| **m == module)
-        .map(|(p, _)| p.clone())
-        .unwrap();
-
-    let is_main = state.modules.main() == Some(url.to_owned());
+    let url = state.module_map.get_path(module.clone()).unwrap();
+    let is_main = state.module_map.main() == Some(url.to_owned());
 
     // Setup import.url property.
     let key = v8::String::new(scope, "url").unwrap();
@@ -134,43 +123,69 @@ pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
     }
 }
 
-/// Called when we require the embedder to load a module.
-/// https://docs.rs/v8/0.56.1/v8/trait.HostImportModuleDynamicallyCallback.html
-pub fn host_import_module_dynamically_cb<'s>(
-    scope: &mut v8::HandleScope<'s>,
-    _: v8::Local<'s, v8::Data>,
-    base: v8::Local<'s, v8::Value>,
-    specifier: v8::Local<'s, v8::String>,
-    _: v8::Local<v8::FixedArray>,
-) -> Option<v8::Local<'s, v8::Promise>> {
-    // Get module base and specifier as strings.
-    let base = base.to_rust_string_lossy(scope);
-    let specifier = specifier.to_rust_string_lossy(scope);
+// Called when we require the embedder to load a module.
+// https://docs.rs/v8/0.56.1/v8/trait.HostImportModuleDynamicallyCallback.html
+// pub fn host_import_module_dynamically_cb<'s>(
+//     scope: &mut v8::HandleScope<'s>,
+//     _: v8::Local<'s, v8::Data>,
+//     base: v8::Local<'s, v8::Value>,
+//     specifier: v8::Local<'s, v8::String>,
+//     _: v8::Local<v8::FixedArray>,
+// ) -> Option<v8::Local<'s, v8::Promise>> {
+//     // Get module base and specifier as strings.
+//     let base = base.to_rust_string_lossy(scope);
+//     let specifier = specifier.to_rust_string_lossy(scope);
 
-    // Create the import promise.
-    let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
-    let promise = promise_resolver.get_promise(scope);
+//     // Create the import promise.
+//     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
+//     let promise = promise_resolver.get_promise(scope);
 
-    let state_rc = JsRuntime::state(scope);
-    let import_map = state_rc.borrow().options.import_map.clone();
+//     let state_rc = JsRuntime::state(scope);
+//     let mut state = state_rc.borrow_mut();
 
-    let specifier = match resolve_import(Some(&base), &specifier, import_map) {
-        Ok(specifier) => specifier,
-        Err(e) => {
-            let exception = v8::String::new(scope, &e.to_string()[18..]).unwrap();
-            let exception = v8::Exception::error(scope, exception);
-            promise_resolver.reject(scope, exception);
-            return Some(promise);
-        }
-    };
+//     let import_map = state.options.import_map.clone();
 
-    let global_promise = v8::Global::new(scope, promise_resolver);
+//     let specifier = match resolve_import(Some(&base), &specifier, import_map) {
+//         Ok(specifier) => specifier,
+//         Err(e) => {
+//             let exception = v8::String::new(scope, &e.to_string()[18..]).unwrap();
+//             let exception = v8::Exception::error(scope, exception);
+//             promise_resolver.reject(scope, exception);
+//             return Some(promise);
+//         }
+//     };
 
-    // Register a new dynamic import.
-    state_rc
-        .borrow_mut()
-        .modules
-        .new_dynamic_import(scope, &specifier, global_promise);
+//     let global_promise = v8::Global::new(scope, promise_resolver);
 
-    Some(promise)
-}
+//     let seen_import = state
+//         .modules
+//         .new_dynamic_import(scope, &specifier, global_promise.clone());
+
+//     if !seen_import {
+//         // Use the event-loop to asynchronously load the requested module.
+//         let task = {
+//             let specifier = specifier.clone();
+//             move || match load_import(&specifier, true) {
+//                 Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
+//                 Err(e) => Some(Result::Err(e)),
+//             }
+//         };
+
+//         let task_cb = {
+//             let state_rc = state_rc.clone();
+//             move |_: LoopHandle, maybe_result: TaskResult| {
+//                 let mut state = state_rc.borrow_mut();
+//                 let future = EsModuleFuture {
+//                     specifier,
+//                     promise: Some(global_promise),
+//                     maybe_result,
+//                 };
+//                 state.pending_futures.push(Box::new(future));
+//             }
+//         };
+
+//         state.handle.spawn(task, Some(task_cb));
+//     };
+
+//     Some(promise)
+// }

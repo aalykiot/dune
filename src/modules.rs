@@ -1,6 +1,7 @@
 use crate::errors::unwrap_or_exit;
+use crate::errors::JsError;
+use crate::event_loop::LoopHandle;
 use crate::event_loop::TaskResult;
-use crate::hooks::module_resolve_cb;
 use crate::loaders::CoreModuleLoader;
 use crate::loaders::FsModuleLoader;
 use crate::loaders::ModuleLoader;
@@ -12,11 +13,13 @@ use anyhow::Result;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::rc::Rc;
 use url::Url;
 
 lazy_static! {
@@ -66,137 +69,222 @@ pub fn create_origin<'s>(
 pub type ModulePath = String;
 pub type ModuleSource = String;
 
-#[derive(Default)]
-#[allow(dead_code)]
-/// Holds information about resolved ES modules.
 pub struct ModuleMap {
-    main: Option<ModulePath>,
-    modules: HashMap<ModulePath, v8::Global<v8::Module>>,
-    pub dynamic_imports_seen: HashSet<ModulePath>,
-    pub dynamic_imports: Vec<(ModulePath, v8::Global<v8::PromiseResolver>)>,
+    pub main: Option<ModulePath>,
+    pub index: HashMap<ModulePath, v8::Global<v8::Module>>,
+    pub seen: HashSet<ModulePath>,
+    pub pending: Vec<Rc<RefCell<EsModule>>>,
 }
 
 impl ModuleMap {
-    /// Registers a new ES module to the map.
-    pub fn new_es_module<'a>(
-        &mut self,
-        scope: &mut v8::HandleScope<'a>,
-        path: &str,
-        module: v8::Local<'a, v8::Module>,
-    ) {
-        // Make a global ref.
-        let module = v8::Global::new(scope, module);
-        let should_update_main =
-            self.main.is_none() && (fs::metadata(path).is_ok() || path.starts_with("http"));
+    // Creates a new module-map instance.
+    pub fn new() -> ModuleMap {
+        Self {
+            main: None,
+            index: HashMap::new(),
+            seen: HashSet::new(),
+            pending: vec![],
+        }
+    }
 
+    // Inserts a compiled ES module to the map.
+    pub fn insert(&mut self, path: &str, module: v8::Global<v8::Module>) {
         // No main module has been set, so let's update it's value.
-        if should_update_main {
+        if self.main.is_none() && (fs::metadata(path).is_ok() || path.starts_with("http")) {
             self.main = Some(path.into());
         }
-
-        self.modules.insert(path.into(), module);
+        self.index.insert(path.into(), module);
     }
 
-    /// Registers a new dynamic import.
-    pub fn new_dynamic_import<'s>(
-        &mut self,
-        scope: &mut v8::HandleScope<'s>,
-        specifier: &str,
-        promise: v8::Global<v8::PromiseResolver>,
-    ) {
-        // Check if we have the requested module to our cache.
-        if let Some(module) = self.modules.get(specifier) {
-            let module = v8::Local::new(scope, module);
-            let namespace = module.get_module_namespace();
-            promise.open(scope).resolve(scope, namespace);
-            return;
-        }
-
-        self.dynamic_imports.push((specifier.to_string(), promise));
+    // Returns if there are still pending graphs to be loaded.
+    pub fn has_pending_imports(&self) -> bool {
+        !self.pending.is_empty()
     }
 
-    /// Returns the main module.
+    // Gets a v8 module reference from me module-map.
+    pub fn get(&self, key: &str) -> Option<v8::Global<v8::Module>> {
+        self.index.get(key).map(|entry| entry.clone())
+    }
+
+    // Gets a specifier given a v8 module.
+    pub fn get_path(&self, module: v8::Global<v8::Module>) -> Option<ModulePath> {
+        self.index
+            .iter()
+            .find(|(_, m)| **m == module)
+            .map(|(p, _)| p.clone())
+    }
+
+    // Returns the main entry point.
     pub fn main(&self) -> Option<ModulePath> {
         self.main.clone()
     }
 }
 
-pub struct DynamicImportFuture {
-    pub specifier: String,
-    pub maybe_result: TaskResult,
-    pub promise: v8::Global<v8::PromiseResolver>,
+pub enum ResolutionType {
+    // Indicates the graph loads static imports.
+    Static,
+    // Indicates the graph loads a dynamic import.
+    Dynamic(v8::Global<v8::PromiseResolver>),
 }
 
-impl JsFuture for DynamicImportFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
-        // Extract the result.
-        let result = self.maybe_result.take().unwrap();
+#[derive(Debug, Clone, PartialEq)]
+pub enum ModuleStatus {
+    // Indicates the module is been fetched.
+    Fetching,
+    // Indicates the module's deps are been fetched.
+    Resolving,
+    // Indicates the modules is resolved.
+    Ready,
+}
 
-        // Handle when something goes wrong with loading the import.
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
-            self.promise.open(scope).reject(scope, exception);
+#[derive(Debug)]
+pub struct EsModule {
+    pub path: ModulePath,
+    pub status: ModuleStatus,
+    pub dependencies: Vec<Rc<RefCell<EsModule>>>,
+}
+
+impl EsModule {
+    // Loops throw dependencies to check if the module is ready.
+    pub fn fast_forward(&mut self) {
+        // Fast-forward all dependencies.
+        self.dependencies
+            .iter_mut()
+            .for_each(|dep| dep.borrow_mut().fast_forward());
+
+        // The module is compiled and has 0 dependencies.
+        if self.dependencies.is_empty() && self.status == ModuleStatus::Resolving {
+            self.status = ModuleStatus::Ready;
             return;
         }
 
-        // Otherwise, get the result and deserialize it.
-        let source = result.unwrap();
-        let source: String = bincode::deserialize(&source).unwrap();
+        // At this point, the module is still been fetched...
+        if self.dependencies.is_empty() {
+            return;
+        }
 
-        // Create a try-catch scope.
-        let tc_scope = &mut v8::TryCatch::new(scope);
+        if !self
+            .dependencies
+            .iter_mut()
+            .map(|m| m.borrow().status.clone())
+            .any(|status| status != ModuleStatus::Ready)
+        {
+            self.status = ModuleStatus::Ready;
+        }
+    }
+}
 
-        // Compile source and resolve dependencies.
-        // TODO(aalykiot): Make the dependency resolution async.
-        let module = match fetch_module_tree(tc_scope, &self.specifier, Some(&source)) {
-            Some(module) => module,
-            None => {
-                let exception = tc_scope.exception().unwrap();
-                self.promise.open(tc_scope).reject(tc_scope, exception);
-                return;
+pub struct EsModuleFuture {
+    pub path: ModulePath,
+    pub module: Rc<RefCell<EsModule>>,
+    pub maybe_result: TaskResult,
+}
+
+impl JsFuture for EsModuleFuture {
+    /// Drives the future to completion.
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        // Extract module's source code.
+        let source = self.maybe_result.take().unwrap();
+        let source = match source {
+            Ok(source) => bincode::deserialize::<String>(&source).unwrap(),
+            Err(e) => {
+                eprintln!("{:?}", e);
+                std::process::exit(1);
             }
         };
 
-        // Instantiate ES module (also resolves module's dependencies).
-        if module
-            .instantiate_module(tc_scope, module_resolve_cb)
-            .is_none()
-        {
-            assert!(tc_scope.has_caught());
-            let exception = tc_scope.exception().unwrap();
-            self.promise.open(tc_scope).reject(tc_scope, exception);
-            return;
+        let tc_scope = &mut v8::TryCatch::new(scope);
+        let origin = create_origin(tc_scope, &self.path, true);
+
+        // Compile source and get it's dependencies.
+        let source = v8::String::new(tc_scope, &source).unwrap();
+        let source = v8::script_compiler::Source::new(source, Some(&origin));
+
+        let module = match v8::script_compiler::compile_module(tc_scope, source) {
+            Some(module) => module,
+            None => {
+                assert!(tc_scope.has_caught());
+                let exception = tc_scope.exception().unwrap();
+                let exception = JsError::from_v8_exception(tc_scope, exception, None);
+                eprintln!("{:?}", exception);
+                std::process::exit(1);
+            }
+        };
+
+        let state_rc = JsRuntime::state(tc_scope);
+        let mut state = state_rc.borrow_mut();
+
+        state
+            .module_map
+            .insert(&self.path, v8::Global::new(tc_scope, module));
+
+        let import_map = state.options.import_map.clone();
+        let skip_cache = state.options.reload;
+
+        let mut dependencies = vec![];
+
+        let requests = module.get_module_requests();
+        let base = self.path.clone();
+
+        for i in 0..requests.length() {
+            // Get import request from the `module_requests` array.
+            let request = requests.get(tc_scope, i).unwrap();
+            let request = v8::Local::<v8::ModuleRequest>::try_from(request).unwrap();
+
+            // Transform v8's ModuleRequest into Rust string.
+            let base = Some(base.as_str());
+            let specifier = request.get_specifier().to_rust_string_lossy(tc_scope);
+            let specifier = match resolve_import(base, &specifier, import_map.clone()) {
+                Ok(specifier) => specifier,
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            // Requested module has been seen already.
+            if state.module_map.seen.contains(&specifier) {
+                continue;
+            }
+
+            state.module_map.seen.insert(specifier.clone());
+
+            // Create a new ES module instance.
+            let module = Rc::new(RefCell::new(EsModule {
+                path: specifier.clone(),
+                status: ModuleStatus::Fetching,
+                dependencies: vec![],
+            }));
+
+            dependencies.push(Rc::clone(&module));
+
+            // Use the event-loop to asynchronously load the requested module.
+            let task = {
+                let specifier = specifier.clone();
+                move || match load_import(&specifier, skip_cache) {
+                    Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
+                    Err(e) => Some(Result::Err(e)),
+                }
+            };
+
+            let task_cb = {
+                let state_rc = state_rc.clone();
+                move |_: LoopHandle, maybe_result: TaskResult| {
+                    let mut state = state_rc.borrow_mut();
+                    let future = EsModuleFuture {
+                        path: specifier,
+                        module: Rc::clone(&module),
+                        maybe_result,
+                    };
+                    state.pending_futures.push(Box::new(future));
+                }
+            };
+
+            state.handle.spawn(task, Some(task_cb));
         }
 
-        let _ = module.evaluate(tc_scope);
-
-        // Check for module evaluation errors.
-        if module.get_status() == v8::ModuleStatus::Errored {
-            let exception = module.get_exception();
-            self.promise.open(tc_scope).reject(tc_scope, exception);
-            return;
-        }
-
-        // Note: Since this is a dynamic import will resolve the promise
-        // with the module's namespace object instead of it's evaluation result.
-        self.promise
-            .open(tc_scope)
-            .resolve(tc_scope, module.get_module_namespace());
-    }
-}
-
-impl std::ops::Deref for ModuleMap {
-    type Target = HashMap<ModulePath, v8::Global<v8::Module>>;
-    fn deref(&self) -> &Self::Target {
-        &self.modules
-    }
-}
-
-impl std::ops::DerefMut for ModuleMap {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.modules
+        self.module.borrow_mut().status = ModuleStatus::Resolving;
+        self.module.borrow_mut().dependencies = dependencies;
     }
 }
 
@@ -250,65 +338,6 @@ pub fn load_import(specifier: &str, skip_cache: bool) -> Result<ModuleSource> {
 
     // Load module.
     loader.load(specifier)
-}
-
-/// Resolves module imports ahead of time (useful for async).
-/// https://source.chromium.org/chromium/v8/v8.git/+/51e736ca62bd5c7bfd82488a5587fed31dbf45d5:src/d8.cc;l=741
-pub fn fetch_module_tree<'a>(
-    scope: &mut v8::HandleScope<'a>,
-    filename: &str,
-    source: Option<&str>,
-) -> Option<v8::Local<'a, v8::Module>> {
-    // Create a script origin.
-    let origin = create_origin(scope, filename, true);
-    let state = JsRuntime::state(scope);
-
-    // This options is used only when loading URL imports.
-    let skip_cache = state.borrow().options.reload;
-
-    // Find appropriate loader if source is empty.
-    let source = match source {
-        Some(source) => source.into(),
-        None => unwrap_or_exit(load_import(filename, skip_cache)),
-    };
-    let source = v8::String::new(scope, &source).unwrap();
-    let source = v8::script_compiler::Source::new(source, Some(&origin));
-
-    let module = match v8::script_compiler::compile_module(scope, source) {
-        Some(module) => module,
-        None => return None,
-    };
-
-    let import_map = state.borrow().options.import_map.clone();
-
-    // Add ES module to map.
-    state
-        .borrow_mut()
-        .modules
-        .new_es_module(scope, filename, module);
-
-    let requests = module.get_module_requests();
-
-    for i in 0..requests.length() {
-        // Get import request from the `module_requests` array.
-        let request = requests.get(scope, i).unwrap();
-        let request = v8::Local::<v8::ModuleRequest>::try_from(request).unwrap();
-
-        // Transform v8's ModuleRequest into Rust string.
-        let specifier = request.get_specifier().to_rust_string_lossy(scope);
-        let specifier = unwrap_or_exit(resolve_import(
-            Some(filename),
-            &specifier,
-            import_map.clone(),
-        ));
-
-        // Resolve subtree of modules.
-        if !state.borrow().modules.contains_key(&specifier) {
-            fetch_module_tree(scope, &specifier, None)?;
-        }
-    }
-
-    Some(module)
 }
 
 /// A single import mapping (specifier, target).
@@ -371,4 +400,53 @@ impl ImportMap {
             None => Some(specifier.replacen(&base, &target, 1)),
         }
     }
+}
+
+/// Resolves module imports synchronously.
+/// https://source.chromium.org/chromium/v8/v8.git/+/51e736ca62bd5c7bfd82488a5587fed31dbf45d5:src/d8.cc;l=741
+pub fn fetch_module_tree<'a>(
+    scope: &mut v8::HandleScope<'a>,
+    filename: &str,
+    source: Option<&str>,
+) -> Option<v8::Local<'a, v8::Module>> {
+    // Create a script origin.
+    let origin = create_origin(scope, filename, true);
+    let state = JsRuntime::state(scope);
+
+    // Find appropriate loader if source is empty.
+    let source = match source {
+        Some(source) => source.into(),
+        None => unwrap_or_exit(load_import(filename, true)),
+    };
+    let source = v8::String::new(scope, &source).unwrap();
+    let source = v8::script_compiler::Source::new(source, Some(&origin));
+
+    let module = match v8::script_compiler::compile_module(scope, source) {
+        Some(module) => module,
+        None => return None,
+    };
+
+    // Subscribe module to the module-map.
+    let path = filename.into();
+    let module_ref = v8::Global::new(scope, module);
+    state.borrow_mut().module_map.insert(path, module_ref);
+
+    let requests = module.get_module_requests();
+
+    for i in 0..requests.length() {
+        // Get import request from the `module_requests` array.
+        let request = requests.get(scope, i).unwrap();
+        let request = v8::Local::<v8::ModuleRequest>::try_from(request).unwrap();
+
+        // Transform v8's ModuleRequest into Rust string.
+        let specifier = request.get_specifier().to_rust_string_lossy(scope);
+        let specifier = unwrap_or_exit(resolve_import(Some(filename), &specifier, None));
+
+        // Resolve subtree of modules.
+        if !state.borrow().module_map.index.contains_key(&specifier) {
+            fetch_module_tree(scope, &specifier, None)?;
+        }
+    }
+
+    Some(module)
 }
