@@ -369,6 +369,25 @@ impl JsRuntime {
             let graph = graph_rc.borrow();
             let mut graph_root = graph.root_rc.borrow_mut();
 
+            // Check for exceptions in the graph (dynamic imports).
+            if let Some(message) = graph_root.exception.borrow_mut().take() {
+                // Create a v8 exception.
+                let exception = v8::String::new(scope, &message).unwrap();
+                let exception = v8::Exception::error(scope, exception);
+
+                // We need to resolve all identical dynamic imports.
+                match graph.kind.clone() {
+                    ImportKind::Static => unreachable!(),
+                    ImportKind::Dynamic(main_promise) => {
+                        for promise in vec![main_promise].iter().chain(graph.same_origin.iter()) {
+                            promise.open(scope).reject(scope, exception);
+                        }
+                    }
+                }
+
+                return false;
+            }
+
             // If the graph is still loading, fast-forward the dependencies.
             if graph_root.status != ModuleStatus::Ready {
                 graph_root.fast_forward();
@@ -419,7 +438,7 @@ impl JsRuntime {
                 // with the module's namespace object instead of it's evaluation result.
                 let namespace = module.get_module_namespace();
 
-                // We also need to resolve/reject all identical dynamic imports.
+                // We need to resolve all identical dynamic imports.
                 for promise in vec![main_promise].iter().chain(graph.same_origin.iter()) {
                     promise.open(tc_scope).resolve(tc_scope, namespace);
                 }

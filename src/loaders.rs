@@ -79,7 +79,7 @@ impl FsModuleLoader {
 
         // 3. Bail out with an error.
         let err_message = format!("Module not found \"{}\"", path.display());
-        bail!(generic_error(err_message));
+        bail!(err_message);
     }
 
     /// Loads import as directory using the 'index.[ext]' convention.

@@ -144,6 +144,8 @@ pub struct EsModule {
     pub path: ModulePath,
     pub status: ModuleStatus,
     pub dependencies: Vec<Rc<RefCell<EsModule>>>,
+    pub exception: Rc<RefCell<Option<String>>>,
+    pub is_dynamic_import: bool,
 }
 
 impl EsModule {
@@ -196,6 +198,8 @@ impl ModuleGraph {
             path: path.into(),
             status: ModuleStatus::Fetching,
             dependencies: vec![],
+            exception: Rc::new(RefCell::new(None)),
+            is_dynamic_import: false,
         }));
 
         Self {
@@ -212,6 +216,8 @@ impl ModuleGraph {
             path: path.into(),
             status: ModuleStatus::Fetching,
             dependencies: vec![],
+            exception: Rc::new(RefCell::new(None)),
+            is_dynamic_import: true,
         }));
 
         Self {
@@ -228,6 +234,21 @@ pub struct EsModuleFuture {
     pub maybe_result: TaskResult,
 }
 
+impl EsModuleFuture {
+    // Handles an error based on the import type.
+    fn handle_failure(&mut self, e: anyhow::Error) {
+        let module = self.module.borrow();
+        // In dynamic imports we reject the promise(s).
+        if module.is_dynamic_import {
+            module.exception.borrow_mut().replace(e.to_string());
+            return;
+        }
+        // In static imports we exit the process.
+        eprintln!("{:?}", e);
+        std::process::exit(1);
+    }
+}
+
 impl JsFuture for EsModuleFuture {
     /// Drives the future to completion.
     fn run(&mut self, scope: &mut v8::HandleScope) {
@@ -236,8 +257,15 @@ impl JsFuture for EsModuleFuture {
         let source = match source {
             Ok(source) => bincode::deserialize::<String>(&source).unwrap(),
             Err(e) => {
-                eprintln!("{:?}", generic_error(e.to_string()));
-                std::process::exit(1);
+                // Style the error according to import type.
+                let is_dynamic_import = self.module.borrow().is_dynamic_import;
+                let exception = match is_dynamic_import {
+                    true => e,
+                    false => generic_error(e.to_string()),
+                };
+
+                self.handle_failure(exception);
+                return;
             }
         };
 
@@ -254,8 +282,9 @@ impl JsFuture for EsModuleFuture {
                 assert!(tc_scope.has_caught());
                 let exception = tc_scope.exception().unwrap();
                 let exception = exception.to_rust_string_lossy(tc_scope);
-                eprintln!("{:?}", generic_error(exception));
-                std::process::exit(1);
+
+                self.handle_failure(generic_error(exception));
+                return;
             }
         };
 
@@ -285,8 +314,15 @@ impl JsFuture for EsModuleFuture {
             let specifier = match resolve_import(base, &specifier, import_map.clone()) {
                 Ok(specifier) => specifier,
                 Err(e) => {
-                    eprintln!("{:?}", generic_error(e.to_string()));
-                    std::process::exit(1);
+                    // Style the error according to import type.
+                    let is_dynamic_import = self.module.borrow().is_dynamic_import;
+                    let exception = match is_dynamic_import {
+                        true => e,
+                        false => generic_error(e.to_string()),
+                    };
+
+                    self.handle_failure(exception);
+                    return;
                 }
             };
 
@@ -302,6 +338,8 @@ impl JsFuture for EsModuleFuture {
                 path: specifier.clone(),
                 status: ModuleStatus::Fetching,
                 dependencies: vec![],
+                exception: Rc::clone(&self.module.borrow().exception),
+                is_dynamic_import: self.module.borrow().is_dynamic_import,
             }));
 
             dependencies.push(Rc::clone(&module));
