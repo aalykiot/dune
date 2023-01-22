@@ -445,10 +445,10 @@ impl JsRuntime {
             }
         }
 
-        // Note: It's important to perform a microtask checkpoint at this
+        // Note: It's important to perform a nextTick checkpoint at this
         // point to allow resources behind a promise to be scheduled correctly
         // to the event-loop.
-        scope.perform_microtask_checkpoint();
+        run_next_tick_callbacks(scope);
     }
 
     /// Returns if unhandled promise rejections where caught.
