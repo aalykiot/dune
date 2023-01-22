@@ -1,5 +1,4 @@
 use crate::bindings;
-use crate::errors::generic_error;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::event_loop::EventLoop;
@@ -14,11 +13,15 @@ use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
 use crate::modules::load_import;
 use crate::modules::resolve_import;
-use crate::modules::DynamicImportFuture;
+use crate::modules::EsModuleFuture;
+use crate::modules::ImportKind;
 use crate::modules::ImportMap;
+use crate::modules::ModuleGraph;
 use crate::modules::ModuleMap;
+use crate::modules::ModuleStatus;
 use anyhow::bail;
 use anyhow::Error;
+use anyhow::Ok;
 use std::cell::RefCell;
 use std::cmp;
 use std::collections::HashMap;
@@ -42,7 +45,7 @@ pub struct JsRuntimeState {
     /// A sand-boxed execution context with its own set of built-in objects and functions.
     pub context: v8::Global<v8::Context>,
     /// Holds information about resolved ES modules.
-    pub modules: ModuleMap,
+    pub module_map: ModuleMap,
     /// A handle to the runtime's event-loop.
     pub handle: LoopHandle,
     /// A handle to the event-loop that can interrupt the poll-phase.
@@ -148,7 +151,7 @@ impl JsRuntime {
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
             context,
-            modules: ModuleMap::default(),
+            module_map: ModuleMap::new(),
             handle: event_loop.handle(),
             interrupt_handle: event_loop.interrupt_handle(),
             pending_futures: Vec::new(),
@@ -164,11 +167,48 @@ impl JsRuntime {
             event_loop,
         };
 
-        // Initialize core environment. (see lib/main.js)
-        let main = include_str!("./js/main.js");
-        unwrap_or_exit(runtime.execute_module("dune:environment/main", Some(main)));
-
+        runtime.load_main_environment();
         runtime
+    }
+
+    /// Initializes synchronously the core environment. (see lib/main.js)
+    fn load_main_environment(&mut self) {
+        let name = "dune:environment/main";
+        let source = include_str!("./js/main.js");
+
+        let scope = &mut self.handle_scope();
+        let tc_scope = &mut v8::TryCatch::new(scope);
+
+        let module = match fetch_module_tree(tc_scope, name, Some(source)) {
+            Some(module) => module,
+            None => {
+                assert!(tc_scope.has_caught());
+                let exception = tc_scope.exception().unwrap();
+                let exception = JsError::from_v8_exception(tc_scope, exception, None);
+                eprintln!("{:?}", exception);
+                std::process::exit(1);
+            }
+        };
+
+        if module
+            .instantiate_module(tc_scope, module_resolve_cb)
+            .is_none()
+        {
+            assert!(tc_scope.has_caught());
+            let exception = tc_scope.exception().unwrap();
+            let exception = JsError::from_v8_exception(tc_scope, exception, None);
+            eprintln!("{:?}", exception);
+            std::process::exit(1);
+        }
+
+        let _ = module.evaluate(tc_scope);
+
+        if module.get_status() == v8::ModuleStatus::Errored {
+            let exception = module.get_exception();
+            let exception = JsError::from_v8_exception(tc_scope, exception, None);
+            eprintln!("{:?}", exception);
+            std::process::exit(1);
+        }
     }
 
     /// Executes traditional JavaScript code (traditional = not ES modules).
@@ -206,55 +246,61 @@ impl JsRuntime {
     }
 
     /// Executes JavaScript code as ES module.
-    pub fn execute_module(
-        &mut self,
-        filename: &str,
-        source: Option<&str>,
-    ) -> Result<v8::Global<v8::Value>, Error> {
+    pub fn execute_module(&mut self, filename: &str, source: Option<&str>) -> Result<(), Error> {
+        // Get a reference to v8's scope.
         let scope = &mut self.handle_scope();
-        let import_map = JsRuntime::state(scope).borrow().options.import_map.clone();
+        let state_rc = JsRuntime::state(scope);
+        let mut state = state_rc.borrow_mut();
 
-        // The following code allows the runtime to load the core JavaScript
-        // environment (lib/main.js) that does not have a valid
-        // filename since it's loaded from memory.
-        let filename = match source.is_some() {
+        // The following code allows the runtime to execute code with no valid
+        // location passed as parameter as an ES module.
+        let path = match source.is_some() {
             true => filename.to_string(),
-            false => unwrap_or_exit(resolve_import(None, filename, import_map)),
+            false => unwrap_or_exit(resolve_import(None, filename, None)),
         };
 
-        let tc_scope = &mut v8::TryCatch::new(scope);
+        // Create static import module graph.
+        let graph = ModuleGraph::static_import(&path);
+        let graph_rc = Rc::new(RefCell::new(graph));
 
-        let module = match fetch_module_tree(tc_scope, &filename, source) {
-            Some(module) => module,
-            None => {
-                assert!(tc_scope.has_caught());
-                let exception = tc_scope.exception().unwrap();
-                bail!(JsError::from_v8_exception(tc_scope, exception, None));
+        state.module_map.pending.push(Rc::clone(&graph_rc));
+        state.module_map.seen.insert(path.clone());
+
+        // If we have a source, create the es-module future.
+        if let Some(source) = source {
+            state.pending_futures.push(Box::new(EsModuleFuture {
+                path,
+                module: Rc::clone(&graph_rc.borrow().root_rc),
+                maybe_result: Some(Ok(bincode::serialize(&source).unwrap())),
+            }));
+            return Ok(());
+        }
+
+        /*  Use the event-loop to asynchronously load the requested module. */
+
+        let task = {
+            let specifier = path.clone();
+            move || match load_import(&specifier, true) {
+                anyhow::Result::Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
+                Err(e) => Some(Result::Err(e)),
             }
         };
 
-        if module
-            .instantiate_module(tc_scope, module_resolve_cb)
-            .is_none()
-        {
-            assert!(tc_scope.has_caught());
-            let exception = tc_scope.exception().unwrap();
-            bail!(JsError::from_v8_exception(tc_scope, exception, None));
-        }
+        let task_cb = {
+            let state_rc = state_rc.clone();
+            move |_: LoopHandle, maybe_result: TaskResult| {
+                let mut state = state_rc.borrow_mut();
+                let future = EsModuleFuture {
+                    path,
+                    module: Rc::clone(&graph_rc.borrow().root_rc),
+                    maybe_result,
+                };
+                state.pending_futures.push(Box::new(future));
+            }
+        };
 
-        let module_result = module.evaluate(tc_scope);
-
-        if module.get_status() == v8::ModuleStatus::Errored {
-            let exception = module.get_exception();
-            bail!(JsError::from_v8_exception(tc_scope, exception, None));
-        }
-
-        match module_result {
-            Some(value) => Ok(v8::Global::new(tc_scope, value)),
-            None => bail!(generic_error(
-                "Cannot evaluate module, because JavaScript execution has been terminated."
-            )),
-        }
+        state.handle.spawn(task, Some(task_cb));
+        Ok(())
     }
 
     /// Runs a single tick of the event-loop.
@@ -262,7 +308,7 @@ impl JsRuntime {
         run_next_tick_callbacks(&mut self.handle_scope());
         self.event_loop.tick();
         self.run_pending_futures();
-        self.prepare_dynamic_imports();
+        self.fast_forward_imports();
     }
 
     /// Runs the event-loop until no more pending events exists.
@@ -273,7 +319,7 @@ impl JsRuntime {
         while self.event_loop.has_pending_events()
             || self.has_promise_rejections()
             || self.isolate.has_pending_background_tasks()
-            || self.has_pending_dynamic_imports()
+            || self.has_pending_imports()
             || self.has_next_tick_callbacks()
         {
             // Tick the event-loop one cycle.
@@ -309,14 +355,110 @@ impl JsRuntime {
         }
     }
 
+    /// Checks for imports (static/dynamic) ready for execution.
+    fn fast_forward_imports(&mut self) {
+        // Get a v8 handle-scope.
+        let scope = &mut self.handle_scope();
+        let state_rc = JsRuntime::state(scope);
+        let mut state = state_rc.borrow_mut();
+
+        let mut ready_imports = vec![];
+
+        state.module_map.pending.retain(|graph_rc| {
+            // Get a usable ref to graph's root module.
+            let graph = graph_rc.borrow();
+            let mut graph_root = graph.root_rc.borrow_mut();
+
+            // Check for exceptions in the graph (dynamic imports).
+            if let Some(message) = graph_root.exception.borrow_mut().take() {
+                // Create a v8 exception.
+                let exception = v8::String::new(scope, &message).unwrap();
+                let exception = v8::Exception::error(scope, exception);
+
+                // We need to resolve all identical dynamic imports.
+                match graph.kind.clone() {
+                    ImportKind::Static => unreachable!(),
+                    ImportKind::Dynamic(main_promise) => {
+                        for promise in vec![main_promise].iter().chain(graph.same_origin.iter()) {
+                            promise.open(scope).reject(scope, exception);
+                        }
+                    }
+                }
+
+                return false;
+            }
+
+            // If the graph is still loading, fast-forward the dependencies.
+            if graph_root.status != ModuleStatus::Ready {
+                graph_root.fast_forward();
+                return true;
+            }
+
+            ready_imports.push(Rc::clone(graph_rc));
+            false
+        });
+
+        // Note: We have to drop the sate ref here to avoid borrow panics
+        // during the module instantiation/evaluation process.
+        drop(state);
+
+        // Execute the root module from the graph.
+        for graph_rc in ready_imports {
+            // Create a tc scope.
+            let tc_scope = &mut v8::TryCatch::new(scope);
+
+            let graph = graph_rc.borrow();
+            let path = graph.root_rc.borrow().path.clone();
+
+            let module = state_rc.borrow().module_map.get(&path).unwrap();
+            let module = v8::Local::new(tc_scope, module);
+
+            if module
+                .instantiate_module(tc_scope, module_resolve_cb)
+                .is_none()
+            {
+                assert!(tc_scope.has_caught());
+                let exception = tc_scope.exception().unwrap();
+                let exception = JsError::from_v8_exception(tc_scope, exception, None);
+                eprintln!("{:?}", exception);
+                std::process::exit(1);
+            }
+
+            let _ = module.evaluate(tc_scope);
+
+            if module.get_status() == v8::ModuleStatus::Errored {
+                let exception = module.get_exception();
+                let exception = JsError::from_v8_exception(tc_scope, exception, None);
+                eprintln!("{:?}", exception);
+                std::process::exit(1);
+            }
+
+            if let ImportKind::Dynamic(main_promise) = graph.kind.clone() {
+                // Note: Since this is a dynamic import will resolve the promise
+                // with the module's namespace object instead of it's evaluation result.
+                let namespace = module.get_module_namespace();
+
+                // We need to resolve all identical dynamic imports.
+                for promise in vec![main_promise].iter().chain(graph.same_origin.iter()) {
+                    promise.open(tc_scope).resolve(tc_scope, namespace);
+                }
+            }
+        }
+
+        // Note: It's important to perform a nextTick checkpoint at this
+        // point to allow resources behind a promise to be scheduled correctly
+        // to the event-loop.
+        run_next_tick_callbacks(scope);
+    }
+
     /// Returns if unhandled promise rejections where caught.
     pub fn has_promise_rejections(&mut self) -> bool {
         !self.get_state().borrow().promise_exceptions.is_empty()
     }
 
-    /// Returns if we have dynamic imports in pending state.
-    pub fn has_pending_dynamic_imports(&mut self) -> bool {
-        !self.get_state().borrow().modules.dynamic_imports.is_empty()
+    /// Returns if we have imports in pending state.
+    pub fn has_pending_imports(&mut self) -> bool {
+        self.get_state().borrow().module_map.has_pending_imports()
     }
 
     /// Returns if we have scheduled any next-tick callbacks.
@@ -341,65 +483,6 @@ impl JsRuntime {
                 JsError::from_v8_exception(scope, exception, Some("(in promise) "))
             })
             .collect()
-    }
-
-    /// Loads pending dynamic imports using the event-loop.
-    pub fn prepare_dynamic_imports(&mut self) {
-        // Get a v8 handle-scope.
-        let scope = &mut self.handle_scope();
-        let state_rc = JsRuntime::state(scope);
-
-        // NOTE: The reason we move all the dynamic imports to a separate vec is because
-        // we need to drop the `state` borrow before we start iterating through all
-        // of them to avoid borrowing panics at runtime.
-        let dynamic_imports: Vec<(String, v8::Global<v8::PromiseResolver>)> = state_rc
-            .borrow_mut()
-            .modules
-            .dynamic_imports
-            .drain(..)
-            .collect();
-
-        for (specifier, promise) in dynamic_imports {
-            // Borrow runtime's state.
-            let mut state = state_rc.borrow_mut();
-
-            // Note: The `dynamic_imports_seen` is there to help us identify concurrent
-            // imports with the same specifier. In that case we should only execute the
-            // module once and return it's namespace object for every request.
-            if state.modules.dynamic_imports_seen.contains(&specifier) {
-                // Reschedule since another import with the same specifier is pending
-                // (will use the cache to resolve the import later).
-                state.modules.new_dynamic_import(scope, &specifier, promise);
-
-                continue;
-            }
-
-            state.modules.dynamic_imports_seen.insert(specifier.clone());
-
-            // Use the event-loop to asynchronously load the import.
-            let task = {
-                let specifier = specifier.clone();
-                move || match load_import(&specifier, false) {
-                    Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
-                    Err(e) => Some(Result::Err(e)),
-                }
-            };
-
-            let task_cb = {
-                let state_rc = state_rc.clone();
-                move |_: LoopHandle, maybe_result: TaskResult| {
-                    let mut state = state_rc.borrow_mut();
-                    let future = DynamicImportFuture {
-                        specifier,
-                        promise,
-                        maybe_result,
-                    };
-                    state.pending_futures.push(Box::new(future));
-                }
-            };
-
-            state.handle.spawn(task, Some(task_cb));
-        }
     }
 }
 
