@@ -26,7 +26,7 @@ pub fn module_resolve_cb<'a>(
     let import_map = state.options.import_map.clone();
     let referrer = v8::Global::new(scope, referrer);
 
-    let dependant = state.module_map.get_path(referrer.clone());
+    let dependant = state.module_map.get_path(referrer);
 
     let specifier = specifier.to_rust_string_lossy(scope);
     let specifier = unwrap_or_exit(resolve_import(dependant.as_deref(), &specifier, import_map));
@@ -52,7 +52,7 @@ pub extern "C" fn host_initialize_import_meta_object_cb(
     // Make the module global.
     let module = v8::Global::new(scope, module);
 
-    let url = state.module_map.get_path(module.clone()).unwrap();
+    let url = state.module_map.get_path(module).unwrap();
     let is_main = state.module_map.main() == Some(url.to_owned());
 
     // Setup import.url property.
@@ -215,12 +215,11 @@ pub fn host_import_module_dynamically_cb<'s>(
     };
 
     let task_cb = {
-        let path = specifier.clone();
         let state_rc = state_rc.clone();
         move |_: LoopHandle, maybe_result: TaskResult| {
             let mut state = state_rc.borrow_mut();
             let future = EsModuleFuture {
-                path,
+                path: specifier,
                 module: Rc::clone(&graph_rc.borrow().root_rc),
                 maybe_result,
             };

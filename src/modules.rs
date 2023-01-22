@@ -104,7 +104,7 @@ impl ModuleMap {
 
     // Returns a v8 module reference from me module-map.
     pub fn get(&self, key: &str) -> Option<v8::Global<v8::Module>> {
-        self.index.get(key).map(|entry| entry.clone())
+        self.index.get(key).cloned()
     }
 
     // Returns a specifier given a v8 module.
@@ -129,7 +129,7 @@ pub enum ImportKind {
     Dynamic(v8::Global<v8::PromiseResolver>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModuleStatus {
     // Indicates the module is being fetched.
     Fetching,
@@ -475,9 +475,8 @@ pub fn fetch_module_tree<'a>(
     };
 
     // Subscribe module to the module-map.
-    let path = filename.into();
     let module_ref = v8::Global::new(scope, module);
-    state.borrow_mut().module_map.insert(path, module_ref);
+    state.borrow_mut().module_map.insert(filename, module_ref);
 
     let requests = module.get_module_requests();
 

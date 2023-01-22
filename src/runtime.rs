@@ -375,7 +375,7 @@ impl JsRuntime {
                 return true;
             }
 
-            ready_imports.push(Rc::clone(&graph_rc));
+            ready_imports.push(Rc::clone(graph_rc));
             false
         });
 
@@ -421,7 +421,7 @@ impl JsRuntime {
 
                 // We also need to resolve/reject all identical dynamic imports.
                 for promise in vec![main_promise].iter().chain(graph.same_origin.iter()) {
-                    promise.open(tc_scope).resolve(tc_scope, namespace.clone());
+                    promise.open(tc_scope).resolve(tc_scope, namespace);
                 }
             }
         }
