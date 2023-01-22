@@ -16,6 +16,7 @@ use serde_json::Value;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::collections::LinkedList;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -130,9 +131,9 @@ pub enum ImportKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ModuleStatus {
-    // Indicates the module is been fetched.
+    // Indicates the module is being fetched.
     Fetching,
-    // Indicates the module's deps are been fetched.
+    // Indicates the dependencies are being fetched.
     Resolving,
     // Indicates the modules is resolved.
     Ready,
@@ -184,6 +185,7 @@ impl EsModule {
 pub struct ModuleGraph {
     pub kind: ImportKind,
     pub root_rc: Rc<RefCell<EsModule>>,
+    pub same_origin: LinkedList<v8::Global<v8::PromiseResolver>>,
 }
 
 impl ModuleGraph {
@@ -199,6 +201,7 @@ impl ModuleGraph {
         Self {
             kind: ImportKind::Static,
             root_rc: module,
+            same_origin: LinkedList::new(),
         }
     }
 
@@ -214,6 +217,7 @@ impl ModuleGraph {
         Self {
             kind: ImportKind::Dynamic(promise),
             root_rc: module,
+            same_origin: LinkedList::new(),
         }
     }
 }

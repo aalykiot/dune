@@ -14,6 +14,7 @@ use crate::modules::fetch_module_tree;
 use crate::modules::load_import;
 use crate::modules::resolve_import;
 use crate::modules::EsModuleFuture;
+use crate::modules::ImportKind;
 use crate::modules::ImportMap;
 use crate::modules::ModuleGraph;
 use crate::modules::ModuleMap;
@@ -411,6 +412,17 @@ impl JsRuntime {
                 let exception = JsError::from_v8_exception(tc_scope, exception, None);
                 eprintln!("{:?}", exception);
                 std::process::exit(1);
+            }
+
+            if let ImportKind::Dynamic(main_promise) = graph.kind.clone() {
+                // Note: Since this is a dynamic import will resolve the promise
+                // with the module's namespace object instead of it's evaluation result.
+                let namespace = module.get_module_namespace();
+
+                // We also need to resolve/reject all identical dynamic imports.
+                for promise in vec![main_promise].iter().chain(graph.same_origin.iter()) {
+                    promise.open(tc_scope).resolve(tc_scope, namespace.clone());
+                }
             }
         }
 

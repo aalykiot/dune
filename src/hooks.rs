@@ -1,8 +1,14 @@
 use crate::bindings::throw_type_error;
 use crate::errors::unwrap_or_exit;
+use crate::event_loop::LoopHandle;
+use crate::event_loop::TaskResult;
+use crate::modules::load_import;
 use crate::modules::resolve_import;
+use crate::modules::EsModuleFuture;
 use crate::modules::ModuleGraph;
 use crate::runtime::JsRuntime;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Called during Module::instantiate_module.
 /// https://docs.rs/rusty_v8/latest/rusty_v8/type.ResolveModuleCallback.html
@@ -142,7 +148,7 @@ pub fn host_import_module_dynamically_cb<'s>(
     let promise = promise_resolver.get_promise(scope);
 
     let state_rc = JsRuntime::state(scope);
-    let state = state_rc.borrow_mut();
+    let mut state = state_rc.borrow_mut();
 
     let import_map = state.options.import_map.clone();
 
@@ -156,11 +162,73 @@ pub fn host_import_module_dynamically_cb<'s>(
         }
     };
 
-    // Create a new module graph.
-    let global_promise = v8::Global::new(scope, promise_resolver);
-    let _ = ModuleGraph::dynamic_import(&specifier, global_promise);
+    let dynamic_import_being_fetched = state
+        .module_map
+        .pending
+        .iter()
+        .any(|graph_rc| graph_rc.borrow().root_rc.borrow().path == specifier);
 
-    // TODO...
+    // Check if the requested dynamic module is already resolved.
+    if state.module_map.index.contains_key(&specifier) && !dynamic_import_being_fetched {
+        // Create a local handle for the module.
+        let module = state.module_map.get(&specifier).unwrap();
+        let module = module.open(scope);
+
+        // Note: Since this is a dynamic import will resolve the promise
+        // with the module's namespace object instead of it's evaluation result.
+        promise_resolver.resolve(scope, module.get_module_namespace());
+        return Some(promise);
+    }
+
+    let global_promise = v8::Global::new(scope, promise_resolver);
+
+    if dynamic_import_being_fetched {
+        // Find the graph with the same root that is being resolved
+        // and declare this graph as same origin.
+        state
+            .module_map
+            .pending
+            .iter()
+            .find(|graph_rc| graph_rc.borrow().root_rc.borrow().path == specifier)
+            .unwrap()
+            .borrow_mut()
+            .same_origin
+            .push_back(global_promise);
+
+        return Some(promise);
+    }
+
+    let graph = ModuleGraph::dynamic_import(&specifier, global_promise);
+    let graph_rc = Rc::new(RefCell::new(graph));
+
+    state.module_map.pending.push(Rc::clone(&graph_rc));
+    state.module_map.seen.insert(specifier.clone());
+
+    /*  Use the event-loop to asynchronously load the requested module. */
+
+    let task = {
+        let specifier = specifier.clone();
+        move || match load_import(&specifier, true) {
+            anyhow::Result::Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
+            Err(e) => Some(Result::Err(e)),
+        }
+    };
+
+    let task_cb = {
+        let path = specifier.clone();
+        let state_rc = state_rc.clone();
+        move |_: LoopHandle, maybe_result: TaskResult| {
+            let mut state = state_rc.borrow_mut();
+            let future = EsModuleFuture {
+                path,
+                module: Rc::clone(&graph_rc.borrow().root_rc),
+                maybe_result,
+            };
+            state.pending_futures.push(Box::new(future));
+        }
+    };
+
+    state.handle.spawn(task, Some(task_cb));
 
     Some(promise)
 }
