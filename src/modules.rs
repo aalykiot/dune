@@ -252,6 +252,15 @@ impl EsModuleFuture {
 impl JsFuture for EsModuleFuture {
     /// Drives the future to completion.
     fn run(&mut self, scope: &mut v8::HandleScope) {
+        let state_rc = JsRuntime::state(scope);
+        let mut state = state_rc.borrow_mut();
+
+        // If the graph has exceptions, stop resolving the current sub-tree (dynamic imports).
+        if self.module.borrow().exception.borrow().is_some() {
+            state.module_map.seen.remove(&self.path);
+            return;
+        }
+
         // Extract module's source code.
         let source = self.maybe_result.take().unwrap();
         let source = match source {
@@ -287,9 +296,6 @@ impl JsFuture for EsModuleFuture {
                 return;
             }
         };
-
-        let state_rc = JsRuntime::state(tc_scope);
-        let mut state = state_rc.borrow_mut();
 
         state
             .module_map
