@@ -78,8 +78,7 @@ impl FsModuleLoader {
         }
 
         // 3. Bail out with an error.
-        let err_message = format!("Module not found \"{}\"", path.display());
-        bail!(err_message);
+        bail!(format!("Module not found \"{}\"", path.display()));
     }
 
     /// Loads import as directory using the 'index.[ext]' convention.
@@ -90,8 +89,7 @@ impl FsModuleLoader {
                 return self.load_source(path);
             }
         }
-        let err_message = format!("Module not found \"{}\"", path.display());
-        bail!(generic_error(err_message));
+        bail!(format!("Module not found \"{}\"", path.display()));
     }
 }
 
@@ -115,7 +113,7 @@ impl ModuleLoader for FsModuleLoader {
             return Ok(self.transform(base.join(specifier).absolutize()?.to_path_buf()));
         }
 
-        bail!(generic_error(format!("Module not found \"{}\"", specifier)))
+        bail!(format!("Module not found \"{}\"", specifier));
     }
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
@@ -133,10 +131,7 @@ impl ModuleLoader for FsModuleLoader {
 
         let source = match maybe_source {
             Ok(source) => source,
-            Err(_) => bail!(generic_error(format!(
-                "Module not found \"{}\"",
-                path.display()
-            ))),
+            Err(_) => bail!(format!("Module not found \"{}\"", path.display())),
         };
 
         let path_extension = path.extension().unwrap().to_str().unwrap();
@@ -183,7 +178,7 @@ impl ModuleLoader for UrlModuleLoader {
         }
 
         // Possibly unreachable error.
-        bail!(generic_error("Base is not a valid URL"));
+        bail!("Base is not a valid URL");
     }
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
@@ -194,7 +189,7 @@ impl ModuleLoader for UrlModuleLoader {
             .join(DUNE_CACHE_DIR);
 
         if fs::create_dir_all(cache_dir).is_err() {
-            bail!(generic_error("Failed to create module caching directory"))
+            bail!("Failed to create module caching directory");
         }
 
         // Hash URL using sha1.
@@ -214,7 +209,7 @@ impl ModuleLoader for UrlModuleLoader {
         // Download file and, save it to cache.
         let source = match ureq::get(specifier).call()?.into_string() {
             Ok(source) => source,
-            Err(_) => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
+            Err(_) => bail!(format!("Module not found \"{}\"", specifier)),
         };
 
         // Use a preprocessor if necessary.
@@ -243,7 +238,7 @@ impl ModuleLoader for CoreModuleLoader {
     fn resolve(&self, _: Option<&str>, specifier: &str) -> Result<ModulePath> {
         match CORE_MODULES.get(specifier) {
             Some(_) => Ok(specifier.to_string()),
-            None => bail!(generic_error(format!("Module not found \"{}\"", specifier))),
+            None => bail!(format!("Module not found \"{}\"", specifier)),
         }
     }
     fn load(&self, specifier: &str) -> Result<ModuleSource> {

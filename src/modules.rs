@@ -1,5 +1,6 @@
 use crate::errors::generic_error;
 use crate::errors::unwrap_or_exit;
+use crate::errors::JsError;
 use crate::event_loop::LoopHandle;
 use crate::event_loop::TaskResult;
 use crate::loaders::CoreModuleLoader;
@@ -9,6 +10,7 @@ use crate::loaders::UrlModuleLoader;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::anyhow;
+use anyhow::Error;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -244,7 +246,7 @@ impl EsModuleFuture {
             return;
         }
         // In static imports we exit the process.
-        eprintln!("{:?}", e);
+        eprintln!("{}", generic_error(e.to_string()));
         std::process::exit(1);
     }
 }
@@ -266,14 +268,7 @@ impl JsFuture for EsModuleFuture {
         let source = match source {
             Ok(source) => bincode::deserialize::<String>(&source).unwrap(),
             Err(e) => {
-                // Style the error according to import type.
-                let is_dynamic_import = self.module.borrow().is_dynamic_import;
-                let exception = match is_dynamic_import {
-                    true => e,
-                    false => generic_error(e.to_string()),
-                };
-
-                self.handle_failure(exception);
+                self.handle_failure(Error::msg(e.to_string()));
                 return;
             }
         };
@@ -290,9 +285,10 @@ impl JsFuture for EsModuleFuture {
             None => {
                 assert!(tc_scope.has_caught());
                 let exception = tc_scope.exception().unwrap();
-                let exception = exception.to_rust_string_lossy(tc_scope);
+                let exception = JsError::from_v8_exception(tc_scope, exception, None);
+                let exception = format!("{} ({})", exception.message, exception.resource_name);
 
-                self.handle_failure(generic_error(exception));
+                self.handle_failure(Error::msg(exception));
                 return;
             }
         };
@@ -323,14 +319,7 @@ impl JsFuture for EsModuleFuture {
             let specifier = match resolve_import(base, &specifier, import_map.clone()) {
                 Ok(specifier) => specifier,
                 Err(e) => {
-                    // Style the error according to import type.
-                    let is_dynamic_import = self.module.borrow().is_dynamic_import;
-                    let exception = match is_dynamic_import {
-                        true => e,
-                        false => generic_error(e.to_string()),
-                    };
-
-                    self.handle_failure(exception);
+                    self.handle_failure(Error::msg(e.to_string()));
                     return;
                 }
             };
