@@ -199,6 +199,36 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `Event: 'close'`: Emitted once the socket is fully closed.
 - [x] `Event: 'timeout'`: Emitted if the socket times out from (read) inactivity.
 
+### HTTP
+
+> The HTTP package is inspired by Node.js' [undici](https://undici.nodejs.org/) package.
+
+- [ ] `request(url, options?)`: Performs an HTTP request.
+
+<details><summary>Details</summary>
+<p></p>
+
+```js
+const URL = 'http://localhost:3000/foo';
+const { statusCode, headers, body } = await http.request(URL);
+```
+
+RequestOptions
+
+- `method`: (string) - Default: `GET`
+- `headers`: (object) - Default: `null`
+- `body`: (string | Uint8Array | stream.Readable) - Default: `null`
+- `timeout`: (number) - Default: `30000` (30 seconds) - Use `0` to disable it entirely.
+- `throwOnError`: (boolean) - Default: `false` - Whether should throw an error upon receiving a 4xx or 5xx response.
+
+Body Mixins
+
+> The body mixins are the most common way to format the response body.
+
+- [ ] `text()`: Formats the body to a UTF-8 string.
+- [ ] `json()`: Formats the body to an actual JSON object.
+</details>
+
 ### Stream
 
 > Streams are very different from Node.js and are based on [async-generators](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGenerator).
