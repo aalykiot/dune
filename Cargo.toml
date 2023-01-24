@@ -57,6 +57,7 @@ mio = { version = "0.8.4", features = ["os-poll", "net"] }
 tempdir = "0.3.7"
 zstd = "0.12"
 notify = "5.0.0"
+httparse = "1.8.0"
 
 [dev-dependencies]
 assert_fs = "1.0.7"
