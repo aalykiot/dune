@@ -134,7 +134,10 @@ export class Socket extends EventEmitter {
       ? addresses.filter((addr) => addr.family === 'IPv4')[0].address
       : addresses[0].address;
 
-    const { id, host, remote } = await binding.connect(remoteHost, port);
+    const { id, host, remote } = await binding.connect(
+      remoteHost,
+      Number.parseInt(port)
+    );
 
     this.#id = id;
     this.#connecting = false;
@@ -337,7 +340,10 @@ export class Socket extends EventEmitter {
   /**
    * The socket should be async iterable.
    */
-  async *[Symbol.asyncIterator]() {
+  async *[Symbol.asyncIterator](signal) {
+    // Close socket on stream pipeline errors.
+    if (signal) signal.on('uncaughtStreamException', () => this.destroy());
+
     let data;
     while ((data = await this.read())) {
       if (!data) break;

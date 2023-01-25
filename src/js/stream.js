@@ -36,6 +36,16 @@ const pipeDirect = (signal) => (source, target) => {
   throw new Error('Unrecognized target type.');
 };
 
+const wrap = (iterable, signal) => {
+  // Wrap the async iterable object into a readable stream.
+  const source = iterable[Symbol.asyncIterator](signal);
+  const readable = async function* () {
+    yield* source;
+  };
+
+  return readable();
+};
+
 /**
  * A module method to pipe between streams forwarding errors and properly cleaning up.
  *
@@ -47,7 +57,7 @@ export function pipeline(source, ...targets) {
   // The signal EE is used to signal the pipeline that an uncaught
   // exception has been thrown and the pipeline is broken.
   const signal = new EventEmitter();
-  const sourceWrap = isFunction(source) ? source(signal) : source;
+  const sourceWrap = isFunction(source) ? source(signal) : wrap(source, signal);
 
   const stream = targets.reduce(pipeDirect(signal), sourceWrap);
 

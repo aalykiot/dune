@@ -197,49 +197,30 @@ export class File {
   /**
    * The File objects should be asynchronously iterable.
    */
-  [Symbol.asyncIterator]() {
-    return {
-      handle: this._handle,
-      offset: 0,
+  async *[Symbol.asyncIterator](signal) {
+    // Close the file on stream pipeline errors.
+    if (signal) signal.on('uncaughtStreamException', () => this.close());
 
-      async next() {
-        // Try read some bytes from the file.
-        const bytes = await binding.read(this.handle, BUFFER_SIZE, this.offset);
-        const bytes_u8 = new Uint8Array(bytes);
-
-        // Update offset.
-        this.offset += bytes_u8.length;
-
-        return {
-          done: bytes_u8.length === 0,
-          value: bytes_u8,
-        };
-      },
-    };
+    let data;
+    let offset = 0;
+    while ((data = await this.read(BUFFER_SIZE, offset))) {
+      if (data.length === 0) break;
+      offset += data.length;
+      yield data;
+    }
   }
 
   /**
    * The File objects should be iterable.
    */
-  [Symbol.iterator]() {
-    return {
-      handle: this._handle,
-      offset: 0,
-
-      next() {
-        // Try read some bytes from the file.
-        const bytes = binding.readSync(this.handle, BUFFER_SIZE, this.offset);
-        const bytes_u8 = new Uint8Array(bytes);
-
-        // Update offset.
-        this.offset += bytes_u8.length;
-
-        return {
-          done: bytes_u8.length === 0,
-          value: bytes_u8,
-        };
-      },
-    };
+  *[Symbol.iterator]() {
+    let data;
+    let offset = 0;
+    while ((data = this.readSync(BUFFER_SIZE, offset))) {
+      if (data.length === 0) break;
+      offset += data.length;
+      yield data;
+    }
   }
 }
 
