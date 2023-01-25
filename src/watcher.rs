@@ -22,7 +22,7 @@ const WATCH_EXTENSIONS: [&str; 4] = ["js", "jsx", "ts", "tsx"];
 struct WatcherHandler {
     // The sending-half of Rust’s asynchronous channel type.
     tx: mpsc::Sender<PathBuf>,
-    // A hashmap that keep tracks event timestamps.
+    // A hashmap that keeps track of event timestamps.
     records: HashMap<PathBuf, Instant>,
 }
 
