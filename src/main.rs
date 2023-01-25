@@ -16,6 +16,7 @@ mod stdio;
 mod timers;
 mod tools;
 mod transpilers;
+mod watcher;
 
 use crate::errors::generic_error;
 use clap::arg;
@@ -42,6 +43,12 @@ fn load_import_map(filename: Option<String>) -> Option<ImportMap> {
 }
 
 fn run_command(mut args: ArgMatches) {
+    // Check if we have to run on `watch` mode.
+    if args.remove_one::<bool>("watch").unwrap_or_default() {
+        watcher::start();
+        return;
+    }
+
     // Extract options from cli arguments.
     let script = args.remove_one::<String>("SCRIPT").unwrap();
     let reload = args.remove_one::<bool>("reload").unwrap_or_default();
@@ -218,7 +225,8 @@ fn main() {
                 .arg(arg!(-r --reload "Reload every URL import (cache is ignored)"))
                 .arg(arg!(--seed <NUMBER> "Make the Math.random() method predictable"))
                 .arg(arg!(--"import-map" <FILE> "Load import map file from local file"))
-                .arg(arg!(--"threadpool-size" <NUMBER> "Set the number of threads used for I/O")),
+                .arg(arg!(--"threadpool-size" <NUMBER> "Set the number of threads used for I/O"))
+                .arg(arg!(--watch "Watch for file changes and restart process automatically")),
         )
         .subcommand(
             Command::new("bundle")
