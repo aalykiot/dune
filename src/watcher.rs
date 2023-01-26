@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 use std::time::Instant;
@@ -87,9 +88,15 @@ pub fn start() {
         .watch(Path::new("."), RecursiveMode::Recursive)
         .unwrap();
 
+    let exe = std::env::current_exe().unwrap();
+    let extension = if cfg!(windows) { "exe" } else { "" };
+
     'outer: loop {
         // Spawn the child process.
-        let mut process = match std::process::Command::new("dune").args(&args).spawn() {
+        let mut process = match Command::new(exe.with_extension(extension))
+            .args(&args)
+            .spawn()
+        {
             Ok(process) => process,
             Err(e) => {
                 eprintln!("{}", e);
