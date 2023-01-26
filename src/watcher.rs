@@ -36,14 +36,17 @@ impl EventHandler for WatcherHandler {
         let extension = WATCH_EXTENSIONS.iter().any(|ext| &path_ext == ext);
 
         // Filter out uninterested events and files.
-        if event.kind != EventKind::Modify(ModifyKind::Data(DataChange::Content)) || !extension {
+        if !(event.kind == EventKind::Modify(ModifyKind::Data(DataChange::Content))
+            || event.kind == EventKind::Modify(ModifyKind::Any)
+            || extension)
+        {
             return;
         }
 
+        // HACKY: Some times we receive duplicate events. To counter that we'll accept
+        // change events with more than 250ms time difference.
         match self.records.get_mut(&path) {
             Some(instant) => {
-                // HACKY: Some times we receive duplicate events. To counter that we'll accept
-                // change events with more than 250ms time difference.
                 if Instant::now() - *instant > Duration::from_millis(250) {
                     *instant = Instant::now();
                     self.tx.send(path).unwrap();
