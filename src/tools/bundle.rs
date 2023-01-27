@@ -69,7 +69,7 @@ pub fn run_bundle(entry: &str, options: &Options) -> Result<String> {
     // Bundle entries.
     let bundle = bundler
         .bundle(entries)
-        .map_err(|e| Error::msg(format!("{:?}", e)))?
+        .map_err(|e| Error::msg(format!("{e:?}")))?
         .pop()
         .unwrap();
 

@@ -46,7 +46,7 @@ impl FsModuleLoader {
 
     /// Wraps JSON data into an ES module (using v8's built in objects).
     fn wrap_json(&self, source: &str) -> String {
-        format!("export default JSON.parse(`{}`);", source)
+        format!("export default JSON.parse(`{source}`);")
     }
 
     /// Loads contents from a file.
@@ -84,7 +84,7 @@ impl FsModuleLoader {
     /// Loads import as directory using the 'index.[ext]' convention.
     fn load_as_directory(&self, path: &Path) -> Result<ModuleSource> {
         for ext in EXTENSIONS {
-            let path = &path.join(format!("index.{}", ext));
+            let path = &path.join(format!("index.{ext}"));
             if path.is_file() {
                 return self.load_source(path);
             }
@@ -113,7 +113,7 @@ impl ModuleLoader for FsModuleLoader {
             return Ok(self.transform(base.join(specifier).absolutize()?.to_path_buf()));
         }
 
-        bail!(format!("Module not found \"{}\"", specifier));
+        bail!(format!("Module not found \"{specifier}\""));
     }
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
@@ -149,8 +149,14 @@ impl ModuleLoader for FsModuleLoader {
     }
 }
 
-static DUNE_ROOT: &str = ".dune";
-static DUNE_CACHE_DIR: &str = "cache";
+lazy_static! {
+    // Use local cache directory in development.
+    pub static ref CACHE_DIR: PathBuf = if cfg!(debug_assertions) {
+        PathBuf::from(".cache")
+    } else {
+        dirs::home_dir().unwrap().join(".dune/cache")
+    };
+}
 
 #[derive(Default)]
 /// Loader supporting URL imports.
@@ -182,19 +188,14 @@ impl ModuleLoader for UrlModuleLoader {
     }
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
-        // Create a .cache directory.
-        let cache_dir = &dirs::home_dir()
-            .unwrap()
-            .join(DUNE_ROOT)
-            .join(DUNE_CACHE_DIR);
-
-        if fs::create_dir_all(cache_dir).is_err() {
+        // Create the cache directory.
+        if fs::create_dir_all(CACHE_DIR.as_path()).is_err() {
             bail!("Failed to create module caching directory");
         }
 
         // Hash URL using sha1.
         let hash = Sha1::default().digest(specifier.as_bytes()).to_hex();
-        let module_path = cache_dir.join(hash);
+        let module_path = CACHE_DIR.join(hash);
 
         if !self.skip_cache {
             // Check cache, and load file.
@@ -209,7 +210,7 @@ impl ModuleLoader for UrlModuleLoader {
         // Download file and, save it to cache.
         let source = match ureq::get(specifier).call()?.into_string() {
             Ok(source) => source,
-            Err(_) => bail!(format!("Module not found \"{}\"", specifier)),
+            Err(_) => bail!(format!("Module not found \"{specifier}\"")),
         };
 
         // Use a preprocessor if necessary.
@@ -238,7 +239,7 @@ impl ModuleLoader for CoreModuleLoader {
     fn resolve(&self, _: Option<&str>, specifier: &str) -> Result<ModulePath> {
         match CORE_MODULES.get(specifier) {
             Some(_) => Ok(specifier.to_string()),
-            None => bail!(format!("Module not found \"{}\"", specifier)),
+            None => bail!(format!("Module not found \"{specifier}\"")),
         }
     }
     fn load(&self, specifier: &str) -> Result<ModuleSource> {

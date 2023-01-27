@@ -138,7 +138,7 @@ class InvalidValueException {
       return new Error(
         MessageFactory.create(message, {
           expected: type,
-          received: ValueConverter.toString(value)
+          received: ValueConverter.toString(value),
         })
       );
     }

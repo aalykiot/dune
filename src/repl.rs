@@ -235,7 +235,7 @@ pub fn start(mut runtime: JsRuntime) {
                     break;
                 }
                 Err(e) => {
-                    eprintln!("{}", e);
+                    eprintln!("{e}");
                     sender.send(ReplMessage::Terminate).unwrap();
                     handle.interrupt();
                     break;
@@ -283,7 +283,7 @@ pub fn start(mut runtime: JsRuntime) {
                         let value = v8::Local::new(scope, value);
                         log.call(scope, global.into(), &[value]);
                     }
-                    Err(e) => eprintln!("{}", e),
+                    Err(e) => eprintln!("{e}"),
                 };
             }
             ReplMessage::Terminate => break,

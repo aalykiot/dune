@@ -41,7 +41,7 @@ impl JsFuture for TimeoutFuture {
         if tc_scope.has_caught() {
             let exception = tc_scope.exception().unwrap();
             let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            println!("{:?}", exception);
+            println!("{exception:?}");
             std::process::exit(1);
         }
     }
@@ -142,7 +142,7 @@ impl JsFuture for ImmediateFuture {
         if tc_scope.has_caught() {
             let exception = tc_scope.exception().unwrap();
             let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            println!("{:?}", exception);
+            println!("{exception:?}");
             std::process::exit(1);
         }
     }

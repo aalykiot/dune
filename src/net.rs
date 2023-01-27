@@ -98,7 +98,7 @@ fn connect(
     // Get IP and PORT from arguments.
     let ip = args.get(0).to_rust_string_lossy(scope);
     let port = args.get(1).to_rust_string_lossy(scope);
-    let address = format!("{}:{}", ip, port);
+    let address = format!("{ip}:{port}");
 
     // Create a promise resolver and extract the actual promise.
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
@@ -325,7 +325,7 @@ fn listen(
     // Get INTERFACE and PORT from arguments.
     let interface = args.get(0).to_rust_string_lossy(scope);
     let port = args.get(1).to_rust_string_lossy(scope);
-    let address = format!("{}:{}", interface, port);
+    let address = format!("{interface}:{port}");
 
     // Get on_connection callback.
     let on_connection = v8::Local::<v8::Function>::try_from(args.get(2)).unwrap();
