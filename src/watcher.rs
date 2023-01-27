@@ -66,18 +66,18 @@ impl EventHandler for WatcherHandler {
 
 /// Starts the file-system watcher.
 pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
-    // Get the paths we need to add a watcher on.
-    let watch_paths: Vec<_> = arguments.get_many::<String>("watch").unwrap().collect();
-
-    // Check if the script is a local file.
+    // Check if entry point is a local file.
     if !script.starts_with('/') {
         bail!("Watch mode is only available for local files as entry point.");
     }
 
-    // Check if the script exists.
+    // Check if the script exists in the file-system.
     if let Err(e) = load_import(script, true) {
         bail!(e.to_string());
     }
+
+    // Get the paths we need to add a watcher on.
+    let watch_paths: Vec<_> = arguments.get_many::<String>("watch").unwrap().collect();
 
     // Remove the `--watch` CLI arguments.
     let mut args = env::args()
@@ -92,7 +92,7 @@ pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
 
     let (sender, receiver) = mpsc::channel::<PathBuf>();
 
-    // Create an FS watcher recommended for the system.
+    // Create an appropriate watcher for the current system.
     let mut watcher = RecommendedWatcher::new(
         WatcherHandler {
             tx: sender,
@@ -136,7 +136,7 @@ pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
     let extension = if cfg!(windows) { "exe" } else { "" };
 
     'outer: loop {
-        // Spawn the child process.
+        // Run the main script as a child process.
         let mut process = match Command::new(exe.with_extension(extension))
             .args(&args)
             .spawn()
@@ -155,7 +155,7 @@ pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
                 continue 'outer;
             }
 
-            // Check if the process has been terminated.
+            // Check if the child process has been terminated.
             if let Ok(Some(status)) = process.try_wait() {
                 match status.code() {
                     // Process exited with error.
