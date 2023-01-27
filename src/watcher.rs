@@ -70,7 +70,7 @@ pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
     let watch_paths: Vec<_> = arguments.get_many::<String>("watch").unwrap().collect();
 
     // Check if the script is a local file.
-    if !script.starts_with("/") {
+    if !script.starts_with('/') {
         bail!("Watch mode is only available for local files as entry point.");
     }
 
@@ -124,7 +124,7 @@ pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
                 "[dune] watching dir(s): {}",
                 watch_paths
                     .iter()
-                    .map(|s| s.clone().to_owned())
+                    .map(|path| (*path).to_owned())
                     .collect::<Vec<String>>()
                     .join(", ")
             )
