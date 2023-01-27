@@ -12,6 +12,7 @@ use notify::EventKind;
 use notify::RecommendedWatcher;
 use notify::RecursiveMode;
 use notify::Watcher;
+use regex::Regex;
 use std::collections::HashMap;
 use std::env;
 use std::path::Path;
@@ -67,7 +68,9 @@ impl EventHandler for WatcherHandler {
 /// Starts the file-system watcher.
 pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
     // Check if entry point is a local file.
-    if !script.starts_with('/') {
+    let windows_regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
+
+    if !(script.starts_with('/') || windows_regex.is_match(script)) {
         bail!("Watch mode is only available for local files as entry point.");
     }
 
