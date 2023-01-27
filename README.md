@@ -142,6 +142,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `rmdir(path, options?)`: Deletes a directory (must be empty).
 - [x] `readdir(path)`: Reads the contents of a directory.
 - [x] `rm(path, options?)`: Removes files and directories.
+- [x] `rename(from, to)`: Renames the file from oldPath to newPath.
 - [x] `stat(path)`: Retrieves statistics for the file.
 - [x] `writeFile(String|Uint8Array , data, options?)`: Writes data to the file, replacing the file if it already exists.
 
