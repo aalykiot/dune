@@ -202,13 +202,13 @@ fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8:
         .map(|s| s.as_str())
         .any(|v| *v == signal)
     {
-        throw_exception(scope, &format!("Invalid signal: {}", signal));
+        throw_exception(scope, &format!("Invalid signal: {signal}"));
         return;
     }
 
     // Try to kill the process.
     if let Err(e) = Command::new("kill")
-        .args([&format!("-{}", signal), &pid])
+        .args([&format!("-{signal}"), &pid])
         .output()
     {
         throw_exception(scope, &e.to_string());
@@ -239,7 +239,7 @@ fn bind(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
         }
         // Throw exception.
         None => {
-            let message = format!("No such module: \"{}\"", request);
+            let message = format!("No such module: \"{request}\"");
             let message = v8::String::new(scope, &message).unwrap();
             let exception = v8::Exception::error(scope, message);
             scope.throw_exception(exception);

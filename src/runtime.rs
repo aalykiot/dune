@@ -185,7 +185,7 @@ impl JsRuntime {
                 assert!(tc_scope.has_caught());
                 let exception = tc_scope.exception().unwrap();
                 let exception = JsError::from_v8_exception(tc_scope, exception, None);
-                eprintln!("{:?}", exception);
+                eprintln!("{exception:?}");
                 std::process::exit(1);
             }
         };
@@ -197,7 +197,7 @@ impl JsRuntime {
             assert!(tc_scope.has_caught());
             let exception = tc_scope.exception().unwrap();
             let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            eprintln!("{:?}", exception);
+            eprintln!("{exception:?}");
             std::process::exit(1);
         }
 
@@ -206,7 +206,7 @@ impl JsRuntime {
         if module.get_status() == v8::ModuleStatus::Errored {
             let exception = module.get_exception();
             let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            eprintln!("{:?}", exception);
+            eprintln!("{exception:?}");
             std::process::exit(1);
         }
     }
@@ -420,7 +420,7 @@ impl JsRuntime {
                 assert!(tc_scope.has_caught());
                 let exception = tc_scope.exception().unwrap();
                 let exception = JsError::from_v8_exception(tc_scope, exception, None);
-                eprintln!("{:?}", exception);
+                eprintln!("{exception:?}");
                 std::process::exit(1);
             }
 
@@ -429,7 +429,7 @@ impl JsRuntime {
             if module.get_status() == v8::ModuleStatus::Errored {
                 let exception = module.get_exception();
                 let exception = JsError::from_v8_exception(tc_scope, exception, None);
-                eprintln!("{:?}", exception);
+                eprintln!("{exception:?}");
                 std::process::exit(1);
             }
 
@@ -541,7 +541,7 @@ fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
         if tc_scope.has_caught() {
             let exception = tc_scope.exception().unwrap();
             let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            println!("{:?}", exception);
+            println!("{exception:?}");
             std::process::exit(1);
         }
     }

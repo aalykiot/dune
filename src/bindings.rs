@@ -48,7 +48,7 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
          args: v8::FunctionCallbackArguments,
          mut _rv: v8::ReturnValue| {
             let value = args.get(0).to_rust_string_lossy(scope);
-            println!("{}", value);
+            println!("{value}");
         },
     );
 
@@ -59,26 +59,24 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
 }
 
 /// Adds a property with the given name and value, into the given object.
-pub fn set_property_to<'s>(
-    scope: &mut v8::HandleScope<'s>,
+pub fn set_property_to(
+    scope: &mut v8::HandleScope<'_>,
     target: v8::Local<v8::Object>,
     name: &'static str,
     value: v8::Local<v8::Value>,
 ) {
     let key = v8::String::new(scope, name).unwrap();
-
     target.set(scope, key.into(), value);
 }
 
 /// Adds a read-only property with the given name and value, into the given object.
-pub fn set_constant_to<'s>(
-    scope: &mut v8::HandleScope<'s>,
+pub fn set_constant_to(
+    scope: &mut v8::HandleScope<'_>,
     target: v8::Local<v8::Object>,
     name: &str,
     value: v8::Local<v8::Value>,
 ) {
     let key = v8::String::new(scope, name).unwrap();
-
     target.define_own_property(scope, key.into(), value, v8::READ_ONLY);
 }
 
@@ -112,8 +110,8 @@ pub fn create_object_under<'s>(
 }
 
 /// Stores a Rust type inside a v8 object.
-pub fn set_internal_ref<'s, T>(
-    scope: &mut v8::HandleScope<'s>,
+pub fn set_internal_ref<T>(
+    scope: &mut v8::HandleScope<'_>,
     target: v8::Local<v8::Object>,
     index: usize,
     data: T,

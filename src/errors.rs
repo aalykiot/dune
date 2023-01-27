@@ -141,7 +141,7 @@ impl Debug for JsError {
         match self.source_line.as_ref() {
             Some(source_line) if !source_line.is_empty() => {
                 // Log the source-line.
-                writeln!(f, "\n{}", source_line)?;
+                writeln!(f, "\n{source_line}")?;
 
                 // Indicate the position where the error was thrown.
                 let start_column = self.start_column.unwrap_or_default();
@@ -153,7 +153,7 @@ impl Debug for JsError {
 
                 for _ in start_column..end_column {
                     let mark = "^".red();
-                    write!(f, "{}", mark)?;
+                    write!(f, "{mark}")?;
                 }
 
                 // Print stacktrace if available.
@@ -172,7 +172,7 @@ pub fn unwrap_or_exit<T>(result: Result<T, Error>) -> T {
     match result {
         Ok(value) => value,
         Err(e) => {
-            eprintln!("{:?}", e);
+            eprintln!("{e:?}");
             std::process::exit(1);
         }
     }

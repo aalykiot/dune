@@ -46,7 +46,7 @@ impl FsModuleLoader {
 
     /// Wraps JSON data into an ES module (using v8's built in objects).
     fn wrap_json(&self, source: &str) -> String {
-        format!("export default JSON.parse(`{}`);", source)
+        format!("export default JSON.parse(`{source}`);")
     }
 
     /// Loads contents from a file.
@@ -84,7 +84,7 @@ impl FsModuleLoader {
     /// Loads import as directory using the 'index.[ext]' convention.
     fn load_as_directory(&self, path: &Path) -> Result<ModuleSource> {
         for ext in EXTENSIONS {
-            let path = &path.join(format!("index.{}", ext));
+            let path = &path.join(format!("index.{ext}"));
             if path.is_file() {
                 return self.load_source(path);
             }
@@ -113,7 +113,7 @@ impl ModuleLoader for FsModuleLoader {
             return Ok(self.transform(base.join(specifier).absolutize()?.to_path_buf()));
         }
 
-        bail!(format!("Module not found \"{}\"", specifier));
+        bail!(format!("Module not found \"{specifier}\""));
     }
 
     fn load(&self, specifier: &str) -> Result<ModuleSource> {
@@ -210,7 +210,7 @@ impl ModuleLoader for UrlModuleLoader {
         // Download file and, save it to cache.
         let source = match ureq::get(specifier).call()?.into_string() {
             Ok(source) => source,
-            Err(_) => bail!(format!("Module not found \"{}\"", specifier)),
+            Err(_) => bail!(format!("Module not found \"{specifier}\"")),
         };
 
         // Use a preprocessor if necessary.
@@ -239,7 +239,7 @@ impl ModuleLoader for CoreModuleLoader {
     fn resolve(&self, _: Option<&str>, specifier: &str) -> Result<ModulePath> {
         match CORE_MODULES.get(specifier) {
             Some(_) => Ok(specifier.to_string()),
-            None => bail!(format!("Module not found \"{}\"", specifier)),
+            None => bail!(format!("Module not found \"{specifier}\"")),
         }
     }
     fn load(&self, specifier: &str) -> Result<ModuleSource> {

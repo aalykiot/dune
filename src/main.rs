@@ -64,7 +64,7 @@ fn run_command(mut args: ArgMatches) {
     // it first, and retry the resolution in case the user forgot to specify it.
     let filename = unwrap_or_exit(
         resolve_import(None, &script, import_map.clone())
-            .or_else(|_| resolve_import(None, &format!("./{}", script), import_map.clone())),
+            .or_else(|_| resolve_import(None, &format!("./{script}"), import_map.clone())),
     );
 
     // Check if we have to run on `watch` mode.
@@ -91,7 +91,7 @@ fn run_command(mut args: ArgMatches) {
 
     match mod_result {
         Ok(_) => runtime.run_event_loop(),
-        Err(e) => eprintln!("{:?}", e),
+        Err(e) => eprintln!("{e:?}"),
     };
 }
 
@@ -119,7 +119,7 @@ fn output_bundle(source: String, output: Option<String>) {
                 Err(e) => eprintln!("{}", generic_error(e.to_string())),
             };
         }
-        None => println!("{}", source),
+        None => println!("{source}"),
     };
 }
 
@@ -173,7 +173,7 @@ fn run_standalone(source: String) {
 
     match mod_result {
         Ok(_) => runtime.run_event_loop(),
-        Err(e) => eprintln!("{:?}", e),
+        Err(e) => eprintln!("{e:?}"),
     };
     std::process::exit(0);
 }

@@ -18,19 +18,17 @@ pub fn run_upgrade() -> Result<()> {
 
     // Check if latest version is already installed.
     if env!("CARGO_PKG_VERSION") == version {
-        println!("Latest version {} is already installed", version);
+        println!("Latest version {version} is already installed");
         std::process::exit(0);
     }
 
-    println!("Found latest version {}", version);
+    println!("Found latest version {version}");
 
     let archive = format!("dune-{}.zip", env!("TARGET"));
-    let download_url = format!(
-        "https://github.com/aalykiot/dune/releases/download/v{}/{}",
-        version, archive
-    );
+    let download_url =
+        format!("https://github.com/aalykiot/dune/releases/download/v{version}/{archive}");
 
-    println!("Downloading {}", download_url);
+    println!("Downloading {download_url}");
 
     // Download the new binary.
     let response = ureq::get(&download_url).call()?;
@@ -47,7 +45,7 @@ pub fn run_upgrade() -> Result<()> {
     let exe_name = "dune";
     let exe_extension = if cfg!(windows) { "exe" } else { "" };
 
-    println!("Dune is upgrading to version {}", version);
+    println!("Dune is upgrading to version {version}");
 
     // Unzip archive based on specific platform.
     if cfg!(windows) {
