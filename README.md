@@ -144,7 +144,9 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `rm(path, options?)`: Removes files and directories.
 - [x] `rename(from, to)`: Renames the file from oldPath to newPath.
 - [x] `stat(path)`: Retrieves statistics for the file.
-- [x] `writeFile(String|Uint8Array , data, options?)`: Writes data to the file, replacing the file if it already exists.
+- [x] `writeFile(path, data, options?)`: Writes data to the file, replacing the file if it already exists.
+
+> Data (to be written) must be of type String|Uint8Array.
 
 ### File
 
@@ -152,7 +154,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `close()`: Closes the file.
 - [x] `read(size?, offset?)`: Reads data from the file.
 - [x] `stat()`: Retrieves statistics for the file.
-- [x] `write(String|Uint8Array, offset?)`: Writes data to the file.
+- [x] `write(data, offset?)`: Writes data to the file.
 
 ### Net
 
