@@ -701,6 +701,47 @@ export function rmSync(path, options = {}, __retries = 0) {
 }
 
 /**
+ * Renames oldPath to newPath asynchronously.
+ *
+ * @param {String} from
+ * @param {String} to
+ * @returns {Promise<undefined>}
+ */
+export async function rename(from, to) {
+  // Check the `from` argument type.
+  if (typeof from !== 'string') {
+    throw new TypeError('The "from" argument must be of type string.');
+  }
+
+  // Check the `to` argument type.
+  if (typeof to !== 'string') {
+    throw new TypeError('The "to" argument must be of type string.');
+  }
+
+  return binding.rename(from, to);
+}
+
+/**
+ * Renames oldPath to newPath synchronously.
+ *
+ * @param {String} from
+ * @param {String} to
+ */
+export function renameSync(from, to) {
+  // Check the `from` argument type.
+  if (typeof from !== 'string') {
+    throw new TypeError('The "from" argument must be of type string.');
+  }
+
+  // Check the `to` argument type.
+  if (typeof to !== 'string') {
+    throw new TypeError('The "to" argument must be of type string.');
+  }
+
+  binding.renameSync(from, to);
+}
+
+/**
  * Returns a new readable IO stream.
  *
  * @param {String} path
@@ -771,6 +812,8 @@ export default {
   readdirSync,
   rm,
   rmSync,
+  rename,
+  renameSync,
   createReadStream,
   createWriteStream,
 };
