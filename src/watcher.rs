@@ -1,3 +1,7 @@
+use crate::modules::load_import;
+use anyhow::bail;
+use anyhow::Result;
+use clap::ArgMatches;
 use colored::*;
 use notify::event::DataChange;
 use notify::event::ModifyKind;
@@ -7,7 +11,6 @@ use notify::EventHandler;
 use notify::EventKind;
 use notify::RecommendedWatcher;
 use notify::RecursiveMode;
-use notify::Result;
 use notify::Watcher;
 use std::collections::HashMap;
 use std::env;
@@ -28,7 +31,7 @@ struct WatcherHandler {
 }
 
 impl EventHandler for WatcherHandler {
-    fn handle_event(&mut self, event: Result<Event>) {
+    fn handle_event(&mut self, event: notify::Result<Event>) {
         let event = event.unwrap();
         let path = event.paths.get(0).unwrap().to_owned();
         let path_ext = path.extension().unwrap_or_default().to_str().unwrap();
@@ -62,12 +65,30 @@ impl EventHandler for WatcherHandler {
 }
 
 /// Starts the file-system watcher.
-pub fn start() {
-    // Remove the `--watch` CLI argument.
-    let args: Vec<String> = env::args()
-        .skip(1)
-        .filter(|arg| *arg != "--watch")
-        .collect();
+pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
+    // Get the paths we need to add a watcher on.
+    let watch_paths: Vec<_> = arguments.get_many::<String>("watch").unwrap().collect();
+
+    // Check if the script is a local file.
+    if !script.starts_with("/") {
+        bail!("Watch mode is only available for local files as entry point.");
+    }
+
+    // Check if the script exists.
+    if let Err(e) = load_import(script, true) {
+        bail!(e.to_string());
+    }
+
+    // Remove the `--watch` CLI arguments.
+    let mut args = env::args()
+        .skip(3)
+        .filter(|arg| !arg.starts_with("--watch"))
+        .filter(|arg| !arg.starts_with("--watch="))
+        .filter(|arg| !watch_paths.iter().any(|path| *path == arg))
+        .collect::<Vec<String>>();
+
+    args.insert(0, "run".into());
+    args.insert(1, script.into());
 
     let (sender, receiver) = mpsc::channel::<PathBuf>();
 
@@ -81,12 +102,35 @@ pub fn start() {
     )
     .unwrap();
 
-    println!("{}", "[dune] watching dir(s): *.*".yellow());
+    if watch_paths.is_empty() {
+        // Start watching the current working dir.
+        println!("{}", "[dune] watching dir(s): *.*".yellow());
+        match watcher.watch(Path::new("."), RecursiveMode::Recursive) {
+            Ok(_) => {}
+            Err(e) => bail!(e),
+        }
+    } else {
+        // Start watching requested paths.
+        for path in watch_paths.clone() {
+            match watcher.watch(Path::new(path), RecursiveMode::Recursive) {
+                Ok(_) => {}
+                Err(e) => bail!(e),
+            }
+        }
 
-    // Start watching the current working dir.
-    watcher
-        .watch(Path::new("."), RecursiveMode::Recursive)
-        .unwrap();
+        println!(
+            "{}",
+            format!(
+                "[dune] watching dir(s): {}",
+                watch_paths
+                    .iter()
+                    .map(|s| s.clone().to_owned())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            )
+            .yellow()
+        );
+    }
 
     let exe = std::env::current_exe().unwrap();
     let extension = if cfg!(windows) { "exe" } else { "" };
@@ -98,10 +142,7 @@ pub fn start() {
             .spawn()
         {
             Ok(process) => process,
-            Err(e) => {
-                eprintln!("{}", e);
-                std::process::exit(1);
-            }
+            Err(e) => bail!(e),
         };
 
         loop {
@@ -132,4 +173,6 @@ pub fn start() {
             }
         }
     }
+
+    Ok(())
 }

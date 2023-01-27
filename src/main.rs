@@ -22,6 +22,7 @@ use crate::errors::generic_error;
 use clap::arg;
 use clap::ArgMatches;
 use clap::Command;
+use colored::*;
 use errors::unwrap_or_exit;
 use modules::resolve_import;
 use modules::ImportMap;
@@ -43,12 +44,6 @@ fn load_import_map(filename: Option<String>) -> Option<ImportMap> {
 }
 
 fn run_command(mut args: ArgMatches) {
-    // Check if we have to run on `watch` mode.
-    if args.remove_one::<bool>("watch").unwrap_or_default() {
-        watcher::start();
-        return;
-    }
-
     // Extract options from cli arguments.
     let script = args.remove_one::<String>("SCRIPT").unwrap();
     let reload = args.remove_one::<bool>("reload").unwrap_or_default();
@@ -71,6 +66,17 @@ fn run_command(mut args: ArgMatches) {
         resolve_import(None, &script, import_map.clone())
             .or_else(|_| resolve_import(None, &format!("./{}", script), import_map.clone())),
     );
+
+    // Check if we have to run on `watch` mode.
+    if args.contains_id("watch") {
+        match watcher::start(&filename, args) {
+            Ok(_) => return,
+            Err(e) => {
+                eprintln!("{}: {}", "Error".red().bold(), e);
+                std::process::exit(1);
+            }
+        };
+    }
 
     let options = JsRuntimeOptions {
         seed,
@@ -226,7 +232,8 @@ fn main() {
                 .arg(arg!(--seed <NUMBER> "Make the Math.random() method predictable"))
                 .arg(arg!(--"import-map" <FILE> "Load import map file from local file"))
                 .arg(arg!(--"threadpool-size" <NUMBER> "Set the number of threads used for I/O"))
-                .arg(arg!(--watch "Watch for file changes and restart process automatically")),
+                .arg(arg!(--watch <FILES>... "Watch for file changes and restart process automatically")
+                .num_args(0..)),
         )
         .subcommand(
             Command::new("bundle")
