@@ -4,6 +4,7 @@ use crate::bindings::set_function_to;
 use crate::bindings::set_internal_ref;
 use crate::bindings::set_property_to;
 use crate::bindings::throw_exception;
+use crate::event_loop::FsEvent;
 use crate::event_loop::LoopHandle;
 use crate::event_loop::TaskResult;
 use crate::runtime::JsFuture;
@@ -11,6 +12,7 @@ use crate::runtime::JsRuntime;
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::Result;
+use notify::EventKind;
 use serde::Deserialize;
 use serde::Serialize;
 use std::ffi::OsString;
@@ -20,6 +22,7 @@ use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::path::Path;
+use std::rc::Rc;
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
 
@@ -77,6 +80,8 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "closeSync", close_sync);
     set_function_to(scope, target, "rename", rename);
     set_function_to(scope, target, "renameSync", rename_sync);
+    set_function_to(scope, target, "watch", watch);
+    set_function_to(scope, target, "unwatch", unwatch);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
@@ -1092,6 +1097,99 @@ fn rename_sync(
     if let Err(e) = rename_op(from, to) {
         throw_exception(scope, &e.to_string());
     }
+}
+
+struct WatchFuture {
+    event: FsEvent,
+    on_event_cb: Rc<v8::Global<v8::Function>>,
+}
+
+impl JsFuture for WatchFuture {
+    fn run(&mut self, scope: &mut v8::HandleScope) {
+        // Create a v8 array.
+        let paths: Vec<v8::Local<v8::Value>> = self
+            .event
+            .paths
+            .iter()
+            .map(|path| path.to_str().unwrap())
+            .map(|path| v8::String::new(scope, path).unwrap())
+            .map(|path_value| path_value.into())
+            .collect();
+
+        let paths_value = v8::Array::new_with_elements(scope, &paths);
+
+        // Format the event type.
+        let kind = match self.event.kind {
+            EventKind::Any => v8::String::new(scope, "any"),
+            EventKind::Access(_) => v8::String::new(scope, "access"),
+            EventKind::Create(_) => v8::String::new(scope, "create"),
+            EventKind::Modify(_) => v8::String::new(scope, "modify"),
+            EventKind::Remove(_) => v8::String::new(scope, "remove"),
+            EventKind::Other => v8::String::new(scope, "other"),
+        };
+
+        let event = v8::Object::new(scope);
+        set_constant_to(scope, event, "paths", paths_value.into());
+        set_constant_to(scope, event, "kind", kind.unwrap().into());
+
+        // Get access to the on_read callback.
+        let on_event = v8::Local::new(scope, (*self.on_event_cb).clone());
+        let undefined = v8::undefined(scope).into();
+
+        on_event.call(scope, undefined, &[event.into()]);
+    }
+}
+
+/// Starts a watcher for a requested path.
+fn watch(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get path and recursive option.
+    let path = args.get(0).to_rust_string_lossy(scope);
+    let recursive = args.get(1).boolean_value(scope);
+
+    // Get the on_event callback.
+    let on_event_cb = v8::Local::<v8::Function>::try_from(args.get(2)).unwrap();
+    let on_event_cb = Rc::new(v8::Global::new(scope, on_event_cb));
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    // A Rust wrapper around the JS on_event callback.
+    let on_event = {
+        let state_rc = state_rc.clone();
+        move |_: LoopHandle, event: FsEvent| {
+            let mut state = state_rc.borrow_mut();
+            let future = WatchFuture {
+                event,
+                on_event_cb: Rc::clone(&on_event_cb),
+            };
+            state.pending_futures.push(Box::new(future));
+        }
+    };
+
+    // Start the watcher.
+    let index = match state.handle.fs_event_start(path, recursive, on_event) {
+        Ok(index) => v8::Integer::new(scope, index as i32),
+        Err(e) => {
+            throw_exception(scope, &e.to_string());
+            return;
+        }
+    };
+
+    rv.set(index.into());
+}
+
+/// Stops a running watcher.
+fn unwatch(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+    // Get the rid of the watcher.
+    let index = args.get(0).int32_value(scope).unwrap() as u32;
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+
+    state.handle.fs_event_stop(&index);
 }
 
 #[cfg(target_family = "unix")]
