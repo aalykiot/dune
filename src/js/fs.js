@@ -246,8 +246,8 @@ class FsWatcher {
   /**
    * Creates a new FsWatcher instance.
    *
-   * @param {string} path
-   * @param {boolean} recursive
+   * @param {String} path
+   * @param {Boolean} recursive
    * @returns {FsWatcher}
    */
   constructor(path, recursive = false) {
@@ -839,10 +839,10 @@ export function renameSync(from, to) {
 }
 
 /**
- * Returns an async iterator that watches for changes on path.
+ * Returns an async iterator that watches for changes over a path.
  *
- * @param {*} path
- * @param {*} options
+ * @param {String} path
+ * @param {Object} options
  * @returns {FsWatcher}
  */
 export function watch(path, options = {}) {

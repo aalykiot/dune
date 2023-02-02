@@ -131,7 +131,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 ### File System
 
-> This module should also include a `Sync` method for every async operation available.
+> This module also includes a `Sync` method for every async operation available.
 
 - [x] `copyFile(src, dest)`: Copies `src` to `dest`.
 - [x] `createReadStream(path, options?)`: Returns a new readable IO stream.
@@ -144,6 +144,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `rm(path, options?)`: Removes files and directories.
 - [x] `rename(from, to)`: Renames the file from oldPath to newPath.
 - [x] `stat(path)`: Retrieves statistics for the file.
+- [x] `watch(path, options?)`: Returns an async iterator that watches for changes over a path.
 - [x] `writeFile(path, data, options?)`: Writes data to the file, replacing the file if it already exists.
 
 > Data (to be written) must be of type String|Uint8Array.
