@@ -180,7 +180,7 @@ export class Socket extends EventEmitter {
     // from the event-emitter when no one is subscribed to the `error` event.
     if (this.listenerCount('error') === 0) this.on('error', () => {});
 
-    // No available value to read wet.
+    // No available value to read yet.
     if (this.#pushQueue.length === 0) {
       const { promise, promiseExt } = makeDeferredPromise();
       this.#pullQueue.push(promiseExt);

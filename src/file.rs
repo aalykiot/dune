@@ -1129,8 +1129,8 @@ impl JsFuture for WatchFuture {
         };
 
         let event = v8::Object::new(scope);
-        set_constant_to(scope, event, "paths", paths_value.into());
         set_constant_to(scope, event, "kind", kind.unwrap().into());
+        set_constant_to(scope, event, "paths", paths_value.into());
 
         // Get access to the on_read callback.
         let on_event = v8::Local::new(scope, (*self.on_event_cb).clone());

@@ -224,6 +224,103 @@ export class File {
   }
 }
 
+function makeDeferredPromise() {
+  // Extract the resolve method from the promise.
+  const promiseExt = {};
+  const promise = new Promise((resolve, reject) => {
+    promiseExt.resolve = resolve;
+    promiseExt.reject = reject;
+  });
+
+  return { promise, promiseExt };
+}
+
+/**
+ * An async iterator yielding file-system events.
+ */
+class FsWatcher {
+  #id;
+  #pushQueue;
+  #pullQueue;
+
+  /**
+   * Creates a new FsWatcher instance.
+   *
+   * @param {string} path
+   * @param {boolean} recursive
+   * @returns {FsWatcher}
+   */
+  constructor(path, recursive = false) {
+    this.#pushQueue = [];
+    this.#pullQueue = [];
+    this.#id = binding.watch(path, recursive, (event) =>
+      this._asyncDispatch(event)
+    );
+  }
+
+  /**
+   * Stops watching the file system and closes the watcher resource.
+   */
+  close() {
+    // Check if the resource id is not undefined.
+    if (!this.#id) {
+      throw new Error(`FsWatcher is not attached to a resource ID.`);
+    }
+    binding.unwatch(this.#id);
+
+    this._asyncDispatch(null);
+    this.#id = undefined;
+  }
+
+  _asyncDispatch(value) {
+    if (this.#pullQueue.length === 0) {
+      this.#pushQueue.push(value);
+      return;
+    }
+    const promise = this.#pullQueue.shift();
+    const action = value instanceof Error ? promise.reject : promise.resolve;
+    action(value);
+  }
+
+  /**
+   * Returns a promise which is fulfilled when a new FS event is available.
+   *
+   * @returns {Promise<object>}
+   */
+  _next() {
+    // Check if the resource id is not undefined.
+    if (!this.#id) {
+      throw new Error(`FsWatcher is not attached to a resource ID.`);
+    }
+
+    // No available event yet.
+    if (this.#pushQueue.length === 0) {
+      const { promise, promiseExt } = makeDeferredPromise();
+      this.#pullQueue.push(promiseExt);
+      return promise;
+    }
+
+    const value = this.#pushQueue.shift();
+    const action = value instanceof Error ? Promise.reject : Promise.resolve;
+
+    return action.call(Promise, value);
+  }
+
+  /**
+   * The FsWatcher should be async iterable.
+   */
+  async *[Symbol.asyncIterator](signal) {
+    // Close watcher on stream pipeline errors.
+    if (signal) signal.on('uncaughtStreamException', () => this.close());
+
+    let data;
+    while ((data = await this._next())) {
+      if (!data) break;
+      yield data;
+    }
+  }
+}
+
 /**
  * Asynchronously opens a file.
  *
@@ -742,6 +839,22 @@ export function renameSync(from, to) {
 }
 
 /**
+ * Returns an async iterator that watches for changes on path.
+ *
+ * @param {*} path
+ * @param {*} options
+ * @returns {FsWatcher}
+ */
+export function watch(path, options = {}) {
+  // Check the `path` argument type.
+  if (typeof path !== 'string') {
+    throw new TypeError('The "path" argument must be of type string.');
+  }
+
+  return new FsWatcher(path, options.recursive);
+}
+
+/**
  * Returns a new readable IO stream.
  *
  * @param {String} path
@@ -814,6 +927,7 @@ export default {
   rmSync,
   rename,
   renameSync,
+  watch,
   createReadStream,
   createWriteStream,
 };
