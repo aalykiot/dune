@@ -41,9 +41,9 @@ impl EventHandler for WatcherHandler {
         let extension = WATCH_EXTENSIONS.iter().any(|ext| &path_ext == ext);
 
         // Filter out uninterested events and files.
-        if !(event.kind == EventKind::Modify(ModifyKind::Data(DataChange::Content))
-            || event.kind == EventKind::Modify(ModifyKind::Any)
-            || extension)
+        if !((event.kind == EventKind::Modify(ModifyKind::Data(DataChange::Content))
+            || event.kind == EventKind::Modify(ModifyKind::Any))
+            && extension)
         {
             return;
         }
@@ -107,7 +107,7 @@ pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
 
     if watch_paths.is_empty() {
         // Start watching the current working dir.
-        println!("{}", "[dune] watching dir(s): *.*".yellow());
+        println!("{}", "[dune] Watching path: *.*".yellow());
         match watcher.watch(Path::new("."), RecursiveMode::Recursive) {
             Ok(_) => {}
             Err(e) => bail!(e),
@@ -124,7 +124,7 @@ pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
         println!(
             "{}",
             format!(
-                "[dune] watching dir(s): {}",
+                "[dune] watching path(s): {}",
                 watch_paths
                     .iter()
                     .map(|path| (*path).to_owned())
@@ -150,32 +150,25 @@ pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
 
         loop {
             // Check if we have a file change to handle.
-            if let Ok(path) = receiver.recv_timeout(Duration::from_millis(250)) {
-                println!("{}", "[dune] file change detected!".green());
-                println!("[dune] {}", path.display());
-                println!("{}", "[dune] restarting...".green());
+            if receiver.recv_timeout(Duration::from_millis(250)).is_ok() {
+                println!(
+                    "{}",
+                    "[dune] File change detected! Restarting!".bright_blue()
+                );
                 process.kill().unwrap();
                 continue 'outer;
             }
 
             // Check if the child process has been terminated.
             if let Ok(Some(status)) = process.try_wait() {
-                match status.code() {
-                    // Process exited with error.
-                    Some(1) => {
-                        println!(
-                            "{}",
-                            "[dune] process exited with error, restarting on file change...".red()
-                        );
-                        receiver.recv().unwrap();
-                        continue 'outer;
-                    }
-                    // Process exited (probably) successfully.
-                    _ => break 'outer,
-                }
+                let output = match status.code() {
+                    Some(1) => "[dune] Process finished. Restarting on file change...".red(),
+                    _ => "[dune] Process finished. Restarting on file change...".bright_blue(),
+                };
+                println!("{output}");
+                receiver.recv().unwrap();
+                continue 'outer;
             }
         }
     }
-
-    Ok(())
 }
