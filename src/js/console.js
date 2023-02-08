@@ -229,6 +229,8 @@ function stringifyPromise(value) {
   return 'Promise { ' + prefix + output + end;
 }
 
+const specialCharsRegex = new RegExp('[^A-Za-z0-9|_]+');
+
 /**
  * Specifically stringifies JavaScript objects.
  *
@@ -282,9 +284,13 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
       entries.push(`${pre(depth * 2)}${key}: [Circular]`);
       continue;
     }
+    // The following wraps in quotes object keys that contain special
+    // characters like { "Foo-Bar": 123 }.
+    const keyValue = specialCharsRegex.test(key) ? `"${key}"` : key;
+
     seen.add(value);
     entries.push(
-      `${pre(depth * 2)}${key}: ${stringify(value[key], seen, depth)}`
+      `${pre(depth * 2)}${keyValue}: ${stringify(value[key], seen, depth)}`
     );
   }
 
