@@ -256,7 +256,7 @@ impl JsRuntime {
         // location passed as parameter as an ES module.
         let path = match source.is_some() {
             true => filename.to_string(),
-            false => unwrap_or_exit(resolve_import(None, filename, None)),
+            false => unwrap_or_exit(resolve_import(None, filename, false, None)),
         };
 
         // Create static import module graph.

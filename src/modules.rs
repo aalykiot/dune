@@ -316,7 +316,7 @@ impl JsFuture for EsModuleFuture {
             // Transform v8's ModuleRequest into Rust string.
             let base = Some(base.as_str());
             let specifier = request.get_specifier().to_rust_string_lossy(tc_scope);
-            let specifier = match resolve_import(base, &specifier, import_map.clone()) {
+            let specifier = match resolve_import(base, &specifier, false, import_map.clone()) {
                 Ok(specifier) => specifier,
                 Err(e) => {
                     self.handle_failure(Error::msg(e.to_string()));
@@ -376,6 +376,7 @@ impl JsFuture for EsModuleFuture {
 pub fn resolve_import(
     base: Option<&str>,
     specifier: &str,
+    ignore_core_modules: bool,
     import_map: Option<ImportMap>,
 ) -> Result<ModulePath> {
     // Use import-maps if available.
@@ -391,7 +392,7 @@ pub fn resolve_import(
         let is_url_import = is_url_import || (base.is_some() && Url::parse(base.unwrap()).is_ok());
 
         match (is_core_module_import, is_url_import) {
-            (true, _) => Box::new(CoreModuleLoader),
+            (true, _) if !ignore_core_modules => Box::new(CoreModuleLoader),
             (_, true) => Box::<UrlModuleLoader>::default(),
             _ => Box::new(FsModuleLoader),
         }
@@ -523,7 +524,7 @@ pub fn fetch_module_tree<'a>(
 
         // Transform v8's ModuleRequest into Rust string.
         let specifier = request.get_specifier().to_rust_string_lossy(scope);
-        let specifier = unwrap_or_exit(resolve_import(Some(filename), &specifier, None));
+        let specifier = unwrap_or_exit(resolve_import(Some(filename), &specifier, false, None));
 
         // Resolve subtree of modules.
         if !state.borrow().module_map.index.contains_key(&specifier) {
