@@ -166,6 +166,7 @@ impl<'a> Resolve for Resolver<'a> {
             Path::new(&resolve_import(
                 base,
                 specifier,
+                true,
                 self.options.import_map.clone(),
             )?)
             .to_path_buf(),
@@ -183,7 +184,7 @@ impl swc_bundler::Hook for Hook {
     ) -> Result<Vec<KeyValueProp>, Error> {
         // Get filename as string.
         let file_name = module.file_name.to_string();
-        let file_name = resolve_import(None, &file_name, None)?;
+        let file_name = resolve_import(None, &file_name, true, None)?;
 
         // Compute .main and .url properties.
         Ok(vec![

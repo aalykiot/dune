@@ -63,8 +63,8 @@ fn run_command(mut args: ArgMatches) {
     // to an absolute path. If the first time fails we will append `./` to
     // it first, and retry the resolution in case the user forgot to specify it.
     let filename = unwrap_or_exit(
-        resolve_import(None, &script, import_map.clone())
-            .or_else(|_| resolve_import(None, &format!("./{script}"), import_map.clone())),
+        resolve_import(None, &script, true, import_map.clone())
+            .or_else(|_| resolve_import(None, &format!("./{script}"), true, import_map.clone())),
     );
 
     // Check if we have to run on `watch` mode.
