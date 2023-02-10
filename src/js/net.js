@@ -37,6 +37,32 @@ function makeDeferredPromise() {
   return { promise, promiseExt };
 }
 
+const TIMEOUT_MAX = Math.pow(2, 31) - 1;
+
+// Error type referring to socket connection timeout.
+export class TimeoutError extends Error {
+  constructor(message) {
+    super();
+    this.name = 'TimeoutError';
+    this.message = message;
+  }
+}
+
+// Utility function that wraps a promise with a timeout.
+function timeout(promise, time = 0) {
+  // When the time is 0ms it means that we don't want to
+  // have a timeout for the provided promise.
+  if (time === 0) return promise;
+
+  const timer = {};
+  return Promise.race([
+    promise,
+    new Promise(
+      (_, reject) => (timer.id = setTimeout(reject, time, new TimeoutError()))
+    ),
+  ]).finally(() => clearTimeout(timer.id));
+}
+
 /**
  * Initiates a connection to a given remote host.
  *
@@ -93,6 +119,7 @@ export class Socket extends EventEmitter {
     this.bytesWritten = 0;
     this.remotePort = undefined;
     this.remoteAddress = undefined;
+    this.timeout = 0;
   }
 
   /**
@@ -166,6 +193,23 @@ export class Socket extends EventEmitter {
   }
 
   /**
+   * Sets the socket to timeout after timeout milliseconds of (read) inactivity on the socket.
+   *
+   * @param {Number} timeout
+   */
+  setTimeout(timeout = 0) {
+    // Coalesce to number or NaN.
+    timeout *= 1;
+
+    // Check timeout's boundaries.
+    if (!(timeout >= 0 && timeout <= TIMEOUT_MAX)) {
+      timeout = 0;
+    }
+
+    this.timeout = timeout;
+  }
+
+  /**
    * Returns a promise which is fulfilled when the TCP stream can return a chunk.
    *
    * @returns {Promise<Uint8Array|string>}
@@ -184,7 +228,7 @@ export class Socket extends EventEmitter {
     if (this.#pushQueue.length === 0) {
       const { promise, promiseExt } = makeDeferredPromise();
       this.#pullQueue.push(promiseExt);
-      return promise;
+      return timeout(promise, this.timeout);
     }
 
     const value = this.#pushQueue.shift();
@@ -519,6 +563,7 @@ export class Server extends EventEmitter {
 }
 
 export default {
+  TimeoutError,
   Socket,
   createConnection,
   Server,
