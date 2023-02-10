@@ -161,6 +161,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 - [x] `createServer(connectionListener?)`: Creates a new TCP server.
 - [x] `createConnection(options)`: Creates unix socket connection to a remote host.
+- [x] `TimeoutError`: Custom error signalling a socket (read) timeout.
 
 ### Net.Server
 
@@ -180,7 +181,8 @@ For more examples look at the <a href="./examples">examples</a> directory.
 > Net.Socket is a class extending `EventEmitter` and implements `@@asyncIterator`.
 
 - [x] `connect(options)`: Opens the connection for a given socket.
-- [x] `setEncoding(encoding)`: Set the encoding for the socket.
+- [x] `setEncoding(encoding)`: Sets the encoding for the socket.
+- [x] `setTimeout(timeout)`: Sets the socket's timeout threshold when reading.
 - [x] `read()`: Reads data out of the socket.
 - [x] `write(data)`: Sends data on the socket.
 - [x] `end(data?)`: Half-closes the socket. i.e., it sends a FIN packet.
