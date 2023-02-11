@@ -63,6 +63,38 @@ function timeout(promise, time = 0) {
   ]).finally(() => clearTimeout(timer.id));
 }
 
+// Utility function that wraps a `repeatable` callback with a timeout.
+function callbackTimeout(callback, time = 0, onTimeout) {
+  // Note: The reason of the event-emitter is to allow the "outside" world
+  // to signal us for changes in the timeout value.
+  if (time === 0) return [callback, null];
+
+  const timer = { time };
+  const timerSignal = new EventEmitter();
+
+  const timeout = () => {
+    onTimeout();
+    timer.id = setTimeout(timeout, timer.time);
+  };
+
+  timerSignal.on('timeoutUpdate', (timeMs) => {
+    clearTimeout(timer.id);
+    timer.time = timeMs;
+    if (timeMs > 0) timer.id = setTimeout(timeout, timeMs);
+  });
+
+  timer.id = setTimeout(timeout, time);
+
+  return [
+    (...args) => {
+      clearTimeout(timer.id);
+      callback(...args);
+      timer.id = setTimeout(timeout, timer.time);
+    },
+    timerSignal,
+  ];
+}
+
 /**
  * Initiates a connection to a given remote host.
  *
@@ -104,6 +136,7 @@ export class Socket extends EventEmitter {
   #writable;
   #pushQueue;
   #pullQueue;
+  #timeoutHandle;
 
   /**
    * Creates a new Socket instance.
@@ -115,6 +148,7 @@ export class Socket extends EventEmitter {
     this.#pushQueue = [];
     this.#pullQueue = [];
     this.#connecting = false;
+    this.#timeoutHandle = undefined;
     this.bytesRead = 0;
     this.bytesWritten = 0;
     this.remotePort = undefined;
@@ -174,7 +208,14 @@ export class Socket extends EventEmitter {
     this.remotePort = remote.port;
     this.emit('connect', { host, remote });
 
-    binding.readStart(this.#id, this._onAvailableSocketData.bind(this));
+    const [onAvailableSocketData, signal] = callbackTimeout(
+      this._onAvailableSocketData.bind(this),
+      this.timeout,
+      () => this.emit('timeout')
+    );
+
+    this.#timeoutHandle = signal;
+    binding.readStart(this.#id, onAvailableSocketData);
 
     return { host, remote };
   }
@@ -204,6 +245,27 @@ export class Socket extends EventEmitter {
     // Check timeout's boundaries.
     if (!(timeout >= 0 && timeout <= TIMEOUT_MAX)) {
       timeout = 0;
+    }
+
+    // Timeout value changed from 0 to something else after the socket
+    // began waiting for data.
+    if (this.timeout === 0 && this.#id) {
+      console.log('foo');
+      const [onAvailableSocketData, signal] = callbackTimeout(
+        this._onAvailableSocketData.bind(this),
+        timeout,
+        () => this.emit('timeout')
+      );
+      this.timeout = timeout;
+      this.#timeoutHandle = signal;
+      binding.readStart(this.#id, onAvailableSocketData);
+      return;
+    }
+
+    // Timeout value changed from a non 0 value to something else
+    // after the socket began waiting for data.
+    if (this.#id) {
+      this.#timeoutHandle.emit('timeoutUpdate', timeout);
     }
 
     this.timeout = timeout;
@@ -302,6 +364,7 @@ export class Socket extends EventEmitter {
     await binding.close(this.#id);
 
     this.emit('close');
+    this.#timeoutHandle?.emit('timeoutUpdate', 0);
     this._reset();
   }
 
@@ -321,10 +384,12 @@ export class Socket extends EventEmitter {
     this.#pushQueue = [];
     this.#pullQueue = [];
     this.#connecting = false;
+    this.#timeoutHandle = undefined;
     this.bytesRead = 0;
     this.bytesWritten = 0;
     this.remotePort = undefined;
     this.remoteAddress = undefined;
+    this.timeout = 0;
   }
 
   _asyncDispatch(value) {
@@ -378,7 +443,15 @@ export class Socket extends EventEmitter {
   [kSetSocketIdUnchecked](id) {
     this.#id = id;
     this.#writable = true;
-    binding.readStart(this.#id, this._onAvailableSocketData.bind(this));
+
+    const [onAvailableSocketData, signal] = callbackTimeout(
+      this._onAvailableSocketData.bind(this),
+      this.timeout,
+      () => this.emit('timeout')
+    );
+
+    this.#timeoutHandle = signal;
+    binding.readStart(this.#id, onAvailableSocketData);
   }
 
   /**

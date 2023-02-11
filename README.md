@@ -197,6 +197,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `Event: 'end'`: Emitted when the other end of the socket sends a FIN packet.
 - [x] `Event: 'error'`: Emitted when an error occurs.
 - [x] `Event: 'close'`: Emitted once the socket is fully closed.
+- [x] `Event: 'timeout'`: Emitted if the socket times out from (read) inactivity.
 
 ### Stream
 
