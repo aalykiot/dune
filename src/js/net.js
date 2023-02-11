@@ -63,33 +63,49 @@ function timeout(promise, time = 0) {
   ]).finally(() => clearTimeout(timer.id));
 }
 
-// Utility function that wraps a `repeatable` callback with a timeout.
+/**
+ *  Utility function that wraps a `repeatable` callback with a timeout.
+ *
+ *  The following implementation does not create a new timer every time an
+ *  I/O activity happens on the socket. The logic is a bit more complex
+ *  but it is more performant on high I/O scenarios.
+ *
+ *  http://pod.tst.eu/http://cvs.schmorp.de/libev/ev.pod#Be_smart_about_timeouts
+ */
 function callbackTimeout(callback, time = 0, onTimeout) {
-  // Note: The reason of the event-emitter is to allow the "outside" world
+  // The reason of the event-emitter is to allow the "outside" world
   // to signal us for changes in the timeout value.
-  if (time === 0) return [callback, null];
-
-  const timer = { time };
+  const timer = { time, lastActivity: Date.now() };
   const timerSignal = new EventEmitter();
 
   const timeout = () => {
-    onTimeout();
-    timer.id = setTimeout(timeout, timer.time);
+    // Calculate when the timeout would happen.
+    const after = timer.lastActivity - Date.now() + timer.time;
+
+    if (timer.time === 0) return;
+
+    // Timeout occurred, take action.
+    if (after < 0) {
+      onTimeout();
+      return (timer.id = setTimeout(timeout, timer.time));
+    }
+
+    // There was some recent activity, simply restart the timer.
+    timer.id = setTimeout(timeout, after);
   };
 
   timerSignal.on('timeoutUpdate', (timeMs) => {
-    clearTimeout(timer.id);
+    if (timer.id) clearTimeout(timer.id);
     timer.time = timeMs;
-    if (timeMs > 0) timer.id = setTimeout(timeout, timeMs);
+    timeout();
   });
 
-  timer.id = setTimeout(timeout, time);
+  if (time > 0) timer.id = setTimeout(timeout, time);
 
   return [
     (...args) => {
-      clearTimeout(timer.id);
       callback(...args);
-      timer.id = setTimeout(timeout, timer.time);
+      timer.lastActivity = Date.now();
     },
     timerSignal,
   ];
@@ -206,7 +222,6 @@ export class Socket extends EventEmitter {
     this.#host = host;
     this.remoteAddress = remote.address;
     this.remotePort = remote.port;
-    this.emit('connect', { host, remote });
 
     const [onAvailableSocketData, signal] = callbackTimeout(
       this._onAvailableSocketData.bind(this),
@@ -215,6 +230,8 @@ export class Socket extends EventEmitter {
     );
 
     this.#timeoutHandle = signal;
+    this.emit('connect', { host, remote });
+
     binding.readStart(this.#id, onAvailableSocketData);
 
     return { host, remote };
@@ -247,24 +264,8 @@ export class Socket extends EventEmitter {
       timeout = 0;
     }
 
-    // Timeout value changed from 0 to something else after the socket
-    // began waiting for data.
-    if (this.timeout === 0 && this.#id) {
-      console.log('foo');
-      const [onAvailableSocketData, signal] = callbackTimeout(
-        this._onAvailableSocketData.bind(this),
-        timeout,
-        () => this.emit('timeout')
-      );
-      this.timeout = timeout;
-      this.#timeoutHandle = signal;
-      binding.readStart(this.#id, onAvailableSocketData);
-      return;
-    }
-
-    // Timeout value changed from a non 0 value to something else
-    // after the socket began waiting for data.
     if (this.#id) {
+      // Timeout value changed after the socket began waiting.
       this.#timeoutHandle.emit('timeoutUpdate', timeout);
     }
 
