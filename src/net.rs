@@ -1,5 +1,6 @@
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
+use crate::errors::JsError;
 use crate::event_loop::Index;
 use crate::event_loop::LoopHandle;
 use crate::event_loop::TcpSocketInfo;
@@ -308,11 +309,20 @@ impl JsFuture for TcpListenFuture {
             Ok(_) => v8::null(scope).into(),
         };
 
-        // Get access to the on_connection callback.
-        let on_connection = v8::Local::new(scope, (*self.on_connection).clone());
-        let undefined = v8::undefined(scope).into();
+        let tc_scope = &mut v8::TryCatch::new(scope);
 
-        on_connection.call(scope, undefined, &[error_value, socket_value]);
+        // Get access to the on_connection callback.
+        let on_connection = v8::Local::new(tc_scope, (*self.on_connection).clone());
+        let undefined = v8::undefined(tc_scope).into();
+
+        on_connection.call(tc_scope, undefined, &[error_value, socket_value]);
+
+        if tc_scope.has_caught() {
+            let exception = tc_scope.exception().unwrap();
+            let exception = JsError::from_v8_exception(tc_scope, exception, None);
+            println!("{exception:?}");
+            std::process::exit(1);
+        }
     }
 }
 
