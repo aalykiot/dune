@@ -1,6 +1,6 @@
 import timers from 'timers';
 import { Console, prompt } from 'console';
-import { TextEncoder, TextDecoder } from 'text-encoding';
+import { TextEncoder, TextDecoder } from 'text_encoding';
 import { cloneFunction, parseEnvVariable } from 'util';
 import { readFileSync } from 'fs';
 

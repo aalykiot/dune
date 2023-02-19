@@ -5,15 +5,15 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
-    set_function_to(scope, target, "parseResponse", parse_response);
-    set_function_to(scope, target, "parseChunk", parse_chunk);
+    set_function_to(scope, target, "parseHttpResponse", parse_http_response);
+    set_function_to(scope, target, "parseHttpChunk", parse_http_chunk);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
 }
 
 /// Parses the HTTP response for statusCode, method and headers.
-fn parse_response(
+fn parse_http_response(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
@@ -75,7 +75,7 @@ fn parse_response(
 }
 
 /// Parses the next body chunk of the HTTP request/response.
-fn parse_chunk(
+fn parse_http_chunk(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
