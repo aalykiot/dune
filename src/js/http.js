@@ -277,7 +277,7 @@ class HttpRequest {
       // Response headers are still incomplete.
       if (!response) continue;
 
-      // Check status code and throw if requested.
+      // Check status code and throw if requsted.
       if (response.statusCode >= 400 && this.#throwOnError) {
         const message = STATUS_CODES[response.statusCode];
         throw new Error(`HTTP request failed with error: "${message}"`);
@@ -303,7 +303,7 @@ class HttpResponse {
     this.#headers = response.headers;
     this.#body = buffer.subarray(response.bodyAt);
     this.#bodyLength = Number.parseInt(this.#headers['content-length']) || 0;
-    this.#isChunked = this.#headers['transfer-encoding']?.contains('chunked');
+    this.#isChunked = this.#headers['transfer-encoding']?.includes('chunked');
     this.#isComplete = this.#body?.length === this.#bodyLength;
 
     if (this.#isComplete && !this.#isChunked) {
@@ -319,6 +319,61 @@ class HttpResponse {
   get headers() {
     return this.#headers;
   }
+
+  get body() {
+    return this[Symbol.asyncIterator]();
+  }
+
+  _parseAvailableChunks(data) {
+    // Mix current body with new data.
+    const buffer = concatUint8Arrays(this.#body, data);
+    const { chunks, position, done } = binding.parseHttpChunks(buffer);
+
+    // Update body based on parser's cursor.
+    this.#body = buffer.subarray(position);
+
+    return {
+      chunks: chunks.map((v) => new Uint8Array(v)),
+      done,
+    };
+  }
+
+  async *[Symbol.asyncIterator](signal) {
+    // Close socket on stream pipeline errors.
+    if (signal) signal.on('uncaughtStreamException', () => this.#socket.end());
+
+    // Check if the full body has been received.
+    if (this.#isComplete && !this.#isChunked) {
+      yield this.#body;
+      return;
+    }
+
+    let bytesReceived = this.#body.length;
+
+    // Process incoming data from the TCP socket.
+    for await (const data of this.#socket) {
+      // HTTP body is received in chunks.
+      if (this.#isChunked) {
+        const { chunks, done } = this._parseAvailableChunks(data);
+        yield* chunks;
+        if (done) break;
+        continue;
+      }
+
+      // Note: The following code handles the case when the HTTP's body
+      // length is already known from the `Content-Length` header
+      // but, it comes to us in multiple TCP packets.
+      yield data;
+      bytesReceived += data.length;
+
+      if (bytesReceived === this.#bodyLength) {
+        break;
+      }
+    }
+
+    // Close the underline TCP socket.
+    this.#socket.end();
+  }
 }
 
 // =========================================================
@@ -331,9 +386,13 @@ const defaultOptions = {
   throwOnError: false,
 };
 
-const options = Object.assign(defaultOptions, {
-  headers: {},
-  body: JSON.stringify({ hello: 'foo!' }),
-});
+const options = Object.assign(defaultOptions, {});
 
-console.log(await new HttpRequest('http://localhost:3000/', options).send());
+const request = new HttpRequest('http://localhost:3000/', options);
+const response = await request.send();
+
+console.log(response.headers);
+
+for await (const data of response.body) {
+  console.log(new TextDecoder().decode(data));
+}

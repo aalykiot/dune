@@ -1,12 +1,15 @@
 use crate::bindings::set_constant_to;
 use crate::bindings::set_function_to;
+use anyhow::Error;
+use anyhow::Result;
+use httparse::Status;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
     set_function_to(scope, target, "parseHttpResponse", parse_http_response);
-    set_function_to(scope, target, "parseHttpChunk", parse_http_chunk);
+    set_function_to(scope, target, "parseHttpChunks", parse_http_chunks);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
@@ -75,10 +78,91 @@ fn parse_http_response(
 }
 
 /// Parses the next body chunk of the HTTP request/response.
-fn parse_http_chunk(
+fn parse_http_chunks(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
+    mut rv: v8::ReturnValue,
 ) {
-    todo!()
+    // Get the (current) HTTP body as ArrayBuffer.
+    let response_body: v8::Local<v8::ArrayBufferView> = args.get(0).try_into().unwrap();
+
+    let mut data = vec![0; response_body.byte_length()];
+    response_body.copy_contents(&mut data);
+
+    // Get all available chunks.
+    let (chunks, position, received_last_chunk) = match get_available_chunks(data) {
+        Ok(values) => values,
+        Err(e) => {
+            let message = v8::String::new(scope, &e.to_string()).unwrap();
+            let exception = v8::Exception::error(scope, message);
+            scope.throw_exception(exception);
+            return;
+        }
+    };
+
+    // Create a v8 typed-array for each chunk.
+    let chunks: Vec<v8::Local<v8::Value>> = chunks
+        .iter()
+        .map(|chunk| {
+            let store = chunk.to_owned().into_boxed_slice();
+            let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store).make_shared();
+            v8::ArrayBuffer::with_backing_store(scope, &store).into()
+        })
+        .collect();
+
+    // Create a v8 array holding all the chunks.
+    let chunks = v8::Array::new_with_elements(scope, &chunks);
+    let position = v8::Integer::new(scope, position as i32);
+    let done = v8::Boolean::new(scope, received_last_chunk);
+
+    // Build the v8 result object.
+    let target = v8::Object::new(scope);
+    set_constant_to(scope, target, "chunks", chunks.into());
+    set_constant_to(scope, target, "position", position.into());
+    set_constant_to(scope, target, "done", done.into());
+
+    rv.set(target.into());
+}
+
+const CRLF_LENGTH: usize = 2;
+
+/// Retrieves all available chunks from a give buffer.
+fn get_available_chunks(mut buffer: Vec<u8>) -> Result<(Vec<Vec<u8>>, usize, bool)> {
+    let mut chunks = vec![];
+    let mut cursor_position = 0;
+    let mut received_last_chunk = false;
+
+    loop {
+        // Parse body buffer as a chunk size.
+        let status = httparse::parse_chunk_size(&buffer).map_err(|e| Error::msg(e.to_string()))?;
+
+        // Check if HTTP chunk can be extracted.
+        let (chunk_start, chunk_length) = match status {
+            Status::Complete(status) => (status.0, status.1),
+            Status::Partial => break,
+        };
+
+        let chunk_end = chunk_start + chunk_length as usize;
+
+        // Check if we received the last chunk.
+        if chunk_length == 0 {
+            cursor_position += chunk_end + CRLF_LENGTH;
+            received_last_chunk = true;
+            break;
+        }
+
+        // Extract chunk as bytes.
+        let chunk = match chunk_length {
+            0 => Default::default(),
+            _ => buffer[chunk_start..chunk_end].to_vec(),
+        };
+
+        // Update cursor's position.
+        cursor_position += chunk_end + CRLF_LENGTH;
+
+        buffer.drain(0..(chunk_end + CRLF_LENGTH));
+        chunks.push(chunk);
+    }
+
+    Ok((chunks, cursor_position, received_last_chunk))
 }
