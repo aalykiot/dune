@@ -90,7 +90,7 @@ fn parse_http_chunks(
     response_body.copy_contents(&mut data);
 
     // Get all available chunks.
-    let (chunks, position, received_last_chunk) = match get_available_chunks(data) {
+    let (chunks, position, received_last_chunk) = match get_available_chunks(&mut data) {
         Ok(values) => values,
         Err(e) => {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
@@ -126,40 +126,33 @@ fn parse_http_chunks(
 
 const CRLF_LENGTH: usize = 2;
 
-/// Retrieves all available chunks from a give buffer.
-fn get_available_chunks(mut buffer: Vec<u8>) -> Result<(Vec<Vec<u8>>, usize, bool)> {
+/// Extracts available chunks from a buffer.
+fn get_available_chunks(buffer: &mut Vec<u8>) -> Result<(Vec<Vec<u8>>, usize, bool)> {
     let mut chunks = vec![];
     let mut cursor_position = 0;
     let mut received_last_chunk = false;
 
+    // Loop over the buffer until all available chunks have been extracted.
     loop {
-        // Parse body buffer as a chunk size.
+        // Parse the buffer as a chunk size and exit the loop if incomplete.
         let status = httparse::parse_chunk_size(&buffer).map_err(|e| Error::msg(e.to_string()))?;
+        if let Status::Partial = status {
+            break;
+        }
 
-        // Check if HTTP chunk can be extracted.
-        let (chunk_start, chunk_length) = match status {
-            Status::Complete(status) => (status.0, status.1),
-            Status::Partial => break,
-        };
-
+        let (chunk_start, chunk_length) = status.unwrap();
         let chunk_end = chunk_start + chunk_length as usize;
 
-        // Check if we received the last chunk.
+        // If this is the last chunk, set a flag and exit the loop.
         if chunk_length == 0 {
             cursor_position += chunk_end + CRLF_LENGTH;
             received_last_chunk = true;
             break;
         }
 
-        // Extract chunk as bytes.
-        let chunk = match chunk_length {
-            0 => Default::default(),
-            _ => buffer[chunk_start..chunk_end].to_vec(),
-        };
-
-        // Update cursor's position.
+        // Extract the chunk as a byte vector and update the cursor position.
+        let chunk = buffer[chunk_start..chunk_end].to_vec();
         cursor_position += chunk_end + CRLF_LENGTH;
-
         buffer.drain(0..(chunk_end + CRLF_LENGTH));
         chunks.push(chunk);
     }

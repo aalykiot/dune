@@ -1,7 +1,9 @@
-// Hypertext Transfer Protocol (HTTP) APIs
+// HTTP Networking APIs
 //
-// The HTTP interfaces are designed to support features of the protocol which have been traditionally difficult to use.
-// The interface is careful to never buffer entire requests or responses, so the user is able to stream data.
+// The HTTP interfaces are built to make it easier to use traditionally
+// difficult protocol features. By never buffering complete requests
+// or responses, users can stream data instead, making data transmission
+// more efficient and flexible.
 //
 // https://undici.nodejs.org/#/
 
@@ -289,27 +291,14 @@ class HttpRequest {
 }
 
 class HttpResponse {
-  #socket;
   #statusCode;
   #headers;
   #body;
-  #bodyLength;
-  #isChunked;
-  #isComplete;
 
   constructor(response, buffer, socket) {
-    this.#socket = socket;
     this.#statusCode = response.statusCode;
     this.#headers = response.headers;
-    this.#body = buffer.subarray(response.bodyAt);
-    this.#bodyLength = Number.parseInt(this.#headers['content-length']) || 0;
-    this.#isChunked = this.#headers['transfer-encoding']?.includes('chunked');
-    this.#isComplete = this.#body?.length === this.#bodyLength;
-
-    if (this.#isComplete && !this.#isChunked) {
-      this.#socket.end();
-      this.#socket = undefined;
-    }
+    this.#body = new HttpResponseBody(response, this.#headers, buffer, socket);
   }
 
   get statusCode() {
@@ -321,7 +310,54 @@ class HttpResponse {
   }
 
   get body() {
-    return this[Symbol.asyncIterator]();
+    return this.#body;
+  }
+}
+
+const decoder = new TextDecoder('utf-8');
+
+class HttpResponseBody {
+  #socket;
+  #body;
+  #bodyLength;
+  #isChunked;
+  #isComplete;
+
+  constructor(response, headers, buffer, socket) {
+    this.#socket = socket;
+    this.#body = buffer.subarray(response.bodyAt);
+    this.#bodyLength = Number.parseInt(headers['content-length']) || 0;
+    this.#isChunked = headers['transfer-encoding']?.includes('chunked');
+    this.#isComplete = this.#body?.length === this.#bodyLength;
+
+    if (this.#isComplete && !this.#isChunked) {
+      this.#socket.end();
+      this.#socket = undefined;
+    }
+  }
+
+  /**
+   * Formats the body to a UTF-8 string.
+   *
+   * @returns Promise<String>
+   */
+  async text() {
+    const string = [];
+    const asyncIterator = this[Symbol.asyncIterator]();
+    for await (const chunk of asyncIterator) {
+      string.push(decoder.decode(chunk));
+    }
+    return string.join('');
+  }
+
+  /**
+   * Formats the body to an actual JSON object.
+   *
+   * @returns Promise<Object>
+   */
+  async json() {
+    const data = await this.text();
+    return JSON.parse(data);
   }
 
   _parseAvailableChunks(data) {
@@ -338,6 +374,9 @@ class HttpResponse {
     };
   }
 
+  /**
+   * The HTTP body should be async iterable.
+   */
   async *[Symbol.asyncIterator](signal) {
     // Close socket on stream pipeline errors.
     if (signal) signal.on('uncaughtStreamException', () => this.#socket.end());
@@ -347,6 +386,10 @@ class HttpResponse {
       yield this.#body;
       return;
     }
+
+    // TODO: Check if chunks are available from the start.
+    // Node.js for examples combines the first chunk with the HTTP headers when
+    // sending responses with chunked encoding.
 
     let bytesReceived = this.#body.length;
 
@@ -363,6 +406,7 @@ class HttpResponse {
       // Note: The following code handles the case when the HTTP's body
       // length is already known from the `Content-Length` header
       // but, it comes to us in multiple TCP packets.
+
       yield data;
       bytesReceived += data.length;
 
@@ -376,8 +420,7 @@ class HttpResponse {
   }
 }
 
-// =========================================================
-
+// Default options for HTTP requests.
 const defaultOptions = {
   method: 'GET',
   headers: {},
@@ -386,13 +429,23 @@ const defaultOptions = {
   throwOnError: false,
 };
 
-const options = Object.assign(defaultOptions, {});
+/**
+ * Performs an HTTP request.
+ *
+ * @param {String} url
+ * @param {Object} options
+ * @returns Promise<HttpResponse>
+ */
+export function request(url, options = {}) {
+  // Check URL param type.
+  if (typeof url !== 'string') {
+    throw new TypeError('The "url" argument must be of type string.');
+  }
 
-const request = new HttpRequest('http://localhost:3000/', options);
-const response = await request.send();
+  const config = Object.assign(defaultOptions, options);
+  const request = new HttpRequest(url, config);
 
-console.log(response.headers);
-
-for await (const data of response.body) {
-  console.log(new TextDecoder().decode(data));
+  return request.send();
 }
+
+export default { request };

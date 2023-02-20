@@ -41,6 +41,7 @@ lazy_static! {
             ("dns", include_str!("./js/dns.js")),
             ("net", include_str!("./js/net.js")),
             ("stream", include_str!("./js/stream.js")),
+            ("http", include_str!("./js/http.js")),
         ];
         HashMap::from_iter(modules.into_iter())
     };
