@@ -203,7 +203,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 > The HTTP package is inspired by Node.js' [undici](https://undici.nodejs.org/) package.
 
-- [ ] `request(url, options?)`: Performs an HTTP request.
+- [x] `request(url, options?)`: Performs an HTTP request.
 
 <details><summary>Details</summary>
 <p></p>
@@ -225,8 +225,8 @@ Body Mixins
 
 > The body mixins are the most common way to format the response body.
 
-- [ ] `text()`: Formats the body to a UTF-8 string.
-- [ ] `json()`: Formats the body to an actual JSON object.
+- [x] `text()`: Formats the body to a UTF-8 string.
+- [x] `json()`: Formats the body to an actual JSON object.
 </details>
 
 ### Stream
