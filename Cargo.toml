@@ -53,7 +53,7 @@ swc_atoms = "0.4.14"
 serde = { version = "1.0.142", features = ["derive"] }
 serde_json = "1.0.88"
 dns-lookup = "1.0.8"
-mio = { version = "0.8.4", features = ["os-poll", "net"] }
+mio = { version = "0.8.5", features = ["os-poll", "net"] }
 tempdir = "0.3.7"
 zstd = "0.12"
 notify = "5.0.0"
