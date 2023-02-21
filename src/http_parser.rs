@@ -135,7 +135,7 @@ fn get_available_chunks(buffer: &mut Vec<u8>) -> Result<(Vec<Vec<u8>>, usize, bo
     // Loop over the buffer until all available chunks have been extracted.
     loop {
         // Parse the buffer as a chunk size and exit the loop if incomplete.
-        let status = httparse::parse_chunk_size(&buffer).map_err(|e| Error::msg(e.to_string()))?;
+        let status = httparse::parse_chunk_size(buffer).map_err(|e| Error::msg(e.to_string()))?;
         let status = match status {
             Status::Complete(status) if buffer.len() >= status.1 as usize => status,
             _ => break,
