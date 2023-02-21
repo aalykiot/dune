@@ -388,7 +388,7 @@ class HttpResponseBody {
     }
 
     // TODO: Check if chunks are available from the start.
-    // Node.js for examples combines the first chunk with the HTTP headers when
+    // Node.js for example combines the first chunk with the HTTP headers when
     // sending responses with chunked encoding.
 
     let bytesReceived = this.#body.length;
@@ -406,7 +406,6 @@ class HttpResponseBody {
       // Note: The following code handles the case when the HTTP's body
       // length is already known from the `Content-Length` header
       // but, it comes to us in multiple TCP packets.
-
       yield data;
       bytesReceived += data.length;
 
