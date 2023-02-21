@@ -448,4 +448,4 @@ export function request(url, options = {}) {
   return request.send();
 }
 
-export default { request };
+export default { METHODS, STATUS_CODES, request };

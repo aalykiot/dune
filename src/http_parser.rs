@@ -28,7 +28,7 @@ fn parse_http_response(
     http_response.copy_contents(&mut data);
 
     // Try parse the HTTP response bytes.
-    let mut response_headers = [httparse::EMPTY_HEADER; 16];
+    let mut response_headers = [httparse::EMPTY_HEADER; 32];
     let mut response = httparse::Response::new(&mut response_headers);
 
     let status = match response.parse(&data) {
@@ -136,11 +136,12 @@ fn get_available_chunks(buffer: &mut Vec<u8>) -> Result<(Vec<Vec<u8>>, usize, bo
     loop {
         // Parse the buffer as a chunk size and exit the loop if incomplete.
         let status = httparse::parse_chunk_size(&buffer).map_err(|e| Error::msg(e.to_string()))?;
-        if let Status::Partial = status {
-            break;
-        }
+        let status = match status {
+            Status::Complete(status) if buffer.len() >= status.1 as usize => status,
+            _ => break,
+        };
 
-        let (chunk_start, chunk_length) = status.unwrap();
+        let (chunk_start, chunk_length) = status;
         let chunk_end = chunk_start + chunk_length as usize;
 
         // If this is the last chunk, set a flag and exit the loop.
