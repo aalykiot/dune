@@ -203,6 +203,8 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 > The HTTP package is inspired by Node.js' [undici](https://undici.nodejs.org/) package.
 
+- [x] `METHODS`: A list of the HTTP methods that are supported by the parser.
+- [x] `STATUS_CODES`: A collection of all the standard HTTP response status codes.
 - [x] `request(url, options?)`: Performs an HTTP request.
 
 <details><summary>Details</summary>
