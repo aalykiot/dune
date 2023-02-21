@@ -279,7 +279,7 @@ class HttpRequest {
       // Response headers are still incomplete.
       if (!response) continue;
 
-      // Check status code and throw if requsted.
+      // Check status code and throw if requested.
       if (response.statusCode >= 400 && this.#throwOnError) {
         const message = STATUS_CODES[response.statusCode];
         throw new Error(`HTTP request failed with error: "${message}"`);
