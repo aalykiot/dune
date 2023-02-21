@@ -36,7 +36,7 @@ dirs = "4.0.0"
 path-absolutize = "3.0.12"
 ureq = { version = "2.4.0", features = ["charset"] }
 phf = { version = "0.11.1", features = ["macros"] }
-url = "2.2.2"
+url = "2.3.1"
 clearscreen = "2.0.0"
 bincode = "1.3.3"
 downcast-rs = { version = "1.2.0", default-features = false }
