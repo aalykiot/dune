@@ -227,8 +227,8 @@ Body Mixins
 
 > The body mixins are the most common way to format the response body.
 
-- [x] `text()`: Formats the body to a UTF-8 string.
-- [x] `json()`: Formats the body to an actual JSON object.
+- [x] `text()`: Produces a UTF-8 string representation of the body.
+- [x] `json()`: Formats the body using JSON parsing.
 </details>
 
 ### Stream
