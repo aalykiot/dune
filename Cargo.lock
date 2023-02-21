@@ -490,6 +490,7 @@ dependencies = [
  "dns-lookup",
  "downcast-rs",
  "enable-ansi-support",
+ "httparse",
  "lazy_static",
  "mio",
  "nanoid",
@@ -777,6 +778,12 @@ checksum = "ee512640fe35acbfb4bb779db6f0d80704c2cacfa2e39b601ef3e3f47d1ae4c7"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "httparse"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d897f394bad6a705d5f4104762e116a75639e470d80901eed05a860a95cb1904"
 
 [[package]]
 name = "ident_case"

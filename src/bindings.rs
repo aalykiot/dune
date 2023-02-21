@@ -1,5 +1,6 @@
 use crate::dns;
 use crate::file;
+use crate::http_parser;
 use crate::net;
 use crate::perf_hooks;
 use crate::process;
@@ -23,6 +24,7 @@ lazy_static! {
             ("dns", dns::initialize),
             ("net", net::initialize),
             ("promise", promise::initialize),
+            ("http_parser", http_parser::initialize),
         ];
         HashMap::from_iter(bindings.into_iter())
     };
