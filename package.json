@@ -1,6 +1,6 @@
 {
   "name": "dune",
-  "version": "0.2.11",
+  "version": "0.3.0",
   "description": "A hobby runtime for JavaScript and TypeScript 🚀",
   "main": "src/js/main.js",
   "scripts": {
