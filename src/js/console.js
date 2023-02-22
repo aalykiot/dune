@@ -32,7 +32,7 @@ function objectToString(value) {
 function stringify(value, seen, depth = 0) {
   switch (typeof value) {
     case 'string':
-      return depth > 0 ? green(`"${value}"`) : value;
+      return depth > 0 ? stringifyText(value) : value;
     case 'number':
     case 'boolean':
       return yellow(String(value));
@@ -51,6 +51,12 @@ function stringify(value, seen, depth = 0) {
     default:
       return '[Unknown]';
   }
+}
+
+function stringifyText(value) {
+  const text = value.length > 100 ? `${value.slice(0, 100)}...` : value;
+  const textEscaped = JSON.stringify(text);
+  return green(textEscaped);
 }
 
 function isArray(value) {
@@ -94,6 +100,20 @@ function isTypedArray(value) {
   }
 }
 
+// Calculate the grid size (trying to make perfect squares and minimizing empty space).
+// 1. Max out at 12xN.
+// 2. Max out at 01xN (if the lengthier element is too big).
+function getMaxElementsPerRow(arr, avgElementLength, maxElementLength) {
+  if (maxElementLength > 30) return 1;
+  return Math.min(
+    Math.max(
+      Math.floor((Math.sqrt(arr.length) * avgElementLength) / maxElementLength),
+      1
+    ),
+    12
+  );
+}
+
 function prettifyArray(arr, depth = 0, hasOnlyNumbers) {
   // Remove the color characters so we can calculate the AVG and MAX correctly.
   const uncolored = arr.map(
@@ -103,14 +123,11 @@ function prettifyArray(arr, depth = 0, hasOnlyNumbers) {
   const maxElementLength = Math.max(...uncolored);
   const avgElementLength = uncolored.reduce((a, b) => a + b) / uncolored.length;
 
-  // Calculate the grid size (trying to make perfect squares and minimizing empty space)
-  // or max out at 12xN;
-  const maxElementsPerRow = Math.min(
-    Math.max(
-      Math.floor((Math.sqrt(arr.length) * avgElementLength) / maxElementLength),
-      1
-    ),
-    12
+  // Calculate the grid size.
+  const maxElementsPerRow = getMaxElementsPerRow(
+    arr,
+    avgElementLength,
+    maxElementLength
   );
 
   // Tries to align the columns.
