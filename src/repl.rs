@@ -223,7 +223,7 @@ pub fn start(mut runtime: JsRuntime) {
                 }
                 Ok(line) => {
                     // Update REPL's history file.
-                    editor.add_history_entry(&line);
+                    editor.add_history_entry(&line).unwrap();
                     // Evaluate current expression.
                     let message = ReplMessage::Evaluate(line.trim_end().into());
                     sender.send(message).unwrap();

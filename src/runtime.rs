@@ -62,6 +62,8 @@ pub struct JsRuntimeState {
     pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
     /// Runtime options.
     pub options: JsRuntimeOptions,
+    /// Tracks wake event for current loop iteration.
+    pub wake_event_queued: bool,
 }
 
 #[derive(Debug, Default)]
@@ -160,6 +162,7 @@ impl JsRuntime {
             next_tick_queue: Vec::new(),
             promise_exceptions: HashMap::new(),
             options,
+            wake_event_queued: false,
         })));
 
         let mut runtime = JsRuntime {
@@ -353,6 +356,8 @@ impl JsRuntime {
             fut.run(scope);
             run_next_tick_callbacks(scope);
         }
+
+        state_rc.borrow_mut().wake_event_queued = false;
     }
 
     /// Checks for imports (static/dynamic) ready for execution.

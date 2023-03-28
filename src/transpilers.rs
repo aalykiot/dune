@@ -158,6 +158,7 @@ impl Jsx {
                     ..Default::default()
                 },
                 Mark::new(),
+                Mark::new(),
             ));
 
             {
