@@ -88,12 +88,12 @@ fn create_timeout(
             };
             state.pending_futures.push(Box::new(future));
 
-            // Important: We have to send an interrupt signal to the event-loop
-            // to prevent the scenario when the even-loop will idle in the poll phase waiting
-            // for I/O while the timer's JS future is pending in the runtime level.
-            if !state.wake_event_sent {
+            // Note: It's important to send an interrupt signal to the event-loop to prevent the
+            // event-loop from idling in the poll phase, waiting for I/O, while the timer's JS
+            // future is ready in the runtime level.
+            if !state.wake_event_queued {
                 state.interrupt_handle.interrupt();
-                state.wake_event_sent = true;
+                state.wake_event_queued = true;
             }
         }
     };
