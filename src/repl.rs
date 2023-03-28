@@ -199,6 +199,16 @@ pub fn start(mut runtime: JsRuntime) {
     let (sender, receiver) = mpsc::channel::<ReplMessage>();
     let handle = runtime.event_loop.interrupt_handle();
 
+    // Note: To prevent a busy loop, we schedule an empty repeatable
+    // timer with a close to maximum timeout value.
+    //
+    // https://doc.rust-lang.org/std/time/struct.Instant.html#os-specific-behaviors
+
+    runtime
+        .event_loop
+        .handle()
+        .timer(u32::MAX as u64, true, |_| {});
+
     // Spawn the REPL thread.
     thread::spawn(move || {
         let mut editor = Editor::new().unwrap();
