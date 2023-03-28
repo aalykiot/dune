@@ -62,6 +62,8 @@ pub struct JsRuntimeState {
     pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
     /// Runtime options.
     pub options: JsRuntimeOptions,
+    /// Indicates if a wake event has been sent in the current loop iteration.
+    pub wake_event_sent: bool,
 }
 
 #[derive(Debug, Default)]
@@ -160,6 +162,7 @@ impl JsRuntime {
             next_tick_queue: Vec::new(),
             promise_exceptions: HashMap::new(),
             options,
+            wake_event_sent: false,
         })));
 
         let mut runtime = JsRuntime {
@@ -309,6 +312,7 @@ impl JsRuntime {
         self.event_loop.tick();
         self.run_pending_futures();
         self.fast_forward_imports();
+        self.get_state().borrow_mut().wake_event_sent = false;
     }
 
     /// Runs the event-loop until no more pending events exists.
