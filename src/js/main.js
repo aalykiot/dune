@@ -1,7 +1,8 @@
 import timers from 'timers';
+import structuredClone from '@web/clone';
 import { Console, prompt } from 'console';
-import { TextEncoder, TextDecoder } from 'text_encoding';
 import { cloneFunction, parseEnvVariable } from 'util';
+import { TextEncoder, TextDecoder } from '@web/text_encoding';
 import { readFileSync } from 'fs';
 
 globalThis.global = globalThis;
@@ -92,6 +93,7 @@ makeGlobal('clearImmediate', timers.clearImmediate);
 
 makeGlobal('TextEncoder', TextEncoder);
 makeGlobal('TextDecoder', TextDecoder);
+makeGlobal('structuredClone', structuredClone);
 
 // Loading env variables from a .env file automatically.
 
