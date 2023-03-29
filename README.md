@@ -102,6 +102,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: DOM style timers.
 - [x] `setImmediate` / `clearImmediate`: Node.js like immediate timers.
 - [x] `process`: An object that provides info about the current dune process.
+- [x] `structuredClone`: Creates a deep clone of a given value.
 
 ### Module Metadata
 

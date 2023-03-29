@@ -34,7 +34,6 @@ lazy_static! {
             ("timers", include_str!("./js/timers.js")),
             ("assert", include_str!("./js/assert.js")),
             ("util", include_str!("./js/util.js")),
-            ("text_encoding", include_str!("./js/text-encoding.js")),
             ("fs", include_str!("./js/fs.js")),
             ("perf_hooks", include_str!("./js/perf-hooks.js")),
             ("colors", include_str!("./js/colors.js")),
@@ -42,6 +41,8 @@ lazy_static! {
             ("net", include_str!("./js/net.js")),
             ("stream", include_str!("./js/stream.js")),
             ("http", include_str!("./js/http.js")),
+            ("@web/text_encoding", include_str!("./js/text-encoding.js")),
+            ("@web/clone", include_str!("./js/structured-clone.js")),
         ];
         HashMap::from_iter(modules.into_iter())
     };

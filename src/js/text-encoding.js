@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 /*
  * Copyright 2017 Sam Thorogood. All rights reserved.
  *
@@ -32,7 +33,7 @@ function FastTextEncoder() {
 }
 
 Object.defineProperty(FastTextEncoder.prototype, 'encoding', {
-  value: 'utf-8'
+  value: 'utf-8',
 });
 
 /**
@@ -129,7 +130,7 @@ function FastTextDecoder(utfLabel = 'utf-8', options = { fatal: false }) {
 }
 
 Object.defineProperty(FastTextDecoder.prototype, 'encoding', {
-  value: 'utf-8'
+  value: 'utf-8',
 });
 
 Object.defineProperty(FastTextDecoder.prototype, 'fatal', { value: false });
