@@ -101,9 +101,9 @@ dependencies = [
 
 [[package]]
 name = "ast_node"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43e351bf9f01438f9479f39ed9d2c26dab615f9887d8ba50d50addd0c6536d51"
+checksum = "7976b3a3e10d7f95891b780534b92f00d914962ab31884b0bde25762b03a0b73"
 dependencies = [
  "darling",
  "pmutil",
@@ -2034,9 +2034,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "swc_atoms"
-version = "0.4.39"
+version = "0.4.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ebef84c2948cd0d1ba25acbf1b4bd9d80ab6f057efdbe35d8449b8d54699401"
+checksum = "389686ca731d3aa643431c8af606ff3eaf921e76027b2d9aeafb8cc4b43c0fe7"
 dependencies = [
  "once_cell",
  "rustc-hash",
@@ -2079,9 +2079,9 @@ dependencies = [
 
 [[package]]
 name = "swc_common"
-version = "0.30.0"
+version = "0.30.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2625cf59127d2ccef0e3cbff5b2c0e370415ef274c03a49d733d0a6a03be53db"
+checksum = "58d48ba41409dfd2ce48a2e4c311020170730559850cfec79ba2694bd95bed71"
 dependencies = [
  "ahash",
  "ast_node",
