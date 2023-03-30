@@ -72,8 +72,11 @@ function stringifyArray(arr, seen, depth) {
     entries.push(stringify(elem, seen, depth));
   }
 
+  // Remove the color characters to get the proper length.
+  const uncoloredEntries = entries.join('').replace(/\u001b\[[0-9;]*m/g, '');
+
   // Multiline formatting.
-  if (entries.join('').length > 50) {
+  if (uncoloredEntries.length > 60) {
     const start = '[\n';
     const end = `\n${pre((depth - 1) * 2)}]`;
     const entriesPretty = prettifyArray(entries, depth, hasOnlyNumbers);
