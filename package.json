@@ -4,6 +4,7 @@
   "description": "A hobby runtime for JavaScript and TypeScript 🚀",
   "main": "src/js/main.js",
   "scripts": {
+    "build:aarch64": "./scripts/build-aarch64.sh",
     "lint": "eslint ./src/js/**/*.js"
   },
   "repository": {
@@ -11,7 +12,7 @@
     "url": "git+https://github.com/aalykiot/dune.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "Alex Alikiotis <alexalikiotis5@gmail.com>",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/aalykiot/dune/issues"
