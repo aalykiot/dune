@@ -20,7 +20,7 @@ nix = { version = "0.26.1", features=["signal"] }
 enable-ansi-support = "0.2.1"
 
 [dependencies]
-v8 = { version = "0.67.0", default-features = false }
+v8 = { version = "0.68.0", default-features = false }
 clap = "4.0.27"
 anyhow = "1.0.52"
 colored = "2.0.0"
