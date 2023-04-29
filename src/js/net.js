@@ -224,7 +224,7 @@ export class Socket extends EventEmitter {
     this.remotePort = remote.port;
 
     const [onAvailableSocketData, signal] = callbackTimeout(
-      this._onAvailableSocketData.bind(this),
+      this.#onAvailableSocketData.bind(this),
       this.timeout,
       () => this.emit('timeout')
     );
@@ -366,7 +366,7 @@ export class Socket extends EventEmitter {
 
     this.emit('close');
     this.#timeoutHandle?.emit('timeoutUpdate', 0);
-    this._reset();
+    this.#reset();
   }
 
   /**
@@ -381,7 +381,7 @@ export class Socket extends EventEmitter {
   /**
    * Resets socket's internal state (not to be called manually).
    */
-  _reset() {
+  #reset() {
     this.#pushQueue = [];
     this.#pullQueue = [];
     this.#connecting = false;
@@ -393,7 +393,7 @@ export class Socket extends EventEmitter {
     this.timeout = 0;
   }
 
-  _asyncDispatch(value) {
+  #asyncDispatch(value) {
     if (this.#pullQueue.length === 0) {
       this.#pushQueue.push(value);
       return;
@@ -403,17 +403,17 @@ export class Socket extends EventEmitter {
     action(value);
   }
 
-  _onAvailableSocketData(err, arrayBufferView) {
+  #onAvailableSocketData(err, arrayBufferView) {
     // Check for errors during socket read.
     if (err) {
-      this._asyncDispatch(err);
+      this.#asyncDispatch(err);
       this.emit('error', err);
       return;
     }
 
     // Check if the remote host closed the connection.
     if (arrayBufferView.byteLength === 0) {
-      this._asyncDispatch(null);
+      this.#asyncDispatch(null);
       this.emit('end');
       this.destroy();
       return;
@@ -433,7 +433,7 @@ export class Socket extends EventEmitter {
       return;
     }
 
-    this._asyncDispatch(data_transform);
+    this.#asyncDispatch(data_transform);
   }
 
   /**
@@ -446,7 +446,7 @@ export class Socket extends EventEmitter {
     this.#writable = true;
 
     const [onAvailableSocketData, signal] = callbackTimeout(
-      this._onAvailableSocketData.bind(this),
+      this.#onAvailableSocketData.bind(this),
       this.timeout,
       () => this.emit('timeout')
     );
@@ -526,7 +526,7 @@ export class Server extends EventEmitter {
     const socketInfo = binding.listen(
       host,
       port,
-      this._onAvailableConnection.bind(this)
+      this.#onAvailableConnection.bind(this)
     );
 
     this.#id = socketInfo.id;
@@ -586,7 +586,7 @@ export class Server extends EventEmitter {
     return this.#host;
   }
 
-  _asyncDispatch(socket) {
+  #asyncDispatch(socket) {
     if (this.#pullQueue.length === 0) {
       this.#pushQueue.push(socket);
       return;
@@ -596,10 +596,10 @@ export class Server extends EventEmitter {
     action(socket);
   }
 
-  _onAvailableConnection(err, sockInfo) {
+  #onAvailableConnection(err, sockInfo) {
     // Check for socket connection errors.
     if (err) {
-      this._asyncDispatch(err);
+      this.#asyncDispatch(err);
       this.emit('error', err);
       return;
     }
@@ -622,7 +622,7 @@ export class Server extends EventEmitter {
       return;
     }
 
-    this._asyncDispatch(socket);
+    this.#asyncDispatch(socket);
   }
 
   /**

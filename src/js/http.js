@@ -360,7 +360,7 @@ class HttpResponseBody {
     return JSON.parse(data);
   }
 
-  _parseAvailableChunks(data) {
+  #parseAvailableChunks(data) {
     // Mix current body with new data.
     const buffer = concatUint8Arrays(this.#body, data);
     const { chunks, position, done } = binding.parseHttpChunks(buffer);
@@ -397,7 +397,7 @@ class HttpResponseBody {
     for await (const data of this.#socket) {
       // HTTP body is received in chunks.
       if (this.#isChunked) {
-        const { chunks, done } = this._parseAvailableChunks(data);
+        const { chunks, done } = this.#parseAvailableChunks(data);
         yield* chunks;
         if (done) break;
         continue;
