@@ -39,6 +39,7 @@ lazy_static! {
             ("colors", include_str!("./js/colors.js")),
             ("dns", include_str!("./js/dns.js")),
             ("net", include_str!("./js/net.js")),
+            ("test", include_str!("./js/test.js")),
             ("stream", include_str!("./js/stream.js")),
             ("http", include_str!("./js/http.js")),
             ("@web/text_encoding", include_str!("./js/text-encoding.js")),
