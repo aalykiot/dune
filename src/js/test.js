@@ -43,6 +43,13 @@ function timeout(promise, time = 0) {
   });
 }
 
+// Utility function to join paths similar to Node.js.
+function joinPaths(...parts) {
+  const separator = '/';
+  const replace = new RegExp(separator + '{1,}', 'g');
+  return parts.join(separator).replace(replace, separator);
+}
+
 /**
  *  TestRunner is the main executor to run JavaScript tests.
  */
@@ -52,7 +59,7 @@ export class TestRunner {
     this.tests = new Map();
     this.testFiles = [];
     this.filter = undefined;
-    this.fastFail = false;
+    this.failFast = false;
     this.counters = {
       ok: 0,
       failed: 0,
@@ -80,7 +87,7 @@ export class TestRunner {
     const entities = fs.readdirSync(path);
 
     for (const filename of entities) {
-      const filePath = path + '/' + filename;
+      const filePath = joinPaths(path, filename);
       const stat = fs.statSync(filePath);
 
       // Test file has been found.
@@ -99,18 +106,18 @@ export class TestRunner {
   /**
    * Loads tests from files to the runner recursively.
    *
-   * @param {String} [entry]
+   * @param {String} [entryPoint]
    */
-  async importTests(entry = process.cwd()) {
-    // Find if the `entry` is file or directory.
-    const stat = fs.statSync(entry);
+  async importTests(entryPoint = process.cwd()) {
+    // Find if the `entryPoint` is file or directory.
+    const stat = fs.statSync(entryPoint);
 
     if (stat.isDirectory) {
-      this.#walkDirs(entry, this.testFiles);
+      this.#walkDirs(entryPoint, this.testFiles);
     }
 
     if (stat.isFile) {
-      this.testFiles.push(entry);
+      this.testFiles.push(entryPoint);
     }
 
     await Promise.all(this.testFiles.map((filename) => import(filename)));
@@ -126,7 +133,7 @@ export class TestRunner {
     // Run test suite.
     for await (const [description, testFn] of this.tests) {
       // Filter tests based on provided regex.
-      if (!description.match(this.filter || /.*/g)) {
+      if (!this.filter?.test(description)) {
         continue;
       }
 
@@ -145,7 +152,7 @@ export class TestRunner {
         console.log(`${FAIL} ${red(description)}\n ${red(err.stack)}`);
 
         // Stop running test suite.
-        if (this.fastFail) {
+        if (this.failFast) {
           const { ok, ignored } = this.counters;
           const remaining = this.tests.size - ok - ignored - 1;
           this.counters.ignored += remaining;
