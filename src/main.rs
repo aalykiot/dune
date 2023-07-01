@@ -101,7 +101,13 @@ fn test_command(mut args: ArgMatches) {
     // Get the path we need to import JavaScript tests from.
     let cwd = env::current_dir().unwrap();
     let test_path = match args.remove_one::<String>("FILES") {
-        Some(path) => fs::canonicalize(path).unwrap_or(cwd),
+        Some(path) => match fs::canonicalize(path) {
+            Ok(path) => path,
+            Err(e) => {
+                eprintln!("{}", generic_error(e.to_string()));
+                std::process::exit(1);
+            }
+        },
         None => cwd,
     };
 
