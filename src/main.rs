@@ -84,6 +84,7 @@ fn run_command(mut args: ArgMatches) {
         reload,
         import_map,
         num_threads,
+        ..Default::default()
     };
 
     // Create new JS runtime.
@@ -123,6 +124,7 @@ fn test_command(mut args: ArgMatches) {
     );
 
     // Extract runtime options.
+    let reload = args.remove_one::<bool>("reload").unwrap_or_default();
     let import_map = args.remove_one::<String>("import-map");
     let import_map = load_import_map(import_map);
 
@@ -137,9 +139,10 @@ fn test_command(mut args: ArgMatches) {
     // Build JS runtime options.
     let options = JsRuntimeOptions {
         seed,
+        test_mode: true,
         import_map,
         num_threads,
-        ..Default::default()
+        reload,
     };
 
     // Create new JS runtime.
@@ -316,6 +319,7 @@ fn main() {
                 .arg(arg!(<FILES>... "List of file names or directories").required(false))
                 .arg(arg!(--"fail-fast" "Stop after the first failure"))
                 .arg(arg!(--filter <FILTER> "Run tests with this regex pattern in test description"))
+                .arg(arg!(-r --reload "Reload every URL import (cache is ignored)"))
                 .arg(arg!(--seed <NUMBER> "Make the Math.random() method predictable"))
                 .arg(arg!(--"import-map" <FILE> "Load import map file from local file"))
                 .arg(arg!(--"threadpool-size" <NUMBER> "Set the number of threads used for I/O"))

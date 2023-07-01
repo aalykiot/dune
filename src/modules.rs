@@ -301,8 +301,9 @@ impl JsFuture for EsModuleFuture {
             .insert(&self.path, v8::Global::new(tc_scope, module));
 
         let import_map = state.options.import_map.clone();
+
         let skip_cache = match self.module.borrow().is_dynamic_import {
-            true => true,
+            true => !state.options.test_mode || state.options.reload,
             false => state.options.reload,
         };
 
