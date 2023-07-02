@@ -84,11 +84,80 @@ fn run_command(mut args: ArgMatches) {
         reload,
         import_map,
         num_threads,
+        ..Default::default()
     };
 
     // Create new JS runtime.
     let mut runtime = JsRuntime::with_options(options);
     let mod_result = runtime.execute_module(&filename, None);
+
+    match mod_result {
+        Ok(_) => runtime.run_event_loop(),
+        Err(e) => eprintln!("{e:?}"),
+    };
+}
+
+fn test_command(mut args: ArgMatches) {
+    // Get the path we need to import JavaScript tests from.
+    let cwd = env::current_dir().unwrap();
+    let test_path = match args.remove_one::<String>("FILES") {
+        Some(path) => match fs::canonicalize(path) {
+            Ok(path) => path,
+            Err(e) => {
+                eprintln!("{}", generic_error(e.to_string()));
+                std::process::exit(1);
+            }
+        },
+        None => cwd,
+    };
+
+    // Extract options from cli arguments.
+    let fail_fast = args.remove_one::<bool>("fail-fast").unwrap_or_default();
+
+    let filter = match args.remove_one::<String>("filter") {
+        Some(value) => format!("new RegExp({})", value),
+        None => "undefined".into(),
+    };
+
+    // Build JavaScript test script.
+    let script = format!(
+        "
+        import {{ mainRunner }} from 'test';
+        mainRunner.failFast = {};
+        mainRunner.filter = {};
+        await mainRunner.importTests('{}');
+        await mainRunner.run();
+    ",
+        fail_fast,
+        filter,
+        test_path.display(),
+    );
+
+    // Extract runtime options.
+    let reload = args.remove_one::<bool>("reload").unwrap_or_default();
+    let import_map = args.remove_one::<String>("import-map");
+    let import_map = load_import_map(import_map);
+
+    let seed = args
+        .remove_one::<String>("seed")
+        .map(|val| val.parse::<i64>().unwrap_or_default());
+
+    let num_threads = args
+        .remove_one::<String>("threadpool-size")
+        .map(|val| val.parse::<usize>().unwrap_or_default());
+
+    // Build JS runtime options.
+    let options = JsRuntimeOptions {
+        seed,
+        test_mode: true,
+        import_map,
+        num_threads,
+        reload,
+    };
+
+    // Create new JS runtime.
+    let mut runtime = JsRuntime::with_options(options);
+    let mod_result = runtime.execute_module("dune:environment/test", Some(&script));
 
     match mod_result {
         Ok(_) => runtime.run_event_loop(),
@@ -255,6 +324,16 @@ fn main() {
                 .arg(arg!(-r --reload "Reload every URL import (cache is ignored)"))
                 .arg(arg!(--"import-map" <FILE> "Load import map file from local file")),
         )
+        .subcommand(
+            Command::new("test").about("Execute tests using the built-in test runner")
+                .arg(arg!(<FILES>... "List of file names or directories").required(false))
+                .arg(arg!(--"fail-fast" "Stop after the first failure"))
+                .arg(arg!(--filter <FILTER> "Run tests with this regex pattern in test description"))
+                .arg(arg!(-r --reload "Reload every URL import (cache is ignored)"))
+                .arg(arg!(--seed <NUMBER> "Make the Math.random() method predictable"))
+                .arg(arg!(--"import-map" <FILE> "Load import map file from local file"))
+                .arg(arg!(--"threadpool-size" <NUMBER> "Set the number of threads used for I/O"))
+        )
         .subcommand(Command::new("upgrade").about("Upgrade to the latest dune version"))
         .subcommand(Command::new("repl").about("Start the REPL (read, eval, print, loop)"))
         .get_matches();
@@ -265,6 +344,7 @@ fn main() {
         ("run", args) => run_command(args),
         ("bundle", args) => bundle_command(args),
         ("compile", args) => compile_command(args),
+        ("test", args) => test_command(args),
         ("upgrade", _) => upgrade_command(),
         _ => repl_command(),
     }

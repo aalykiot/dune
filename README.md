@@ -245,6 +245,40 @@ Body Mixins
 - [x] `timeOrigin`: Specifies the millisecond timestamp at which the current process began.
 - [x] `now()`: Returns the millisecond timestamp, where 0 represents the start of the current process.
 
+### Test Runner
+
+- [x] `test(description, [options], testFn)`: Registers a test with the default test runner.
+- [x] `TestRunner`: (Class) A main executor to run JavaScript and TypeScript tests.
+
+<details><summary>Details</summary>
+<p></p>
+
+Options
+
+- `ignore`: (boolean) - Default: `false` - Ignore test based on a runtime check.
+
+Custom Executors
+
+> You can attach tests to custom runners and run them manually.
+
+```js
+import { TestRunner } from 'test';
+import assert from 'assert';
+
+const runner = new TestRunner();
+
+runner.failFast = true;
+runner.filter = null;
+
+runner.test('a simple test', () => {
+  assert.equal(1 + 2, 3);
+});
+
+await runner.run();
+```
+
+</details>
+
 ### Assert
 
 > The assertion API is copied from: https://assert-js.norbert.tech/
@@ -272,6 +306,37 @@ Body Mixins
 - [x] `count(expected, arrayValue)`: Asserts that array have specific number of elements.
 - [x] `notEmpty(arrayValue)`: Asserts that array is not empty.
 - [x] `throws(fn, error)`: Asserts that function throws expected exception.
+
+## Testing
+
+Dune has a built-in test runner that you can use for testing JavaScript or TypeScript code.
+
+```js
+import test from 'test';
+import assert from 'assert';
+
+function doSomeMath(a, b) {
+  return a + b;
+}
+
+test('checking multiple addition values', () => {
+  for (let a = 1; a < 10; a++) {
+    assert.equal(doSomeMath(a, 5), a + 5);
+  }
+});
+```
+
+You can run the above suite using the `dune test` subcommand:
+
+```sh
+$ dune test example_test.js
+
+OK  checking multiple addition values
+
+Test result: 1 ok; 0 failed; 0 ignored (0 ms)
+```
+
+For more testing examples look at the <a href="./examples/testing/">examples/testing</a> directory.
 
 ## Contributing
 

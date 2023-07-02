@@ -77,6 +77,8 @@ pub struct JsRuntimeOptions {
     pub import_map: Option<ImportMap>,
     // The numbers of threads used by the threadpool.
     pub num_threads: Option<usize>,
+    // Indicates if we're running JavaScript tests.
+    pub test_mode: bool,
 }
 
 pub struct JsRuntime {

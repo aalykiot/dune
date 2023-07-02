@@ -10,4 +10,4 @@ const response = await http.request(URL, {
 const todos = await response.body.json();
 const titles = todos.map((todo) => todo.title);
 
-console.log(titles); // <-- Formatting is a bit odd but will fix it.
+console.log(titles);

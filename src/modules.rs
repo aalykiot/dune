@@ -39,6 +39,7 @@ lazy_static! {
             ("colors", include_str!("./js/colors.js")),
             ("dns", include_str!("./js/dns.js")),
             ("net", include_str!("./js/net.js")),
+            ("test", include_str!("./js/test.js")),
             ("stream", include_str!("./js/stream.js")),
             ("http", include_str!("./js/http.js")),
             ("@web/text_encoding", include_str!("./js/text-encoding.js")),
@@ -300,8 +301,9 @@ impl JsFuture for EsModuleFuture {
             .insert(&self.path, v8::Global::new(tc_scope, module));
 
         let import_map = state.options.import_map.clone();
+
         let skip_cache = match self.module.borrow().is_dynamic_import {
-            true => true,
+            true => !state.options.test_mode || state.options.reload,
             false => state.options.reload,
         };
 
