@@ -14,7 +14,7 @@ const OK = bg_green(bold(' OK '));
 const FAIL = bg_red(bold(' FAIL '));
 
 // Regex to match test files.
-const TEST_FILE = new RegExp(/.*.spec.ts|.*.test.ts|.*.spec.js|.*.test.js/);
+const TEST_FILE = new RegExp(/.*.spec.ts$|.*.test.ts$|.*.spec.js$|.*.test.js$/);
 
 // Error type referring to test duration timeout.
 export class TimeoutError extends Error {
