@@ -263,7 +263,7 @@ Custom Executors
 
 ```js
 import { TestRunner } from 'test';
-import assert from 'assert;';
+import assert from 'assert';
 
 const runner = new TestRunner();
 

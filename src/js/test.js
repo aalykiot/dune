@@ -133,7 +133,7 @@ export class TestRunner {
     // Run test suite.
     for await (const [description, testFn] of this.tests) {
       // Filter tests based on provided regex.
-      if (!this.filter?.test(description)) {
+      if (this.filter && !this.filter.test(description)) {
         continue;
       }
 

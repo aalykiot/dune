@@ -113,14 +113,18 @@ fn test_command(mut args: ArgMatches) {
 
     // Extract options from cli arguments.
     let fail_fast = args.remove_one::<bool>("fail-fast").unwrap_or_default();
-    let filter = args.remove_one::<String>("filter").unwrap_or_default();
+
+    let filter = match args.remove_one::<String>("filter") {
+        Some(value) => format!("new RegExp({})", value),
+        None => "undefined".into(),
+    };
 
     // Build JavaScript test script.
     let script = format!(
         "
         import {{ mainRunner }} from 'test';
         mainRunner.failFast = {};
-        mainRunner.filter = new RegExp({}) || undefined;
+        mainRunner.filter = {};
         await mainRunner.importTests('{}');
         await mainRunner.run();
     ",
