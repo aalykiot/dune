@@ -233,7 +233,7 @@ impl JsFuture for FsReadFuture {
         // Deserialize bincode binary into actual rust types.
         let (n, data): (usize, Vec<u8>) = bincode::deserialize(&result).unwrap();
 
-        // Copy data slice into v8's typed-array backing store.
+        // Copy the slice's bytes into v8's typed-array backing store.
         for (i, value) in data.iter().enumerate() {
             self.buffer_store[i].set(*value);
         }
@@ -334,7 +334,7 @@ fn read_sync(
 
     match read_file_op(&mut file, buffer_size, offset) {
         Ok((n, data)) => {
-            // Copy data slice into v8's typed-array backing store.
+            // Copy the slice's bytes into v8's typed-array backing store.
             for (i, value) in data.iter().enumerate() {
                 buffer_store[i].set(*value);
             }

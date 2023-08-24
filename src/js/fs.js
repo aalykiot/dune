@@ -65,45 +65,45 @@ export class File {
   /**
    * Reads asynchronously some bytes from the file.
    *
-   * @param {Uint8Array} storage
+   * @param {Uint8Array} buffer
    * @param {Number} offset
    * @returns {Promise<Number>}
    */
-  async read(storage, offset = 0) {
+  async read(buffer, offset = 0) {
     // Check if the file is open.
     if (!this._handle) {
       throw new Error('The file is not open.');
     }
 
-    // Check the storage argument type.
-    if (!(storage instanceof Uint8Array)) {
-      throw new TypeError(`The "storage" argument must be of type Uint8Array.`);
+    // Provided buffers must be Uint8Arrays.
+    if (!(buffer instanceof Uint8Array)) {
+      throw new TypeError(`The "buffer" argument must be of type Uint8Array.`);
     }
 
-    // Copy bytes to storage and return bytes read.
-    return binding.read(this._handle, storage.buffer, offset);
+    // Copy bytes into buffer and return bytes read.
+    return binding.read(this._handle, buffer.buffer, offset);
   }
 
   /**
    * Reads synchronously some bytes from the file.
    *
-   * @param {Uint8Array} storage
+   * @param {Uint8Array} buffer
    * @param {Number} offset
    * @returns {Number}
    */
-  readSync(storage, offset = 0) {
+  readSync(buffer, offset = 0) {
     // Check if the file is open.
     if (!this._handle) {
       throw new Error('The file is not open.');
     }
 
-    // Check the storage argument type.
-    if (!(storage instanceof Uint8Array)) {
-      throw new TypeError(`The "storage" argument must be of type Uint8Array.`);
+    // Provided buffers must be Uint8Arrays.
+    if (!(buffer instanceof Uint8Array)) {
+      throw new TypeError(`The "buffer" argument must be of type Uint8Array.`);
     }
 
-    // Copy bytes to storage and return bytes read.
-    return binding.readSync(this._handle, storage.buffer, offset);
+    // Copy bytes into buffer and return bytes read.
+    return binding.readSync(this._handle, buffer.buffer, offset);
   }
 
   /**
@@ -201,33 +201,33 @@ export class File {
   }
 
   /**
-   * The File objects should be asynchronously iterable.
+   * The `File` instances are asynchronously iterable objects.
    */
   async *[Symbol.asyncIterator](signal) {
     // Close the file on stream pipeline errors.
     if (signal) signal.on('uncaughtStreamException', () => this.close());
 
     let buffer = new Uint8Array(BUFFER_SIZE);
-    let bytes_read = 0;
+    let bytesRead = 0;
     let offset = 0;
-    while ((bytes_read = await this.read(buffer, offset))) {
-      if (bytes_read === 0) break;
-      offset += bytes_read;
-      yield buffer.subarray(0, bytes_read);
+    while ((bytesRead = await this.read(buffer, offset))) {
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+      yield buffer.subarray(0, bytesRead);
     }
   }
 
   /**
-   * The File objects should be iterable.
+   * The `File` instances are iterable objects.
    */
   *[Symbol.iterator]() {
     let buffer = new Uint8Array(BUFFER_SIZE);
-    let bytes_read = 0;
+    let bytesRead = 0;
     let offset = 0;
-    while ((bytes_read = this.readSync(buffer, offset))) {
-      if (bytes_read === 0) break;
-      offset += bytes_read;
-      yield buffer.subarray(0, bytes_read);
+    while ((bytesRead = this.readSync(buffer, offset))) {
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+      yield buffer.subarray(0, bytesRead);
     }
   }
 }
@@ -382,13 +382,13 @@ export async function readFile(path, options = {}) {
   const file = new File(path, 'r');
   await file.open();
 
-  // Create a buffer to store the bytes from the file.
+  // Allocate a buffer to store all the bytes from the file.
   const stat = await file.stat();
   const data = new Uint8Array(stat.size);
 
   let bytesRead = 0;
 
-  // Note: Since the file object is async iterable will read the entire contents
+  // Note: Since the file object is async iterable will read the entire content
   // of the file using the for-await loop.
   for await (let chunk of file) {
     data.set(chunk, bytesRead);
@@ -420,13 +420,13 @@ export function readFileSync(path, options = {}) {
   const file = new File(path, 'r');
   file.openSync();
 
-  // Create a buffer to store the bytes from the file.
+  // Allocate a buffer to store all the bytes from the file.
   const stat = file.statSync();
   const data = new Uint8Array(stat.size);
 
   let bytesRead = 0;
 
-  // Note: Since the file object is iterable will read the entire contents
+  // Note: Since the file object is iterable will read the entire content
   // of the file using the for-of loop.
   for (let chunk of file) {
     data.set(chunk, bytesRead);
