@@ -210,6 +210,7 @@ fn open_sync(
 /// Describes what will run after the async read_file_op completes.
 struct FsReadFuture {
     promise: v8::Global<v8::PromiseResolver>,
+    buffer_store: v8::SharedRef<v8::BackingStore>,
     maybe_result: TaskResult,
 }
 
@@ -230,31 +231,18 @@ impl JsFuture for FsReadFuture {
         let result = result.unwrap();
 
         // Deserialize bincode binary into actual rust types.
-        let (n, mut buffer): (usize, Vec<u8>) = bincode::deserialize(&result).unwrap();
+        let (n, data): (usize, Vec<u8>) = bincode::deserialize(&result).unwrap();
 
-        // We reached the end of the file.
-        if n == 0 {
-            // Create an empty ArrayBuffer and return it to JavaScript.
-            let store = v8::ArrayBuffer::new_backing_store(scope, 0).make_shared();
-            let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
-
-            self.promise.open(scope).resolve(scope, bytes.into());
-            return;
+        // Copy the slice's bytes into v8's typed-array backing store.
+        for (i, value) in data.iter().enumerate() {
+            self.buffer_store[i].set(*value);
         }
 
-        // Resize buffer given bytes read.
-        buffer.resize(n, 0);
-
-        // Create ArrayBuffer's backing store from Vec<u8>.
-        let store = buffer.into_boxed_slice();
-        let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store).make_shared();
-
-        // Initialize ArrayBuffer.
-        let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
+        let bytes_read = v8::Integer::new(scope, n as i32);
 
         self.promise
             .open(scope)
-            .resolve(scope, bytes.into())
+            .resolve(scope, bytes_read.into())
             .unwrap();
     }
 }
@@ -264,8 +252,11 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
 
-    // Get chunk size and byte offset.
-    let size = args.get(1).to_integer(scope).unwrap().value();
+    // Get a reference to the provided JS land buffer.
+    let buffer = v8::Local::<v8::ArrayBuffer>::try_from(args.get(1)).unwrap();
+    let buffer_size = buffer.byte_length() as i64;
+    let buffer_store = buffer.get_backing_store();
+
     let offset = args.get(2).to_integer(scope).unwrap().value();
 
     // Create a promise resolver and extract the actual promise.
@@ -289,7 +280,7 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || match read_file_op(&mut file, size, offset) {
+    let task = move || match read_file_op(&mut file, buffer_size, offset) {
         Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
@@ -304,6 +295,7 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
             let future = FsReadFuture {
                 promise,
                 maybe_result,
+                buffer_store,
             };
             state.pending_futures.push(Box::new(future));
         }
@@ -324,6 +316,13 @@ fn read_sync(
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
 
+    // Get a reference to the provided JS land buffer.
+    let buffer = v8::Local::<v8::ArrayBuffer>::try_from(args.get(1)).unwrap();
+    let buffer_size = buffer.byte_length() as i64;
+    let buffer_store = buffer.get_backing_store();
+
+    let offset = args.get(2).to_integer(scope).unwrap().value();
+
     // Check if the file is already closed, otherwise create a file reference.
     let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
         Some(file) => file.try_clone().unwrap(),
@@ -333,33 +332,15 @@ fn read_sync(
         }
     };
 
-    // Get chunk size and byte offset.
-    let size = args.get(1).to_integer(scope).unwrap().value();
-    let offset = args.get(2).to_integer(scope).unwrap().value();
-
-    match read_file_op(&mut file, size, offset) {
-        Ok((n, mut buffer)) => {
-            // We reached the end of the file.
-            if n == 0 {
-                // Create an empty ArrayBuffer and return it to JavaScript.
-                let store = v8::ArrayBuffer::new_backing_store(scope, 0).make_shared();
-                let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
-
-                rv.set(bytes.into());
-                return;
+    match read_file_op(&mut file, buffer_size, offset) {
+        Ok((n, data)) => {
+            // Copy the slice's bytes into v8's typed-array backing store.
+            for (i, value) in data.iter().enumerate() {
+                buffer_store[i].set(*value);
             }
 
-            // Resize buffer given bytes read.
-            buffer.resize(n, 0);
-
-            // Create ArrayBuffer's backing store from Vec<u8>.
-            let store = buffer.into_boxed_slice();
-            let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store).make_shared();
-
-            // Initialize ArrayBuffer.
-            let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
-
-            rv.set(bytes.into());
+            let bytes_read = v8::Integer::new(scope, n as i32);
+            rv.set(bytes_read.into());
         }
         Err(e) => {
             throw_exception(scope, &e.to_string());

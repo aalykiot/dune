@@ -386,7 +386,7 @@ impl JsRuntime {
                 match graph.kind.clone() {
                     ImportKind::Static => unreachable!(),
                     ImportKind::Dynamic(main_promise) => {
-                        for promise in vec![main_promise].iter().chain(graph.same_origin.iter()) {
+                        for promise in [main_promise].iter().chain(graph.same_origin.iter()) {
                             promise.open(scope).reject(scope, exception);
                         }
                     }
@@ -446,7 +446,7 @@ impl JsRuntime {
                 let namespace = module.get_module_namespace();
 
                 // We need to resolve all identical dynamic imports.
-                for promise in vec![main_promise].iter().chain(graph.same_origin.iter()) {
+                for promise in [main_promise].iter().chain(graph.same_origin.iter()) {
                     promise.open(tc_scope).resolve(tc_scope, namespace);
                 }
             }

@@ -450,7 +450,7 @@ impl ImportMap {
         }
 
         let map: HashMap<String, String> = serde_json::from_value(imports)?;
-        let mut map: Vec<ImportMapEntry> = Vec::from_iter(map.into_iter());
+        let mut map: Vec<ImportMapEntry> = Vec::from_iter(map);
 
         // Note: We're sorting the imports because we need to support "Packages"
         // via trailing slashes, so the lengthier mapping should always be selected.

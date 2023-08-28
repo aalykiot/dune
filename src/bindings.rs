@@ -79,7 +79,7 @@ pub fn set_constant_to(
     value: v8::Local<v8::Value>,
 ) {
     let key = v8::String::new(scope, name).unwrap();
-    target.define_own_property(scope, key.into(), value, v8::READ_ONLY);
+    target.define_own_property(scope, key.into(), value, v8::PropertyAttribute::READ_ONLY);
 }
 
 /// Adds a `Function` object which calls the given Rust function
