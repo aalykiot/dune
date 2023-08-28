@@ -31,7 +31,7 @@ lazy_static = "1.4.0"
 rayon = "1.6.1"
 sha = "1.0.3"
 nanoid = "0.4.0"
-regex = "1.5.5"
+regex = "1.9.4"
 dirs = "5.0.0"
 path-absolutize = "3.0.12"
 ureq = { version = "2.4.0", features = ["charset"] }
