@@ -297,6 +297,7 @@ fn main() {
             Command::new("run")
                 .about("Run a JavaScript or TypeScript program")
                 .arg_required_else_help(true)
+                .allow_external_subcommands(true)
                 .arg(arg!(<SCRIPT> "The script that will run").required(true))
                 .arg(arg!(-r --reload "Reload every URL import (cache is ignored)"))
                 .arg(arg!(--seed <NUMBER> "Make the Math.random() method predictable"))
