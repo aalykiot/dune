@@ -4,6 +4,7 @@ use crate::modules::ModuleSource;
 use crate::modules::CORE_MODULES;
 use crate::transpilers::Jsx;
 use crate::transpilers::TypeScript;
+use crate::transpilers::Wasm;
 use anyhow::bail;
 use anyhow::Result;
 use colored::*;
@@ -25,7 +26,7 @@ pub trait ModuleLoader {
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath>;
 }
 
-static EXTENSIONS: &[&str] = &["js", "jsx", "ts", "tsx", "json"];
+static EXTENSIONS: &[&str] = &["js", "jsx", "ts", "tsx", "json", "wasm"];
 
 #[derive(Default)]
 pub struct FsModuleLoader;
@@ -139,6 +140,7 @@ impl ModuleLoader for FsModuleLoader {
 
         // Use a preprocessor if necessary.
         match path_extension {
+            "wasm" => Ok(Wasm::parse(&source)),
             "ts" => TypeScript::compile(fname, &source).map_err(|e| generic_error(e.to_string())),
             "jsx" => Jsx::compile(fname, &source).map_err(|e| generic_error(e.to_string())),
             "tsx" => Jsx::compile(fname, &source)
@@ -215,13 +217,15 @@ impl ModuleLoader for UrlModuleLoader {
 
         // Use a preprocessor if necessary.
         let source = match (
+            specifier.ends_with(".wasm"),
             specifier.ends_with(".jsx"),
             specifier.ends_with(".ts"),
             specifier.ends_with(".tsx"),
         ) {
-            (true, _, _) => Jsx::compile(Some(specifier), &source)?,
-            (_, true, _) => TypeScript::compile(Some(specifier), &source)?,
-            (_, _, true) => Jsx::compile(Some(specifier), &source)
+            (true, _, _, _) => Wasm::parse(&source),
+            (_, true, _, _) => Jsx::compile(Some(specifier), &source)?,
+            (_, _, true, _) => TypeScript::compile(Some(specifier), &source)?,
+            (_, _, _, true) => Jsx::compile(Some(specifier), &source)
                 .and_then(|output| TypeScript::compile(Some(specifier), &output))?,
             _ => source,
         };
@@ -281,7 +285,7 @@ mod tests {
         ];
 
         // Run tests.
-        let loader = FsModuleLoader::default();
+        let loader = FsModuleLoader;
 
         for (base, specifier, expected) in tests {
             let path = loader.resolve(base, specifier).unwrap();
@@ -306,7 +310,7 @@ mod tests {
             }
         ";
 
-        let source_files = vec![
+        let source_files = [
             "./core/tests/005_more_imports.js",
             "./core/tests/006_more_imports/index.js",
         ];
@@ -328,7 +332,7 @@ mod tests {
         ];
 
         // Run tests.
-        let loader = FsModuleLoader::default();
+        let loader = FsModuleLoader;
 
         for specifier in tests {
             let path = format!("{}", temp_dir.child(specifier).display());
