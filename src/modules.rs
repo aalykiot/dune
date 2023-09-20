@@ -139,8 +139,8 @@ pub enum ModuleStatus {
     Fetching,
     // Indicates the dependencies are being fetched.
     Resolving,
-    // Indicates the "actual" status is not known (duplicate module).
-    Unknown,
+    // Indicates the module has ben seen before.
+    Duplicate,
     // Indicates the modules is resolved.
     Ready,
 }
@@ -162,8 +162,8 @@ impl EsModule {
             return;
         }
 
-        // TODO: Write this code better with a match statement.
-        if self.status == ModuleStatus::Unknown {
+        // If it's a duplicate module we need to check the module status cache.
+        if self.status == ModuleStatus::Duplicate {
             let status_ref = seen_modules.get(&self.path).unwrap();
             if status_ref == &ModuleStatus::Ready {
                 self.status = ModuleStatus::Ready;
@@ -191,7 +191,7 @@ impl EsModule {
         if !self
             .dependencies
             .iter_mut()
-            .map(|m| m.borrow().status.clone())
+            .map(|m| m.borrow().status)
             .any(|status| status != ModuleStatus::Ready)
         {
             self.status = ModuleStatus::Ready;
@@ -343,11 +343,11 @@ impl JsFuture for EsModuleFuture {
             };
 
             // Check if requested module has been seen already.
-            let module_has_been_seen = state.module_map.seen.contains_key(&specifier);
-            let status = if module_has_been_seen {
-                ModuleStatus::Unknown
-            } else {
-                ModuleStatus::Fetching
+            let seen_module = state.module_map.seen.get(&specifier);
+            let status = match seen_module {
+                Some(ModuleStatus::Ready) => continue,
+                Some(_) => ModuleStatus::Duplicate,
+                None => ModuleStatus::Fetching,
             };
 
             // Create a new ES module instance.
@@ -361,8 +361,9 @@ impl JsFuture for EsModuleFuture {
 
             dependencies.push(Rc::clone(&module));
 
-            // Use the event-loop to asynchronously load the requested module.
-            if !module_has_been_seen {
+            // If the module is newly seen, use the event-loop to load
+            // the requested module.
+            if seen_module.is_none() {
                 let task = {
                     let specifier = specifier.clone();
                     move || match load_import(&specifier, skip_cache) {
