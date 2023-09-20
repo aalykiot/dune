@@ -133,7 +133,7 @@ pub enum ImportKind {
     Dynamic(v8::Global<v8::PromiseResolver>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModuleStatus {
     // Indicates the module is being fetched.
     Fetching,
