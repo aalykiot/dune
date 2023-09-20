@@ -17,7 +17,6 @@ use regex::Regex;
 use serde_json::Value;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::env;
 use std::fs;
@@ -78,7 +77,7 @@ pub type ModuleSource = String;
 pub struct ModuleMap {
     pub main: Option<ModulePath>,
     pub index: HashMap<ModulePath, v8::Global<v8::Module>>,
-    pub seen: HashSet<ModulePath>,
+    pub seen: HashMap<ModulePath, ModuleStatus>,
     pub pending: Vec<Rc<RefCell<ModuleGraph>>>,
 }
 
@@ -88,7 +87,7 @@ impl ModuleMap {
         Self {
             main: None,
             index: HashMap::new(),
-            seen: HashSet::new(),
+            seen: HashMap::new(),
             pending: vec![],
         }
     }
@@ -134,12 +133,14 @@ pub enum ImportKind {
     Dynamic(v8::Global<v8::PromiseResolver>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ModuleStatus {
     // Indicates the module is being fetched.
     Fetching,
     // Indicates the dependencies are being fetched.
     Resolving,
+    // Indicates the "actual" status is not known (duplicate module).
+    Unknown,
     // Indicates the modules is resolved.
     Ready,
 }
@@ -155,20 +156,30 @@ pub struct EsModule {
 
 impl EsModule {
     // Traverses the dependency tree to check if the module is ready.
-    pub fn fast_forward(&mut self) {
+    pub fn fast_forward(&mut self, seen_modules: &mut HashMap<ModulePath, ModuleStatus>) {
         // If the module is ready, no need to check the sub-tree.
         if self.status == ModuleStatus::Ready {
+            return;
+        }
+
+        // TODO: Write this code better with a match statement.
+        if self.status == ModuleStatus::Unknown {
+            let status_ref = seen_modules.get(&self.path).unwrap();
+            if status_ref == &ModuleStatus::Ready {
+                self.status = ModuleStatus::Ready;
+            }
             return;
         }
 
         // Fast-forward all dependencies.
         self.dependencies
             .iter_mut()
-            .for_each(|dep| dep.borrow_mut().fast_forward());
+            .for_each(|dep| dep.borrow_mut().fast_forward(seen_modules));
 
         // The module is compiled and has 0 dependencies.
         if self.dependencies.is_empty() && self.status == ModuleStatus::Resolving {
             self.status = ModuleStatus::Ready;
+            seen_modules.insert(self.path.clone(), self.status);
             return;
         }
 
@@ -184,6 +195,7 @@ impl EsModule {
             .any(|status| status != ModuleStatus::Ready)
         {
             self.status = ModuleStatus::Ready;
+            seen_modules.insert(self.path.clone(), self.status);
         }
     }
 }
@@ -296,9 +308,11 @@ impl JsFuture for EsModuleFuture {
             }
         };
 
-        state
-            .module_map
-            .insert(&self.path, v8::Global::new(tc_scope, module));
+        let new_status = ModuleStatus::Resolving;
+        let module_ref = v8::Global::new(tc_scope, module);
+
+        state.module_map.insert(self.path.as_str(), module_ref);
+        state.module_map.seen.insert(self.path.clone(), new_status);
 
         let import_map = state.options.import_map.clone();
 
@@ -328,17 +342,18 @@ impl JsFuture for EsModuleFuture {
                 }
             };
 
-            // Requested module has been seen already.
-            if state.module_map.seen.contains(&specifier) {
-                continue;
-            }
-
-            state.module_map.seen.insert(specifier.clone());
+            // Check if requested module has been seen already.
+            let module_has_been_seen = state.module_map.seen.contains_key(&specifier);
+            let status = if module_has_been_seen {
+                ModuleStatus::Unknown
+            } else {
+                ModuleStatus::Fetching
+            };
 
             // Create a new ES module instance.
             let module = Rc::new(RefCell::new(EsModule {
                 path: specifier.clone(),
-                status: ModuleStatus::Fetching,
+                status,
                 dependencies: vec![],
                 exception: Rc::clone(&self.module.borrow().exception),
                 is_dynamic_import: self.module.borrow().is_dynamic_import,
@@ -347,28 +362,32 @@ impl JsFuture for EsModuleFuture {
             dependencies.push(Rc::clone(&module));
 
             // Use the event-loop to asynchronously load the requested module.
-            let task = {
-                let specifier = specifier.clone();
-                move || match load_import(&specifier, skip_cache) {
-                    Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
-                    Err(e) => Some(Result::Err(e)),
-                }
-            };
+            if !module_has_been_seen {
+                let task = {
+                    let specifier = specifier.clone();
+                    move || match load_import(&specifier, skip_cache) {
+                        Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
+                        Err(e) => Some(Result::Err(e)),
+                    }
+                };
 
-            let task_cb = {
-                let state_rc = state_rc.clone();
-                move |_: LoopHandle, maybe_result: TaskResult| {
-                    let mut state = state_rc.borrow_mut();
-                    let future = EsModuleFuture {
-                        path: specifier,
-                        module: Rc::clone(&module),
-                        maybe_result,
-                    };
-                    state.pending_futures.push(Box::new(future));
-                }
-            };
+                let task_cb = {
+                    let specifier = specifier.clone();
+                    let state_rc = state_rc.clone();
+                    move |_: LoopHandle, maybe_result: TaskResult| {
+                        let mut state = state_rc.borrow_mut();
+                        let future = EsModuleFuture {
+                            path: specifier,
+                            module: Rc::clone(&module),
+                            maybe_result,
+                        };
+                        state.pending_futures.push(Box::new(future));
+                    }
+                };
 
-            state.handle.spawn(task, Some(task_cb));
+                state.module_map.seen.insert(specifier, status);
+                state.handle.spawn(task, Some(task_cb));
+            }
         }
 
         self.module.borrow_mut().status = ModuleStatus::Resolving;

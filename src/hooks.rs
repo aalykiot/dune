@@ -6,6 +6,7 @@ use crate::modules::load_import;
 use crate::modules::resolve_import;
 use crate::modules::EsModuleFuture;
 use crate::modules::ModuleGraph;
+use crate::modules::ModuleStatus;
 use crate::runtime::JsRuntime;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -205,9 +206,10 @@ pub fn host_import_module_dynamically_cb<'s>(
 
     let graph = ModuleGraph::dynamic_import(&specifier, global_promise);
     let graph_rc = Rc::new(RefCell::new(graph));
+    let status = ModuleStatus::Fetching;
 
     state.module_map.pending.push(Rc::clone(&graph_rc));
-    state.module_map.seen.insert(specifier.clone());
+    state.module_map.seen.insert(specifier.clone(), status);
 
     /*  Use the event-loop to asynchronously load the requested module. */
 
