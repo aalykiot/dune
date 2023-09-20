@@ -267,9 +267,10 @@ impl JsRuntime {
         // Create static import module graph.
         let graph = ModuleGraph::static_import(&path);
         let graph_rc = Rc::new(RefCell::new(graph));
+        let status = ModuleStatus::Fetching;
 
         state.module_map.pending.push(Rc::clone(&graph_rc));
-        state.module_map.seen.insert(path.clone());
+        state.module_map.seen.insert(path.clone(), status);
 
         // If we have a source, create the es-module future.
         if let Some(source) = source {
@@ -371,7 +372,13 @@ impl JsRuntime {
 
         let mut ready_imports = vec![];
 
-        state.module_map.pending.retain(|graph_rc| {
+        // Note: The following is a trick to get multiple `mut` references in the same
+        // struct called splitting borrows (https://doc.rust-lang.org/nomicon/borrow-splitting.html).
+        let state_ref = &mut *state;
+        let pending_graphs = &mut state_ref.module_map.pending;
+        let seen_modules = &mut state_ref.module_map.seen;
+
+        pending_graphs.retain(|graph_rc| {
             // Get a usable ref to graph's root module.
             let graph = graph_rc.borrow();
             let mut graph_root = graph.root_rc.borrow_mut();
@@ -397,7 +404,7 @@ impl JsRuntime {
 
             // If the graph is still loading, fast-forward the dependencies.
             if graph_root.status != ModuleStatus::Ready {
-                graph_root.fast_forward();
+                graph_root.fast_forward(seen_modules);
                 return true;
             }
 
