@@ -76,11 +76,11 @@ pub fn run_bundle(entry: &str, options: &Options) -> Result<String> {
     let mut buf = vec![];
 
     {
+        let mut cfg = swc_ecma_codegen::Config::default();
+        cfg.minify = options.minify;
+
         let mut emitter = Emitter {
-            cfg: swc_ecma_codegen::Config {
-                minify: options.minify,
-                ..Default::default()
-            },
+            cfg,
             cm: cm.clone(),
             comments: None,
             wr: Box::new(JsWriter::new(cm, "\n", &mut buf, None)),
