@@ -1,6 +1,6 @@
 [package]
 name = "dune"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["Alex Alikiotis <alexalikiotis5@gmail.com>"]
 edition = "2021"
 license = "MIT"
@@ -20,7 +20,7 @@ nix = { version = "0.27.0", features = ["signal"] }
 enable-ansi-support = "0.2.1"
 
 [dependencies]
-v8 = { version = "0.76.0", default-features = false }
+v8 = { version = "0.77.0", default-features = false }
 clap = "4.0.27"
 anyhow = "1.0.52"
 colored = "2.0.0"
