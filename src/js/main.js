@@ -3,6 +3,7 @@ import structuredClone from '@web/clone';
 import { Console, prompt } from 'console';
 import { cloneFunction, parseEnvVariable } from 'util';
 import { TextEncoder, TextDecoder } from '@web/text_encoding';
+import { AbortController } from '@web/abort';
 import { readFileSync } from 'fs';
 
 globalThis.global = globalThis;
@@ -94,6 +95,7 @@ makeGlobal('clearImmediate', timers.clearImmediate);
 makeGlobal('TextEncoder', TextEncoder);
 makeGlobal('TextDecoder', TextDecoder);
 makeGlobal('structuredClone', structuredClone);
+makeGlobal('AbortController', AbortController);
 
 // Loading env variables from a .env file automatically.
 

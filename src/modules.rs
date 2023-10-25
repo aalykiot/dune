@@ -41,6 +41,7 @@ lazy_static! {
             ("test", include_str!("./js/test.js")),
             ("stream", include_str!("./js/stream.js")),
             ("http", include_str!("./js/http.js")),
+            ("@web/abort", include_str!("./js/abort-controller.js")),
             ("@web/text_encoding", include_str!("./js/text-encoding.js")),
             ("@web/clone", include_str!("./js/structured-clone.js")),
         ];
