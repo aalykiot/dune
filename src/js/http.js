@@ -430,22 +430,10 @@ class HttpResponseBody {
  * @param {AbortSignal} signal
  * @returns Promise<void>
  */
-function createAbortPromise(signal) {
+function cancelation(signal) {
   return new Promise((_, reject) => {
     signal.addEventListener('abort', () => reject(signal.reason));
   });
-}
-
-/**
- * Runs a request and clears the signal's timer afterward.
- *
- * @param {HttpRequest} request
- * @param {AbortSignal} signal
- */
-async function executeAndCleanSignal(request, signal) {
-  const response = await request.send();
-  signal.clearTimeout();
-  return response;
 }
 
 // Default options for HTTP requests.
@@ -479,12 +467,9 @@ export function request(url, options = {}) {
   const { signal } = configuration;
 
   // Note: In case an abort-signal has been provided we should wrap
-  // a promise on its event emitter.
+  // a promise around its event emitter.
   return signal
-    ? Promise.race([
-        executeAndCleanSignal(request, signal),
-        createAbortPromise(signal),
-      ])
+    ? Promise.race([request.send(), cancelation(signal)])
     : request.send();
 }
 

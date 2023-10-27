@@ -19,17 +19,6 @@ class AbortError extends Error {
 }
 
 /**
- * Error type referring to an operation being aborted due to timeout.
- */
-export class TimeoutError extends Error {
-  constructor(message) {
-    super();
-    this.name = 'TimeoutError';
-    this.message = message;
-  }
-}
-
-/**
  * The `AbortSignal` interface represents a signal object that allows you
  * to communicate with a request and abort it.
  */
@@ -44,7 +33,6 @@ export class AbortSignal {
     this.onabort = null;
     this.aborted = false;
     this.reason = undefined;
-    this.timeoutRef = null;
   }
 
   /**
@@ -61,16 +49,19 @@ export class AbortSignal {
 
   /**
    * Returns an abort-signal instance that will automatically abort after a specified time.
+   * https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static
    *
-   * @param {Number} ms
-   * @returns
+   * @param {Number} milliseconds
+   * @returns {AbortSignal}
    */
-  static timeout(ms) {
-    const controller = new AbortController();
-    const reason = 'The operation was aborted due to timeout.';
-    const abort = () => controller.abort(new TimeoutError(reason));
-    controller.signal.timeoutRef = setTimeout(abort, ms);
-    return controller.signal;
+  // eslint-disable-next-line no-unused-vars
+  static timeout(milliseconds) {
+    // Note: Implemetning the static `timeout` method adds a lot of complexity, plus
+    // the `http.request` method supports nativly the consept of timeouts.
+    //
+    // https://github.com/mo/abortcontroller-polyfill/issues/73#issuecomment-1660420796
+
+    throw new Error('Not implemnted!');
   }
 
   addEventListener(name, handler) {
@@ -95,17 +86,6 @@ export class AbortSignal {
   throwIfAborted() {
     if (this.aborted) throw this.reason;
   }
-
-  /**
-   * Note: Since the AbortSignal timeout cannot be canceled, we must prevent the timer
-   * from prolonging the Dune process. By calling the following method from the
-   * "ouside" world, we ensure its removal (FOR INTERNAL USE ONLY).
-   */
-  clearTimeout() {
-    if (this.timeoutRef) {
-      clearTimeout(this.timeoutRef);
-    }
-  }
 }
 
 /**
@@ -127,14 +107,12 @@ export class AbortController {
    *
    * @param {String} reason
    */
-  abort(reason = 'This operation was aborted.') {
+  abort(reason = 'The operation was aborted.') {
     // If it's already aborted, don't do anything.
     if (this.signal.aborted) return;
 
     this.signal.aborted = true;
-    this.signal.reason =
-      reason instanceof Error ? reason : new AbortError(reason);
-
+    this.signal.reason = new AbortError(reason);
     this.signal.dispatchEvent('abort');
   }
 }
