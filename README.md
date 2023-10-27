@@ -103,6 +103,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `setImmediate` / `clearImmediate`: Node.js like immediate timers.
 - [x] `process`: An object that provides info about the current dune process.
 - [x] `structuredClone`: Creates a deep clone of a given value.
+- [x] `AbortController` / `AbortSignal`: Allows you to communicate with a request and abort it.
 
 ### Module Metadata
 
@@ -213,6 +214,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 ```js
 const URL = 'http://localhost:3000/foo';
+
 const { statusCode, headers, body } = await http.request(URL);
 ```
 
@@ -223,6 +225,7 @@ RequestOptions
 - `body`: (string | Uint8Array | stream.Readable) - Default: `null`
 - `timeout`: (number) - Default: `30000` (30 seconds) - Use `0` to disable it entirely.
 - `throwOnError`: (boolean) - Default: `false` - Whether should throw an error upon receiving a 4xx or 5xx response.
+- `signal`: (AbortSignal) - Default: `null` - Allows you to communicate with the request and abort it.
 
 Body Mixins
 
