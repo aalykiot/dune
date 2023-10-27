@@ -337,7 +337,7 @@ export class Socket extends EventEmitter {
    *
    * @param {String|Uint8Array} data
    * @param {String} [encoding]
-   * @returns {Promise<*>}
+   * @returns {Promise<void>}
    */
   async end(data, encoding = 'utf-8') {
     // Check socket connection.

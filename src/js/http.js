@@ -166,7 +166,6 @@ function formatHeaders(headers) {
 const urlRegex = new RegExp('^(.*:)//([A-Za-z0-9-.]+)(:[0-9]+)?(.*)$');
 
 class HttpRequest {
-  #protocol;
   #hostname;
   #port;
   #path;
@@ -178,17 +177,18 @@ class HttpRequest {
   #socket;
   #headers;
   #isChunkedEncoding;
+  #signal;
 
   constructor(url, options) {
     // Include protocol in URL.
     const checkedUrl = url.includes('://') ? url : 'http://' + url;
-    const [_, protocol, hostname, port, path] = urlRegex.exec(checkedUrl); // eslint-disable-line no-unused-vars
+    const [_, __, hostname, port, path] = urlRegex.exec(checkedUrl); // eslint-disable-line no-unused-vars
 
-    this.#protocol = protocol.replace(':', '');
     this.#hostname = hostname;
     this.#port = port ? Number(port.replace(':', '')) : 80;
     this.#path = path || '/';
     this.#method = options.method.toUpperCase();
+    this.#signal = options.signal;
 
     // Check if HTTP method is valid.
     if (!METHODS.includes(this.#method)) {
@@ -249,6 +249,11 @@ class HttpRequest {
     // Write headers to the socket.
     await this.#socket.connect(this.#port, this.#hostname);
     await this.#socket.write(reqHeadersBytes);
+
+    // Subscribe to the abort-controller if provided.
+    if (this.#signal) {
+      this.#signal.addEventListener('abort', () => this.#socket.destroy());
+    }
 
     // Write body to the socket. (sized)
     if (this.#body && !this.#isChunkedEncoding) {
@@ -419,6 +424,30 @@ class HttpResponseBody {
   }
 }
 
+/**
+ * Creates a promise that rejects when the 'abort' event is triggered.
+ *
+ * @param {AbortSignal} signal
+ * @returns Promise<void>
+ */
+function createAbortPromise(signal) {
+  return new Promise((_, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason));
+  });
+}
+
+/**
+ * Runs a request and clears the signal's timer afterward.
+ *
+ * @param {HttpRequest} request
+ * @param {AbortSignal} signal
+ */
+async function executeAndCleanSignal(request, signal) {
+  const response = await request.send();
+  signal.clearTimeout();
+  return response;
+}
+
 // Default options for HTTP requests.
 const defaultOptions = {
   method: 'GET',
@@ -426,6 +455,7 @@ const defaultOptions = {
   body: null,
   timeout: 30000,
   throwOnError: false,
+  signal: null,
 };
 
 /**
@@ -441,10 +471,21 @@ export function request(url, options = {}) {
     throw new TypeError('The "url" argument must be of type string.');
   }
 
-  const config = Object.assign(defaultOptions, options);
-  const request = new HttpRequest(url, config);
+  // Check if the operation has been already aborted.
+  options?.signal?.throwIfAborted();
 
-  return request.send();
+  const configuration = Object.assign(defaultOptions, options);
+  const request = new HttpRequest(url, configuration);
+  const { signal } = configuration;
+
+  // Note: In case an abort-signal has been provided we should wrap
+  // a promise on its event emitter.
+  return signal
+    ? Promise.race([
+        executeAndCleanSignal(request, signal),
+        createAbortPromise(signal),
+      ])
+    : request.send();
 }
 
 export default { METHODS, STATUS_CODES, request };

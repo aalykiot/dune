@@ -1,4 +1,4 @@
-// AbortController API
+// Abort Controller API
 //
 // The AbortController interface represents a controller object that allows
 // you to abort one or more Web requests as and when desired.
@@ -8,12 +8,34 @@
 import { EventEmitter } from 'events';
 
 /**
- * The AbortSignal interface represents a signal object that allows you
+ * Error type referring to an operation being aborted.
+ */
+class AbortError extends Error {
+  constructor(message) {
+    super();
+    this.name = 'AbortError';
+    this.message = message;
+  }
+}
+
+/**
+ * Error type referring to an operation being aborted due to timeout.
+ */
+export class TimeoutError extends Error {
+  constructor(message) {
+    super();
+    this.name = 'TimeoutError';
+    this.message = message;
+  }
+}
+
+/**
+ * The `AbortSignal` interface represents a signal object that allows you
  * to communicate with a request and abort it.
  */
 export class AbortSignal {
   /**
-   * Creates a new AbortSignal instance.
+   * Creates a new abort-signal instance.
    *
    * @returns {AbortSignal}
    */
@@ -22,10 +44,11 @@ export class AbortSignal {
     this.onabort = null;
     this.aborted = false;
     this.reason = undefined;
+    this.timeoutRef = null;
   }
 
   /**
-   * Returns an AbortSignal instance that is already set as aborted.
+   * Returns an abort-signal instance that is already set as aborted.
    *
    * @param {String} [reason]
    * @returns {AbortSignal}
@@ -37,14 +60,16 @@ export class AbortSignal {
   }
 
   /**
-   * Returns an AbortSignal instance that will automatically abort after a specified time.
+   * Returns an abort-signal instance that will automatically abort after a specified time.
    *
    * @param {Number} ms
    * @returns
    */
   static timeout(ms) {
     const controller = new AbortController();
-    setTimeout(() => controller.abort(new Error('TimeoutError')), ms);
+    const reason = 'The operation was aborted due to timeout.';
+    const abort = () => controller.abort(new TimeoutError(reason));
+    controller.signal.timeoutRef = setTimeout(abort, ms);
     return controller.signal;
   }
 
@@ -70,15 +95,26 @@ export class AbortSignal {
   throwIfAborted() {
     if (this.aborted) throw this.reason;
   }
+
+  /**
+   * Note: Since the AbortSignal timeout cannot be canceled, we must prevent the timer
+   * from prolonging the Dune process. By calling the following method from the
+   * "ouside" world, we ensure its removal (FOR INTERNAL USE ONLY).
+   */
+  clearTimeout() {
+    if (this.timeoutRef) {
+      clearTimeout(this.timeoutRef);
+    }
+  }
 }
 
 /**
- * The AbortController interface represents a controller object that allows
- * you to abort one or more Web requests as and when desired.
+ * The `AbortController` interface represents a controller object that allows
+ * you to abort one or more web requests as and when desired.
  */
 export class AbortController {
   /**
-   * Creates a new AbortController instance.
+   * Creates a new abort-controller instance.
    *
    * @returns {AbortController}
    */
@@ -91,12 +127,14 @@ export class AbortController {
    *
    * @param {String} reason
    */
-  abort(reason) {
+  abort(reason = 'This operation was aborted.') {
     // If it's already aborted, don't do anything.
     if (this.signal.aborted) return;
 
     this.signal.aborted = true;
-    this.signal.reason = reason ? reason : new Error('AbortError');
+    this.signal.reason =
+      reason instanceof Error ? reason : new AbortError(reason);
+
     this.signal.dispatchEvent('abort');
   }
 }

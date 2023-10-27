@@ -3,7 +3,7 @@ import structuredClone from '@web/clone';
 import { Console, prompt } from 'console';
 import { cloneFunction, parseEnvVariable } from 'util';
 import { TextEncoder, TextDecoder } from '@web/text_encoding';
-import { AbortController } from '@web/abort';
+import { AbortController, AbortSignal } from '@web/abort';
 import { readFileSync } from 'fs';
 
 globalThis.global = globalThis;
@@ -96,8 +96,9 @@ makeGlobal('TextEncoder', TextEncoder);
 makeGlobal('TextDecoder', TextDecoder);
 makeGlobal('structuredClone', structuredClone);
 makeGlobal('AbortController', AbortController);
+makeGlobal('AbortSignal', AbortSignal);
 
-// Loading env variables from a .env file automatically.
+/* Loading env variables from .env file automatically. */
 
 const DOTENV_FILE = process.cwd() + '/.env';
 const DOTENV_COMMENTS = /(?<=^([^"']|"[^"']*")*)#.*/g;
@@ -114,5 +115,5 @@ try {
     process.env[key.trim()] = parseEnvVariable(value);
   });
 } catch (_) {
-  // We don't care about handling the error.
+  // We don't care about handling this error.
 }
