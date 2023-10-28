@@ -271,3 +271,74 @@ fn remove_timeout(
 The state should be available in all shorts of different places that's why we wrap it into a `Rc<RefCell<T>>` structure.
 
 **Important**: It is crucial to be cautious because only one "accessor" should borrow the state at any given moment. Otherwise, Rust will panic, leading to a crash in Dune.
+
+### Promises
+
+Given JavaScript's asynchronous nature, heavily reliant on promises, it's vital to comprehend how this interface is exposed by V8 and how Dune utilizes it.
+
+There is two kind of objects exposed by V8:
+
+- **`v8::Promise`**: An instance of the built-in Promise constructor.
+
+- **`v8::PromiseResolver`**: It's a wrapper around a promise instance that retains information about the promise and provides APIs to resolve or reject the associated promise.
+
+To put it differently, we can generate a `v8::PromiseResolver`, and extract the internal promise to provide it to the JavaScript side. Later on, we can resolve or reject the promise from Rust.
+
+```rust
+fn get_new_promise(
+    scope: &mut v8::HandleScope,
+    _: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+  // Create the new promise.
+  let promise_resolver = v8:PromiseResolver::new(scope).unwrap();
+  let promise.get_promise(scope);
+
+  // Create a global handle for future usage.
+  let pr_global = v8::Global::new(scope, promise_resolver.into());
+
+  // Give promise to the JS side.
+  rv.set(promise.into());
+}
+```
+
+Storing the `promise_resolver` within a `v8::Global` allows us to access it at a later stage, enabling us to easily resolve the promise as follows:
+
+```rust
+let value = v8::Number::new(scope, 20 as f64);
+let promise = pr_global.open(scope);
+
+promise.resolve(scope, value.into());
+```
+
+This action will result in the promise on the JavaScript side resolving with the number `20` as the outcome.
+
+Dune follows the same pattern with promises. It returns a promise to JavaScript through a `binding`, and when the operation is finished, the event loop notifies Dune. At that point, Dune resolves or rejects the promise. We will discuss later where exactly the `v8::PromiseResolver` wrapped in a `v8::Global` is stored while waiting for the operation to complete.
+
+#### `Microtask Queue`
+
+It's worth mentioning that V8 provides a mechanism to automatically resolve promises when they are created directly from the JavaScript side.
+
+```js
+await Promise.resolve(20);
+```
+
+Dune intentionally avoids this feature and instead manually processes the `microtask` queue using the `perform_microtask_checkpoint(&mut self)` method provided by V8. This ensures alignment with the order of execution in Node.js.
+
+```rust
+// File: /src/runtime.rs
+
+impl JsRuntime {
+  /// Creates a new JsRuntime based on provided options.
+  pub fn with_options(options: JsRuntimeOptions) -> JsRuntime {
+    /* .. more code .. */
+    isolate.set_microtasks_policy(v8::MicrotasksPolicy::Explicit);
+  }
+}
+
+/// Runs callbacks stored in the next-tick queue.
+fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
+  /* .. more code .. */
+  tc_scope.perform_microtask_checkpoint();
+}
+```
