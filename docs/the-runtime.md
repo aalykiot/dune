@@ -6,9 +6,9 @@ Hi! 👋 You've found the technical overview of Dune as a JavaScript runtime. Th
 
 Dune leverages the powerful capabilities of the [V8](https://v8.dev/) engine through the usage of the [rusty_v8](https://github.com/denoland/rusty_v8) crate, an impressive creation by the skilled Deno team. Serving as a convenient wrapper for V8's C++ APIs, this crate allows seamless communication with V8, ensuring alignment with the original API to a high degree.
 
-<br/>
-<center><img src="./images/tech-overview-1.svg" height="80px" /></center>
-<br/><br/>
+<br />
+<img src="./assets/the-runtime-01.svg" height="85px" />
+<br /><br />
 
 All rusty_v8 available APIs can be found [here](https://docs.rs/v8/latest/v8/).
 
@@ -27,8 +27,8 @@ Each `v8::Isolate` operates independently. It means that if something needs to b
 Every object returned from V8 must be monitored by the garbage collector to confirm its active status. Directly pointing to an object is unsafe due to potential object movement during garbage collection. Consequently, all objects are stored in handles, recognized by the garbage collector and updated whenever an object relocates.
 
 <br/>
-<center><img src="./images/tech-overview-2.svg" height="250px" /></center>
-<br/><br/>
+<img src="./assets/the-runtime-02.svg" height="280px" />
+<br/><br/><br/>
 
 There are two types of handles: **local** and **persistent** handles.
 
@@ -77,7 +77,7 @@ Obviously, creating a local handle for every object can result in an excessive n
 Once the handle scope of a local handle is deleted, the garbage collector will cease tracking the object stored in the handle, and it might deallocate it.
 
 <br/>
-<center><img src="./images/tech-overview-3.svg" height="320px" /></center>
+<img src="./assets/the-runtime-03.svg" height="280px" />
 <br/><br/>
 
 For more in-depth information about isolates, handles, etc. visit v8's advanced [guide](https://v8.dev/docs/embed#advanced-guide).
@@ -86,7 +86,7 @@ For more in-depth information about isolates, handles, etc. visit v8's advanced 
 
 Dune is composed of mainly 2 separate parts:
 
-<center><img src="./images/tech-overview-4.svg" height="100px" /></center>
+<img src="./assets/the-runtime-04.svg" height="150px" />
 
 #### `JavaScript Frontend`
 
@@ -187,4 +187,3 @@ This looks simple enough, even for Rust:
 The **standard output** (stdout) is the default file descriptor where a process can write output. In simpler terms, any program wanting to display information in the `terminal` must send that information to this output `stream`.
 
 Certainly, the provided example represents the fundamental workings of bindings in Dune. This process remains uniform across all scenarios. The variation lies in the complexity of the code, which escalates according to the required functionality.
-
