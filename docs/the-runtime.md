@@ -8,7 +8,7 @@ Dune leverages the powerful capabilities of the [V8](https://v8.dev/) engine thr
 
 <br />
 <img src="./assets/the-runtime-01.svg" height="85px" />
-<br /><br />
+<br />
 
 All rusty_v8 available APIs can be found [here](https://docs.rs/v8/latest/v8/).
 
@@ -28,7 +28,7 @@ Every object returned from V8 must be monitored by the garbage collector to conf
 
 <br/>
 <img src="./assets/the-runtime-02.svg" height="280px" />
-<br/><br/><br/>
+<br/><br/>
 
 There are two types of handles: **local** and **persistent** handles.
 
@@ -47,7 +47,7 @@ function getFoo(obj) {
 ```
 
 ```rust
-fn getFoo(
+fn get_foo(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
@@ -65,7 +65,7 @@ Because of their persistent nature, these handles are deemed to have a lifetime 
 
 ```rust
 let number_1 = v8::Integer::new(scope, 1);
-let number_1_global = v8::Global::new(scope, number_1);
+let number_1_global = v8::Global::new(scope, number_1.into());
 ```
 
 Safely extracting the object stored in the handle, such as retrieving `*Object` from a Local, can be done by dereferencing the handle. The value remains under the control of a handle behind the scenes, and the same rules governing handles are applicable to these values.
@@ -78,7 +78,7 @@ Once the handle scope of a local handle is deleted, the garbage collector will c
 
 <br/>
 <img src="./assets/the-runtime-03.svg" height="280px" />
-<br/><br/>
+<br/>
 
 For more in-depth information about isolates, handles, etc. visit v8's advanced [guide](https://v8.dev/docs/embed#advanced-guide).
 
@@ -292,7 +292,7 @@ fn get_new_promise(
 ) {
   // Create the new promise.
   let promise_resolver = v8:PromiseResolver::new(scope).unwrap();
-  let promise.get_promise(scope);
+  let promise = promise_resolver.get_promise(scope);
 
   // Create a global handle for future usage.
   let pr_global = v8::Global::new(scope, promise_resolver.into());
@@ -312,6 +312,10 @@ promise.resolve(scope, value.into());
 ```
 
 This action will result in the promise on the JavaScript side resolving with the number `20` as the outcome.
+
+<br />
+<img src="./assets/the-runtime-05.svg" height="250px" />
+<br />
 
 Dune follows the same pattern with promises. It returns a promise to JavaScript through a `binding`, and when the operation is finished, the event loop notifies Dune. At that point, Dune resolves or rejects the promise. We will discuss later where exactly the `v8::PromiseResolver` wrapped in a `v8::Global` is stored while waiting for the operation to complete.
 
