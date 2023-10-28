@@ -33,11 +33,13 @@ The Rust backend lives here.
 
 5. **`bindings.rs`**: exposes the registered `bindings` to the JavaScript frontend.
 
-6. **`modules.rs`**: contains the logic related to ECMAScript module resolution.
+6. **`hooks.rs`**: defines FFI callback functions for V8.
 
-7. **`errors.rs`**: contains logic responsible for converting V8 exceptions into custom Rust errors, along with associated metadata information.
+7. **`modules.rs`**: contains the logic related to ECMAScript module resolution.
 
-8. **`repl.rs`**: contains all the logic around Dune's available REPL interface.
+8. **`errors.rs`**: contains logic responsible for converting V8 exceptions into custom Rust errors, along with associated metadata information.
+
+9. **`repl.rs`**: contains all the logic around Dune's available REPL interface.
 
 These represent the core components, with the remaining files primarily defining bindings within a specific namespace.
 

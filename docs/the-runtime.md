@@ -346,3 +346,143 @@ fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
   tc_scope.perform_microtask_checkpoint();
 }
 ```
+
+### Errors
+
+From the runtime perspective, there are two distinct types of errors to be concerned about: errors thrown as `exceptions` and errors arising from `unhandled promise rejections`.
+
+#### `v8::TryCatch`
+
+The `TryCatch` scope enables us to execute a particular JavaScript operation within a "special" handle scope that provides information about any thrown exceptions during that operation.
+
+```rust
+fn run_javascript_func(
+  scope: &mut v8::HandleScope,
+  args: v8::FunctionCallbackArguments,
+  _: v8::ReturnValue,
+) {
+  // Get the function from arguments.
+  let undefined = v8::undefined(scope).into();
+  let func = v8::Local::<v8::Function>::try_from(args.get(0)).unwrap();
+
+  // Create the try-catch scope.
+  let tc_scope = &mut v8::TryCatch::new(scope);
+
+  // Execute the JS function.
+  func.call(tc_scope, undefined, &[]);
+
+  // Check for thrown exceptions.
+  if tc_scope.has_caught() {
+    let exception = tc_scope.exception().unwrap();
+    // Handle exception somehow..
+  }
+}
+```
+
+In simpler terms, the `v8::TryCatch` scope is akin to enclosing the JavaScript operation we want to execute within a `try-catch` block, but this is done from the Rust side.
+
+This approach is employed to address the first error type.
+
+#### `v8::PromiseRejectCallback`
+
+V8 isolates offer a custom `hook` that allows us to receive notifications when an exception is thrown from a promise with no rejection handler.
+
+The `v8::PromiseRejectCallback` is a type alias for a C++ FFI function, specifically `extern "C" fn(_: PromiseRejectMessage<'_>)`.
+
+```rust
+pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
+  let scope = &mut unsafe { v8::CallbackScope::new(&message) };
+  let event = message.get_event();
+
+  use v8::PromiseRejectEvent::*;
+
+  let reason = match event {
+    PromiseHandlerAddedAfterReject
+    | PromiseRejectAfterResolved
+    | PromiseResolveAfterResolved => undefined,
+    PromiseRejectWithNoHandler => message.get_value().unwrap(),
+  };
+
+  // Handle exception somehow..
+}
+
+isolate.set_promise_reject_callback(promise_reject_cb);
+```
+
+This Rust "callback" function is triggered whenever an `unhandled promise rejection` error occurs. It receives the `v8::PromiseRejectMessage` value from V8, allowing us to extract the exception "reason" and determine how to handle the error.
+
+Dune stores these kind of exceptions in the runtime state:
+
+```rust
+pub struct JsRuntimeState {
+  /* .. more code .. */
+  pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
+}
+```
+
+The reason for this approach is to ensure the completion of the current event-loop `tick` managed by Dune. Subsequently, we can check for these thrown exceptions and handle them appropriately.
+
+```rust
+// File: /src/runtime.rs
+
+/// Runs the event-loop until no more pending events exists.
+pub fn run_event_loop(&mut self) {
+  /* .. more code .. */
+  //
+  // Report (and exit) if any unhandled promise rejection has been caught.
+  if self.has_promise_rejections() {
+      println!("{:?}", self.promise_rejections().remove(0));
+      std::process::exit(1);
+  }
+}
+```
+
+This approach is employed to address the second error type.
+
+#### `JsError`
+
+Dune has implemented a custom error type, located in `errors.rs`, to gain complete control over the thrown V8 exception. This custom error type contains additional information about the `origins` of the exception and includes the `stack-trace` if available.
+
+```rust
+// File: /src/errors.rs
+
+/// Represents an exception coming from V8.
+#[derive(Eq, PartialEq, Clone, Default)]
+pub struct JsError {
+    pub message: String,
+    pub resource_name: String,
+    pub source_line: Option<String>,
+    pub line_number: Option<i64>,
+    pub start_column: Option<i64>,
+    pub end_column: Option<i64>,
+    pub stack: Option<String>,
+}
+```
+
+In both of the error scenarios mentioned earlier, the goal is to transition from a `v8::Exception` or `v8::PromiseRejectMessage` to a custom `JsError`.
+
+```rust
+let exception = tc_scope.exception().unwrap();
+let exception = JsError::from_v8_exception(tc_scope, exception, None);
+```
+
+Having complete control over the error allows us to customize how the error will be presented to the user in the terminal.
+
+```rust
+impl Display for JsError {
+  /// Displays a minified version of the error.
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+      let line = self.line_number.unwrap_or_default();
+      let column = self.start_column.unwrap_or_default();
+      write!(
+          f,
+          "{} {} ({}:{}:{})",
+          "Uncaught".red().bold(),
+          self.message,
+          self.resource_name,
+          line,
+          column
+      )
+  }
+}
+```
