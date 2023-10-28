@@ -48,14 +48,14 @@ function getFoo(obj) {
 
 ```rust
 fn get_foo(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
+  scope: &mut v8::HandleScope,
+  args: v8::FunctionCallbackArguments,
+  mut rv: v8::ReturnValue,
 ) {
-    let object = v8::Local::<v8::Object>::try_from(args.get(0)).unwrap();
-    let field = v8::String::new(scope, "foo").unwrap();
-    let foo = object.get(scope, field.into()).unwrap();
-    rv.set(foo.into());
+  let object = v8::Local::<v8::Object>::try_from(args.get(0)).unwrap();
+  let field = v8::String::new(scope, "foo").unwrap();
+  let foo = object.get(scope, field.into()).unwrap();
+  rv.set(foo.into());
 }
 ```
 
@@ -114,7 +114,7 @@ To understand this process, let's explore how something passed to `console.log` 
 
 ```js
 // File: /src/js/console.js
-
+//
 /**
  * Outputs data to the stdout stream.
  *
@@ -133,7 +133,7 @@ Let's take a look how the `process.stdout.write` is implemented.
 
 ```js
 // File: /src/js/main.js
-
+//
 Object.defineProperty(process, 'stdout', {
   get() {
     return {
@@ -157,19 +157,19 @@ This approach is widespread throughout the codebase. Whenever we need to use a R
 
 ```rust
 // File: /src/stdio.rs
-
+//
 set_function_to(scope, target, "write", write);
 
 /* .. more code .. */
 
 /// Writes data to the stdout stream.
 fn write(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
-    // Convert string to bytes.
-    let content = args.get(0).to_rust_string_lossy(scope);
-    let content = content.as_bytes();
-    // Flush bytes to stdout.
-    io::stdout().write_all(content).unwrap();
-    io::stdout().flush().unwrap();
+  // Convert string to bytes.
+  let content = args.get(0).to_rust_string_lossy(scope);
+  let content = content.as_bytes();
+  // Flush bytes to stdout.
+  io::stdout().write_all(content).unwrap();
+  io::stdout().flush().unwrap();
 }
 
 ```
@@ -198,30 +198,30 @@ Whenever a new operation needs to be dispatched to the `event loop`, such as a n
 
 ```rust
 // File: /src/runtime.rs
-
+//
 pub struct JsRuntimeState {
-    /// A sand-boxed execution context with its own set of built-in objects and functions.
-    pub context: v8::Global<v8::Context>,
-    /// Holds information about resolved ES modules.
-    pub module_map: ModuleMap,
-    /// A handle to the runtime's event-loop.
-    pub handle: LoopHandle,
-    /// A handle to the event-loop that can interrupt the poll-phase.
-    pub interrupt_handle: LoopInterruptHandle,
-    /// Holds JS pending futures scheduled by the event-loop.
-    pub pending_futures: Vec<Box<dyn JsFuture>>,
-    /// Indicates the start time of the process.
-    pub startup_moment: Instant,
-    /// Specifies the timestamp which the current process began in Unix time.
-    pub time_origin: u128,
-    /// Holds callbacks scheduled by nextTick.
-    pub next_tick_queue: NextTickQueue,
-    /// Holds exceptions from promises with no rejection handler.
-    pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
-    /// Runtime options.
-    pub options: JsRuntimeOptions,
-    /// Tracks wake event for current loop iteration.
-    pub wake_event_queued: bool,
+  /// A sand-boxed execution context with its own set of built-in objects and functions.
+  pub context: v8::Global<v8::Context>,
+  /// Holds information about resolved ES modules.
+  pub module_map: ModuleMap,
+  /// A handle to the runtime's event-loop.
+  pub handle: LoopHandle,
+  /// A handle to the event-loop that can interrupt the poll-phase.
+  pub interrupt_handle: LoopInterruptHandle,
+  /// Holds JS pending futures scheduled by the event-loop.
+  pub pending_futures: Vec<Box<dyn JsFuture>>,
+  /// Indicates the start time of the process.
+  pub startup_moment: Instant,
+  /// Specifies the timestamp which the current process began in Unix time.
+  pub time_origin: u128,
+  /// Holds callbacks scheduled by nextTick.
+  pub next_tick_queue: NextTickQueue,
+  /// Holds exceptions from promises with no rejection handler.
+  pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
+  /// Runtime options.
+  pub options: JsRuntimeOptions,
+  /// Tracks wake event for current loop iteration.
+  pub wake_event_queued: bool,
 }
 ```
 
@@ -241,10 +241,10 @@ Anyone with access to a `v8::HandleScope` can obtain a reference to this state t
 impl JsRuntime {
   /// Returns the runtime state stored in the given isolate.
   pub fn state(isolate: &v8::Isolate) -> Rc<RefCell<JsRuntimeState>> {
-      isolate
-          .get_slot::<Rc<RefCell<JsRuntimeState>>>()
-          .unwrap()
-          .clone()
+    isolate
+      .get_slot::<Rc<RefCell<JsRuntimeState>>>()
+      .unwrap()
+      .clone()
   }
 }
 ```
@@ -253,18 +253,18 @@ The key point here is that Rust [automatically](https://docs.rs/v8/latest/v8/str
 
 ```rust
 // File: src/timers.rs
-
+//
 /// Removes a scheduled timeout from the event-loop.
 fn remove_timeout(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
+  scope: &mut v8::HandleScope,
+  args: v8::FunctionCallbackArguments,
+  _: v8::ReturnValue,
 ) {
-    // Get timeout's ID, and remove it.
-    let id = args.get(0).int32_value(scope).unwrap() as u32;
-    let state_rc = JsRuntime::state(scope);
+  // Get timeout's ID, and remove it.
+  let id = args.get(0).int32_value(scope).unwrap() as u32;
+  let state_rc = JsRuntime::state(scope);
 
-    state_rc.borrow().handle.remove_timer(&id);
+  state_rc.borrow().handle.remove_timer(&id);
 }
 ```
 
@@ -286,9 +286,9 @@ To put it differently, we can generate a `v8::PromiseResolver`, and extract the 
 
 ```rust
 fn get_new_promise(
-    scope: &mut v8::HandleScope,
-    _: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
+  scope: &mut v8::HandleScope,
+  _: v8::FunctionCallbackArguments,
+  mut rv: v8::ReturnValue,
 ) {
   // Create the new promise.
   let promise_resolver = v8:PromiseResolver::new(scope).unwrap();
@@ -331,7 +331,7 @@ Dune intentionally avoids this feature and instead manually processes the `micro
 
 ```rust
 // File: /src/runtime.rs
-
+//
 impl JsRuntime {
   /// Creates a new JsRuntime based on provided options.
   pub fn with_options(options: JsRuntimeOptions) -> JsRuntime {
@@ -424,15 +424,15 @@ The reason for this approach is to ensure the completion of the current event-lo
 
 ```rust
 // File: /src/runtime.rs
-
+//
 /// Runs the event-loop until no more pending events exists.
 pub fn run_event_loop(&mut self) {
   /* .. more code .. */
   //
   // Report (and exit) if any unhandled promise rejection has been caught.
   if self.has_promise_rejections() {
-      println!("{:?}", self.promise_rejections().remove(0));
-      std::process::exit(1);
+    println!("{:?}", self.promise_rejections().remove(0));
+    std::process::exit(1);
   }
 }
 ```
@@ -445,17 +445,17 @@ Dune has implemented a custom error type, located in `errors.rs`, to gain comple
 
 ```rust
 // File: /src/errors.rs
-
+//
 /// Represents an exception coming from V8.
 #[derive(Eq, PartialEq, Clone, Default)]
 pub struct JsError {
-    pub message: String,
-    pub resource_name: String,
-    pub source_line: Option<String>,
-    pub line_number: Option<i64>,
-    pub start_column: Option<i64>,
-    pub end_column: Option<i64>,
-    pub stack: Option<String>,
+  pub message: String,
+  pub resource_name: String,
+  pub source_line: Option<String>,
+  pub line_number: Option<i64>,
+  pub start_column: Option<i64>,
+  pub end_column: Option<i64>,
+  pub stack: Option<String>,
 }
 ```
 
@@ -472,17 +472,168 @@ Having complete control over the error allows us to customize how the error will
 impl Display for JsError {
   /// Displays a minified version of the error.
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-      let line = self.line_number.unwrap_or_default();
-      let column = self.start_column.unwrap_or_default();
-      write!(
-          f,
-          "{} {} ({}:{}:{})",
-          "Uncaught".red().bold(),
-          self.message,
-          self.resource_name,
-          line,
-          column
-      )
+    let line = self.line_number.unwrap_or_default();
+    let column = self.start_column.unwrap_or_default();
+    write!(
+      f,
+      "{} {} ({}:{}:{})",
+      "Uncaught".red().bold(),
+      self.message,
+      self.resource_name,
+      line,
+      column
+    )
   }
 }
 ```
+
+### Event Loop
+
+This section will not delve into the intricacies of the event-loop's internals, as that is a topic for an entirely different README. Instead, it will focus on how the `event-loop` is utilized by the runtime to dispatch operations and receive results.
+
+Here is the link to the repo: https://github.com/aalykiot/dune-event-loop
+
+<br />
+<img src="./assets/the-runtime-06.svg" height="100px" />
+<br />
+
+The event-loop itself is intentionally designed to be **unaware** of the external context and is inaccessible. However, it offers two types of handles for communication: the `LoopHandle` and the `LoopInterruptHandle`.
+
+#### `LoopInterruptHandle`
+
+Its sole purpose is to awaken the loop from its `poll` phase. This handle can be safely shared across `threads` and is primarily used for the `REPL` interface.
+
+#### `LoopHandle`
+
+Offers methods allowing us to dispatch operations to the event-loop, such as creating `timers`, spawning `tasks`, and initiating `network` actions. This handle **can't** be shared across threads.
+
+To dispatch an operation to the event-loop, we can utilize the APIs provided by the `LoopHandle`. We pass a Rust callback function (or `closure`) indicating what should run when the operation completes.
+
+```rust
+let mut event_loop = EventLoop::default();
+let handle = event_loop.handle();
+
+handle.timer(1000, false, |_: LoopHandle| {
+  println!("Hello!");
+});
+```
+
+The above snippet registers a callback to the event-loop that will run after 1 second.
+
+**Dispatching Operations**
+
+Dune stores both of these handles to the runtime state and follows the same pattern for all event-loop operations, but we'll focus on the `setTimeout` example as it is the simplest one.
+
+```rust
+// File: /src/timers.rs
+//
+/// Schedules a new timeout to the event-loop.
+fn create_timeout(
+  scope: &mut v8::HandleScope,
+  args: v8::FunctionCallbackArguments,
+  mut rv: v8::ReturnValue,
+) {
+   // Get timer's callback.
+  let callback = v8::Local::<v8::Function>::try_from(args.get(0)).unwrap();
+  let callback = Rc::new(v8::Global::new(scope, callback));
+
+  /* ..more code.. */
+
+  let timeout_cb = {
+    let state_rc = state_rc.clone();
+    move |_: LoopHandle| {
+      let mut state = state_rc.borrow_mut();
+      let future = TimeoutFuture {
+        cb: Rc::clone(&callback),
+        params: Rc::clone(&params),
+      };
+      state.pending_futures.push(Box::new(future));
+    }
+  }
+  state.handle.timer(millis, repeatable, timeout_cb);
+}
+```
+
+The code snippet presented is simplified for demonstration purposes, but the fundamental concept remains intact: `clone` the runtime state and any additional necessary data so that the Rust `closure` can access them. Then, use the `LoopHandle` to dispatch a new timer within the event-loop.
+
+**The Rust Closure**:
+
+1. **`let future = TimeoutFuture{..}`**: Creates a `TimeoutFuture` instance (which will be discussed shortly).
+
+2. **`state.pending_futures.push(Box::new(future));`**: Adds the future to the `pending_futures` vector, which is located in the runtime's state.
+
+We **cannot** directly run the timer's callback (JS function) within the closure.
+
+The reason we have to create the [JsFuture](#jsfuture) is that we require a valid `v8::HandleScope` in place to do anything with V8. Unfortunately, `v8::HandleScope` instances **cannot** be passed into closures due to the `'static` lifetime requirement enforced by Rust closures. It's crucial to remember that handle scopes are temporary constructs as well bound to a lifetime `'s` and not the all-encompassing `'static` one.
+
+#### `JsFuture`
+
+Dune introduces a custom trait called `JsFuture`, which aims to provide an abstraction layer and seamlessly connect Rust closures (passed to the event-loop) with valid `v8::HandleScope` instances.
+
+```rust
+/// An abstract interface for something that should run in respond to an
+/// async task, scheduled previously and is now completed.
+pub trait JsFuture {
+  fn run(&mut self, scope: &mut v8::HandleScope);
+}
+```
+
+The concept revolves around the Rust closure creating an instance that implements the `JsFuture` trait and informing the runtime about it. Subsequently, after the event-loop `tick` is complete, the runtime will iterate through all available futures, invoking their run method while passing a valid `v8::HandleScope`. 😁
+
+```rust
+// File: /src/runtime.rs
+//
+/// Runs all the pending javascript tasks.
+fn run_pending_futures(&mut self) {
+  /* ..more code.. */
+  for mut fut in futures {
+    fut.run(scope);
+    run_next_tick_callbacks(scope);
+  }
+}
+```
+
+In the timer's example mentioned earlier, the `TimerFuture` would have looked similar to this:
+
+```rust
+// File: /src/timers.rs
+//
+struct TimeoutFuture {
+  cb: Rc<v8::Global<v8::Function>>,
+  params: Rc<Vec<v8::Global<v8::Value>>>,
+}
+
+impl JsFuture for TimeoutFuture {
+  fn run(&mut self, scope: &mut v8::HandleScope) {
+    /* ..more code.. */
+    let tc_scope = &mut v8::TryCatch::new(scope);
+    let callback = v8::Local::new(scope, (*self.cb).clone());
+
+    callback.call(tc_scope, undefined, &args);
+  }
+}
+```
+
+Storing necessary values for the future's execution, such as `v8::Global` handles or other data, is achieved by adding fields to the struct that implements the `JsFuture` trait.
+
+> Note: The described process introduces a delay in JS execution since it doesn't occur precisely when the event-loop finishes the operation, but rather when the runtime runs the corresponding `JsFuture` after the event-loop `tick` is completed. However, it's important to note that in practice, event-loop ticks typically take nanoseconds to complete. Moreover, the `pending_futures` vector follows a `First-In-First-Out` (FIFO) mechanism, ensuring the correct execution order is preserved.
+
+#### `Ticks`
+
+It is important to note that the `event-loop` does not continuously `tick` until there are no more operations to be executed. Instead, it needs to be manually **triggered** by the runtime to initiate a tick (the reasoning behind this will be explained in the separate README).
+
+```rust
+// File: /src/runtime.rs
+//
+/// Runs the event-loop until no more pending events exists.
+pub fn run_event_loop(&mut self) {
+  /** ..more code.. */
+  while { ... }
+  {
+    // Tick the event-loop one cycle.
+    self.tick_event_loop();
+  }
+}
+```
+
+This approach is convenient for the runtime because after each tick, it can process internal callback `queues`, handle promise `rejections`, and, of course, execute pending `futures`.
