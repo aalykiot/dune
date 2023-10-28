@@ -187,3 +187,87 @@ This looks simple enough, even for Rust:
 The **standard output** (stdout) is the default file descriptor where a process can write output. In simpler terms, any program wanting to display information in the `terminal` must send that information to this output `stream`.
 
 Certainly, the provided example represents the fundamental workings of bindings in Dune. This process remains uniform across all scenarios. The variation lies in the complexity of the code, which escalates according to the required functionality.
+
+### Runtime State
+
+Every Dune process is linked to a specific `state` containing information related to a particular `v8::Isolate` instance. The state includes information about startup time, initialization options, ES-module metadata, various queues, and notably, a handle to the event loop.
+
+Whenever a new operation needs to be dispatched to the `event loop`, such as a network call or file read, it is necessary to first obtain access to this state.
+
+**The current runtime state:**
+
+```rust
+// File: /src/runtime.rs
+
+pub struct JsRuntimeState {
+    /// A sand-boxed execution context with its own set of built-in objects and functions.
+    pub context: v8::Global<v8::Context>,
+    /// Holds information about resolved ES modules.
+    pub module_map: ModuleMap,
+    /// A handle to the runtime's event-loop.
+    pub handle: LoopHandle,
+    /// A handle to the event-loop that can interrupt the poll-phase.
+    pub interrupt_handle: LoopInterruptHandle,
+    /// Holds JS pending futures scheduled by the event-loop.
+    pub pending_futures: Vec<Box<dyn JsFuture>>,
+    /// Indicates the start time of the process.
+    pub startup_moment: Instant,
+    /// Specifies the timestamp which the current process began in Unix time.
+    pub time_origin: u128,
+    /// Holds callbacks scheduled by nextTick.
+    pub next_tick_queue: NextTickQueue,
+    /// Holds exceptions from promises with no rejection handler.
+    pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
+    /// Runtime options.
+    pub options: JsRuntimeOptions,
+    /// Tracks wake event for current loop iteration.
+    pub wake_event_queued: bool,
+}
+```
+
+To enable access to this state from various V8 structures, we store it within the isolate's `slot`.
+
+```rust
+let mut isolate = v8::Isolate::new(v8::CreateParams::default());
+let state = Rc::new(RefCell::new(RuntimeState{..}));
+
+// Store state inside the v8 isolate slot.
+isolate.set_slot(state);
+```
+
+Anyone with access to a `v8::HandleScope` can obtain a reference to this state through a convenient `static` exposed utility from the JsRuntime struct:
+
+```rust
+impl JsRuntime {
+  /// Returns the runtime state stored in the given isolate.
+  pub fn state(isolate: &v8::Isolate) -> Rc<RefCell<JsRuntimeState>> {
+      isolate
+          .get_slot::<Rc<RefCell<JsRuntimeState>>>()
+          .unwrap()
+          .clone()
+  }
+}
+```
+
+The key point here is that Rust [automatically](https://docs.rs/v8/latest/v8/struct.HandleScope.html#impl-AsRef%3CIsolate%3E-for-HandleScope%3C's,+C%3E) allows a `v8::HandleScope<'s>` to be dereferenced into a `v8::Isolate`.
+
+```rust
+// File: src/timers.rs
+
+/// Removes a scheduled timeout from the event-loop.
+fn remove_timeout(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    // Get timeout's ID, and remove it.
+    let id = args.get(0).int32_value(scope).unwrap() as u32;
+    let state_rc = JsRuntime::state(scope);
+
+    state_rc.borrow().handle.remove_timer(&id);
+}
+```
+
+The state should be available in all shorts of different places that's why we wrap it into a `Rc<RefCell<T>>` structure.
+
+**Important**: It is crucial to be cautious because only one "accessor" should borrow the state at any given moment. Otherwise, Rust will panic, leading to a crash in Dune.
