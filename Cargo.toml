@@ -20,7 +20,7 @@ nix = { version = "0.27.0", features = ["signal"] }
 enable-ansi-support = "0.2.1"
 
 [dependencies]
-v8 = { version = "0.77.0", default-features = false }
+v8 = { version = "0.80.0", default-features = false }
 clap = "4.0.27"
 anyhow = "1.0.52"
 colored = "2.0.0"
@@ -55,7 +55,7 @@ serde_json = "1.0.88"
 dns-lookup = "2.0.0"
 mio = { version = "0.8.4", features = ["os-poll", "net"] }
 tempdir = "0.3.7"
-zstd = "0.12"
+zstd = "0.13.0"
 notify = "6.1.1"
 httparse = "1.8.0"
 
