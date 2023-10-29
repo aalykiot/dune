@@ -279,9 +279,7 @@ export class Socket extends EventEmitter {
    */
   read() {
     // Check if the socket is connected to a host.
-    if (!this.#id) {
-      throw new Error(`Socket is not connected to a remote host.`);
-    }
+    if (!this.#id) return null;
 
     // HACK: The following is used to handle uncaught errors thrown
     // from the event-emitter when no one is subscribed to the `error` event.
@@ -323,7 +321,7 @@ export class Socket extends EventEmitter {
       throw new Error(`The socket stream is not writable.`);
     }
 
-    // Default tu UTF-8 encoding.
+    // Default to UTF-8 encoding.
     encoding = encoding || this.#encoding || 'utf-8';
 
     const bytes = toUint8Array(data, encoding);
@@ -339,7 +337,7 @@ export class Socket extends EventEmitter {
    *
    * @param {String|Uint8Array} data
    * @param {String} [encoding]
-   * @returns {Promise<*>}
+   * @returns {Promise<void>}
    */
   async end(data, encoding = 'utf-8') {
     // Check socket connection.
@@ -362,11 +360,21 @@ export class Socket extends EventEmitter {
     if (!this.#id) {
       throw new Error('Socket is not connected to a remote host.');
     }
-    await binding.close(this.#id);
 
-    this.emit('close');
+    // Clone pending reads before reset.
+    const pullQueue = [...this.#pullQueue];
+
     this.#timeoutHandle?.emit('timeoutUpdate', 0);
     this.#reset();
+
+    await binding.close(this.#id);
+
+    // If we have pending reads, sink them.
+    for (const promise of pullQueue) {
+      promise.resolve(null);
+    }
+
+    this.emit('close');
   }
 
   /**

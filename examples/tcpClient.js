@@ -13,9 +13,7 @@ const client = net.createConnection({
 client.setEncoding('utf-8');
 
 client.on('connect', () => client.write(HTTP_REQUEST));
-
 client.on('data', (data) => console.log(data));
-
 client.on('close', () => console.log('Connection closed.'));
 
 // 2. Using async iterators to handle data.

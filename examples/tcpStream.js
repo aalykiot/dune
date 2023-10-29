@@ -9,6 +9,6 @@ const server = net.createServer((socket) => {
   pipeline(socket, writer);
 });
 
-await server.listen(3000, '127.0.0.1');
-
 console.log('Server listening on port 3000...');
+
+await server.listen(3000, '127.0.0.1');
