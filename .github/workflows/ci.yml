@@ -93,4 +93,5 @@ jobs:
       - name: Run cargo test (javascript)
         uses: actions-rs/cargo@v1
         with:
-          command: run -- test tests/
+          command: run
+          args: test tests/
