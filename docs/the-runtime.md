@@ -189,9 +189,9 @@ Certainly, the provided example represents the fundamental workings of bindings 
 
 ### Runtime State
 
-Every Dune process is linked to a specific `state` containing information related to a particular `v8::Isolate` instance. The state includes information about startup time, initialization options, ES-module metadata, various queues, and notably, a handle to the event loop.
+Every Dune process is linked to a specific `state` containing information related to a particular `v8::Isolate` instance. The state includes information about startup time, initialization options, ES-module metadata, various queues, and notably, a handle to the event-loop.
 
-Whenever a new operation needs to be dispatched to the `event loop`, such as a network call or file read, it is necessary to first obtain access to this state.
+Whenever a new operation needs to be dispatched to the `event-loop`, such as a network call or file read, it is necessary to first obtain access to this state.
 
 **The current runtime state:**
 
@@ -316,7 +316,7 @@ This action will result in the promise on the JavaScript side resolving with the
 <img src="./assets/the-runtime-05.svg" height="250px" />
 <br />
 
-Dune follows the same pattern with promises. It returns a promise to JavaScript through a `binding`, and when the operation is finished, the event loop notifies Dune. At that point, Dune resolves or rejects the promise. We will discuss later where exactly the `v8::PromiseResolver` wrapped in a `v8::Global` is stored while waiting for the operation to complete.
+Dune follows the same pattern with promises. It returns a promise to JavaScript through a `binding`, and when the operation is finished, the event-loop notifies Dune. At that point, Dune resolves or rejects the promise. We will discuss later where exactly the `v8::PromiseResolver` wrapped in a `v8::Global` is stored while waiting for the operation to complete.
 
 #### `Microtask Queue`
 
