@@ -56,12 +56,12 @@ export class AbortSignal {
    */
   // eslint-disable-next-line no-unused-vars
   static timeout(milliseconds) {
-    // Note: Implemetning the static `timeout` method adds a lot of complexity, plus
+    // Note: Implementing the static `timeout` method adds a lot of complexity, plus
     // the `http.request` method supports nativly the consept of timeouts.
     //
     // https://github.com/mo/abortcontroller-polyfill/issues/73#issuecomment-1660420796
 
-    throw new Error('Not implemnted!');
+    throw new Error('Not implemented!');
   }
 
   addEventListener(name, handler) {
