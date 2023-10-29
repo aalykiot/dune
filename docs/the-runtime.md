@@ -10,9 +10,9 @@ Dune leverages the powerful capabilities of the [V8](https://v8.dev/) engine thr
 <img src="./assets/the-runtime-01.svg" height="85px" />
 <br />
 
-All rusty_v8 available APIs can be found [here](https://docs.rs/v8/latest/v8/).
+All available APIs of `rusty_v8` can be found in the official [documentation](https://docs.rs/v8/latest/v8/).
 
-The purpose of this README is not to comprehensively cover all V8 concepts. However, we will touch on some key ones to enhance understanding in this technical overview. Among these concepts are the [Isolate](#isolate) and JS [Handles](#handles).
+The purpose of this README is not to comprehensively cover all V8 concepts. However, we will touch on some key ones to enhance understanding in this technical overview. Among these concepts are the [Isolate](#isolate) and JS value [Handles](#handles).
 
 #### `Isolate`
 
@@ -30,7 +30,7 @@ Every object returned from V8 must be monitored by the garbage collector to conf
 <img src="./assets/the-runtime-02.svg" height="280px" />
 <br/><br/>
 
-There are two types of handles: **local** and **persistent** handles.
+There are two types of handles: **local** and **persistent** (global) handles.
 
 A `v8::Local` handle serves as a momentary pointer to a JavaScript object, typically no longer required after the current function finishes execution. These handles are restricted to allocation on the Rust stack. Local handles are lightweight and short-lived, primarily employed in local operations.
 
@@ -120,7 +120,6 @@ To understand this process, let's explore how something passed to `console.log` 
  *
  * @param  {...any} args
  */
-
 log(...args) {
   const output = args.map((arg) => stringify(arg)).join(' ');
   process.stdout.write(`${output}\n`);
@@ -385,9 +384,7 @@ This approach is employed to address the first error type.
 
 #### `v8::PromiseRejectCallback`
 
-V8 isolates offer a custom `hook` that allows us to receive notifications when an exception is thrown from a promise with no rejection handler.
-
-The `v8::PromiseRejectCallback` is a type alias for a C++ FFI function, specifically `extern "C" fn(_: PromiseRejectMessage<'_>)`.
+V8 isolates provide a custom `hook` that enables us to receive notifications when an exception is thrown from a promise without a rejection handler. The `v8::PromiseRejectCallback` is a type alias for `extern "C" fn(_: PromiseRejectMessage<'_>)`, which represents a Rust function that will be invoked by V8 using Foreign Function Interface (FFI) mechanisms.
 
 ```rust
 pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
@@ -441,7 +438,7 @@ This approach is employed to address the second error type.
 
 #### `JsError`
 
-Dune has implemented a custom error type, located in `errors.rs`, to gain complete control over the thrown V8 exception. This custom error type contains additional information about the `origins` of the exception and includes the `stack-trace` if available.
+Dune has implemented a custom error type, to gain complete control over the thrown V8 exception. This custom error type contains additional information about the `origins` of the exception and includes the `stack-trace` if available.
 
 ```rust
 // File: /src/errors.rs
@@ -489,7 +486,7 @@ impl Display for JsError {
 
 ### Event Loop
 
-This section will not delve into the intricacies of the event-loop's internals, as that is a topic for an entirely different README. Instead, it will focus on how the `event-loop` is utilized by the runtime to dispatch operations and receive results.
+This section will not explore the intricacies of the event-loop's internals, as that is a topic for an entirely different README. Instead, it will focus on how the `event-loop` is utilized by the runtime to dispatch operations and receive results.
 
 Here is the link to the repo: https://github.com/aalykiot/dune-event-loop
 
@@ -520,7 +517,7 @@ handle.timer(1000, false, |_: LoopHandle| {
 
 The above snippet registers a callback to the event-loop that will run after 1 second.
 
-**Dispatching Operations**
+**The `setTimeout` example:**
 
 Dune stores both of these handles to the runtime state and follows the same pattern for all event-loop operations, but we'll focus on the `setTimeout` example as it is the simplest one.
 
@@ -550,6 +547,7 @@ fn create_timeout(
       state.pending_futures.push(Box::new(future));
     }
   }
+
   state.handle.timer(millis, repeatable, timeout_cb);
 }
 ```
@@ -564,7 +562,7 @@ The code snippet presented is simplified for demonstration purposes, but the fun
 
 We **cannot** directly run the timer's callback (JS function) within the closure.
 
-The reason we have to create the [JsFuture](#jsfuture) is that we require a valid `v8::HandleScope` in place to do anything with V8. Unfortunately, `v8::HandleScope` instances **cannot** be passed into closures due to the `'static` lifetime requirement enforced by Rust closures. It's crucial to remember that handle scopes are temporary constructs as well bound to a lifetime `'s` and not the all-encompassing `'static` one.
+The reason we have to create a [JsFuture](#jsfuture) is that we require a valid `v8::HandleScope` in place to do anything with V8. Unfortunately, `v8::HandleScope` instances **cannot** be passed into closures due to the `'static` lifetime requirement enforced by Rust closures. It's crucial to remember that handle scopes are also temporary constructs bound to a lifetime `'s` and not the all-encompassing `'static` one.
 
 #### `JsFuture`
 
@@ -620,7 +618,7 @@ Storing necessary values for the future's execution, such as `v8::Global` handle
 
 #### `Ticks`
 
-It is important to note that the `event-loop` does not continuously `tick` until there are no more operations to be executed. Instead, it needs to be manually **triggered** by the runtime to initiate a tick (the reasoning behind this will be explained in the separate README).
+It is worth mentioning that the `event-loop` does not continuously `tick` until there are no more operations to be executed. Instead, it needs to be manually **triggered** by the runtime to initiate a tick (the reasoning behind this will be elaborated in a separate README).
 
 ```rust
 // File: /src/runtime.rs
