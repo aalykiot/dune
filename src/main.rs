@@ -27,11 +27,13 @@ use colored::*;
 use errors::unwrap_or_exit;
 use modules::resolve_import;
 use modules::ImportMap;
+use path_absolutize::*;
 use runtime::JsRuntime;
 use runtime::JsRuntimeOptions;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 use tools::bundle;
 use tools::compile;
 use tools::upgrade;
@@ -100,15 +102,15 @@ fn run_command(mut args: ArgMatches) {
 fn test_command(mut args: ArgMatches) {
     // Get the path we need to import JavaScript tests from.
     let cwd = env::current_dir().unwrap();
-    let test_path = match args.remove_one::<String>("FILES") {
-        Some(path) => match fs::canonicalize(path) {
-            Ok(path) => path,
-            Err(e) => {
-                eprintln!("{}", generic_error(e.to_string()));
-                std::process::exit(1);
-            }
-        },
-        None => cwd,
+
+    // Get the input path as an absolute location.
+    let test_path = args.remove_one::<String>("FILES").map(PathBuf::from);
+    let test_path = match test_path.as_ref().unwrap_or(&cwd).absolutize() {
+        Ok(path) => path,
+        Err(e) => {
+            eprintln!("{}", generic_error(e.to_string()));
+            std::process::exit(1);
+        }
     };
 
     // Extract options from cli arguments.
@@ -119,18 +121,22 @@ fn test_command(mut args: ArgMatches) {
         None => "undefined".into(),
     };
 
+    // Note: The env variable method is used to address an issue on Windows where
+    // the test path entry is injected into the test script in a slightly
+    // altered manner, leading to errors.
+
+    env::set_var("TEST_ENTRY_PATH", String::from(test_path.to_string_lossy()));
+
     // Build JavaScript test script.
     let script = format!(
         "
         import {{ mainRunner }} from 'test';
         mainRunner.failFast = {};
         mainRunner.filter = {};
-        await mainRunner.importTests('{}');
+        await mainRunner.importTests(process.env.TEST_ENTRY_PATH);
         await mainRunner.run();
     ",
-        fail_fast,
-        filter,
-        test_path.display(),
+        fail_fast, filter,
     );
 
     // Extract runtime options.

@@ -397,6 +397,13 @@ impl JsFuture for EsModuleFuture {
     }
 }
 
+lazy_static! {
+    // Windows absolute path regex validator.
+    static ref WINDOWS_REGEX: Regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
+    // URL regex validator (string begins with http:// or https://).
+    static ref URL_REGEX: Regex = Regex::new(r"^(http|https)://").unwrap();
+}
+
 /// Resolves an import using the appropriate loader.
 pub fn resolve_import(
     base: Option<&str>,
@@ -413,8 +420,11 @@ pub fn resolve_import(
     // Look the params and choose a loader.
     let loader: Box<dyn ModuleLoader> = {
         let is_core_module_import = CORE_MODULES.contains_key(specifier.as_str());
-        let is_url_import = Url::parse(&specifier).is_ok();
-        let is_url_import = is_url_import || (base.is_some() && Url::parse(base.unwrap()).is_ok());
+        let is_url_import = URL_REGEX.is_match(&specifier)
+            || match base {
+                Some(base) => URL_REGEX.is_match(base),
+                None => false,
+            };
 
         match (is_core_module_import, is_url_import) {
             (true, _) if !ignore_core_modules => Box::new(CoreModuleLoader),
@@ -429,11 +439,6 @@ pub fn resolve_import(
 
 /// Loads an import using the appropriate loader.
 pub fn load_import(specifier: &str, skip_cache: bool) -> Result<ModuleSource> {
-    // Windows absolute path regex validator.
-    lazy_static! {
-        static ref WINDOWS_REGEX: Regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
-    }
-
     // Look the params and choose a loader.
     let loader: Box<dyn ModuleLoader> = match (
         CORE_MODULES.contains_key(specifier),

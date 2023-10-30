@@ -13,7 +13,9 @@
     "global": "readonly",
     "globalThis": "readonly",
     "process": true,
-    "prompt": true
+    "prompt": true,
+    "setImmediate": true,
+    "clearImmediate": true
   },
   "rules": {}
 }
