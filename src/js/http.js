@@ -210,8 +210,9 @@ class HttpRequest {
 
     this.#headers = new Map();
     this.#headers.set('host', this.#hostname + ':' + this.#port);
-    this.#headers.set('user-agent', 'Dune HTTP client');
-    this.#headers.set('connection', 'keep-alive');
+    this.#headers.set('user-agent', `dune/${process.version}`);
+    this.#headers.set('accept', '*/*');
+    this.#headers.set('connection', 'close');
     this.#headers.set('content-length', this.#bodyLength);
 
     // Check if encoding should be chunked.
