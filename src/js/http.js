@@ -114,8 +114,6 @@ export const STATUS_CODES = {
   511: 'Network Authentication Required',
 };
 
-const encoder = new TextEncoder('utf-8');
-
 function concatUint8Arrays(...arrays) {
   return arrays.reduce(
     (acc, array) => new Uint8Array([...acc, ...array]),
@@ -163,6 +161,16 @@ function formatHeaders(headers) {
   return kHeaders;
 }
 
+async function* wrapIterable(iterable) {
+  let result;
+  let iterator = iterable[Symbol.asyncIterator]();
+  while ((result = await iterator.next())) {
+    if (result.done) break;
+    yield result.value;
+  }
+}
+
+const encoder = new TextEncoder('utf-8');
 const urlRegex = new RegExp('^(.*:)//([A-Za-z0-9-.]+)(:[0-9]+)?(.*)$');
 
 class HttpRequest {
@@ -277,7 +285,7 @@ class HttpRequest {
     this.#socket.setTimeout(this.#timeout);
 
     // Await and parse response from the server.
-    for await (const data of this.#socket) {
+    for await (const data of wrapIterable(this.#socket)) {
       chunks.push(data);
       const buffer = concatUint8Arrays(...chunks);
       const response = binding.parseResponse(buffer);
@@ -400,7 +408,7 @@ class HttpResponseBody {
     let bytesReceived = this.#body.length;
 
     // Process incoming data from the TCP socket.
-    for await (const data of this.#socket) {
+    for await (const data of wrapIterable(this.#socket)) {
       // HTTP body is received in chunks.
       if (this.#isChunked) {
         const { chunks, done } = this.#parseAvailableChunks(data);
