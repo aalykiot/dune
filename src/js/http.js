@@ -346,9 +346,9 @@ class Body {
   #isComplete;
   #keepAlive;
 
-  constructor(metadata, headers, buffer, socket, keepAlive = true) {
+  constructor({ headers, bodyAt }, buffer, socket, keepAlive = true) {
     this.#socket = socket;
-    this.#body = buffer.subarray(metadata.bodyAt);
+    this.#body = buffer.subarray(bodyAt);
     this.#bodyLength = Number.parseInt(headers['content-length']) || 0;
     this.#isChunked = headers['transfer-encoding']?.includes('chunked');
     this.#isComplete = this.#body?.length === this.#bodyLength;
@@ -442,6 +442,46 @@ class Body {
     if (!this.#keepAlive) {
       this.#socket.end();
     }
+  }
+}
+
+/**
+ * Represents a server-side request object for handling HTTP requests.
+ */
+export class ServerRequest {
+  #body;
+
+  constructor(metadata, buffer, socket) {
+    this.httpVersion = `1.${metadata.version}`;
+    this.method = metadata.method;
+    this.url = metadata.url || '/';
+    this.headers = metadata.headers;
+    this.#body = new Body(metadata, buffer, socket);
+  }
+
+  /**
+   * Formats the body to a UTF-8 string.
+   *
+   * @returns Promise<String>
+   */
+  async text() {
+    return this.#body.text();
+  }
+
+  /**
+   * Formats the body to an actual JSON object.
+   *
+   * @returns Promise<Object>
+   */
+  async json() {
+    return this.#body.json();
+  }
+
+  /**
+   * The HTTP request should be async iterable.
+   */
+  async *[Symbol.asyncIterator](signal) {
+    yield* this.#body[Symbol.asyncIterator](signal);
   }
 }
 
