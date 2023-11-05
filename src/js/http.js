@@ -1,9 +1,8 @@
 // HTTP Networking APIs
 //
-// The HTTP interfaces are built to make it easier to use traditionally
-// difficult protocol features. By never buffering complete requests
-// or responses, users can stream data instead, making data transmission
-// more efficient and flexible.
+// The HTTP interfaces are built to make it easier to use traditionally difficult protocol
+// features. By never buffering complete requests or responses, users can stream data
+// instead, making data transmission more efficient and flexible.
 //
 // https://undici.nodejs.org/#/
 
@@ -171,9 +170,14 @@ async function* wrapIterable(iterable) {
 }
 
 const encoder = new TextEncoder('utf-8');
+const decoder = new TextDecoder('utf-8');
+
 const urlRegex = new RegExp('^(.*:)//([A-Za-z0-9-.]+)(:[0-9]+)?(.*)$');
 
-class HttpRequest {
+/**
+ * An outgoing HTTP request to a remote host.
+ */
+class Request {
   #hostname;
   #port;
   #path;
@@ -288,31 +292,34 @@ class HttpRequest {
     for await (const data of wrapIterable(this.#socket)) {
       chunks.push(data);
       const buffer = concatUint8Arrays(...chunks);
-      const response = binding.parseResponse(buffer);
+      const metadata = binding.parseResponse(buffer);
 
       // Response headers are still incomplete.
-      if (!response) continue;
+      if (!metadata) continue;
 
       // Check status code and throw if requested.
-      if (response.statusCode >= 400 && this.#throwOnError) {
-        const message = STATUS_CODES[response.statusCode];
+      if (metadata.statusCode >= 400 && this.#throwOnError) {
+        const message = STATUS_CODES[metadata.statusCode];
         throw new Error(`HTTP request failed with error: "${message}"`);
       }
 
-      return new HttpResponse(response, buffer, this.#socket);
+      return new IncomingResponse(metadata, buffer, this.#socket);
     }
   }
 }
 
-class HttpResponse {
+/**
+ * An HTTP response from a remote host.
+ */
+class IncomingResponse {
   #statusCode;
   #headers;
   #body;
 
-  constructor(response, buffer, socket) {
-    this.#statusCode = response.statusCode;
-    this.#headers = response.headers;
-    this.#body = new HttpResponseBody(response, this.#headers, buffer, socket);
+  constructor(metadata, buffer, socket) {
+    this.#statusCode = metadata.statusCode;
+    this.#headers = metadata.headers;
+    this.#body = new Body(metadata, this.#headers, buffer, socket, false);
   }
 
   get statusCode() {
@@ -328,23 +335,26 @@ class HttpResponse {
   }
 }
 
-const decoder = new TextDecoder('utf-8');
-
-class HttpResponseBody {
+/**
+ * A wrapper around a request/response HTTP body.
+ */
+class Body {
   #socket;
   #body;
   #bodyLength;
   #isChunked;
   #isComplete;
+  #keepAlive;
 
-  constructor(response, headers, buffer, socket) {
+  constructor(metadata, headers, buffer, socket, keepAlive = true) {
     this.#socket = socket;
-    this.#body = buffer.subarray(response.bodyAt);
+    this.#body = buffer.subarray(metadata.bodyAt);
     this.#bodyLength = Number.parseInt(headers['content-length']) || 0;
     this.#isChunked = headers['transfer-encoding']?.includes('chunked');
     this.#isComplete = this.#body?.length === this.#bodyLength;
+    this.#keepAlive = keepAlive;
 
-    if (this.#isComplete && !this.#isChunked) {
+    if (this.#isComplete && !this.#isChunked && !keepAlive) {
       this.#socket.end();
       this.#socket = undefined;
     }
@@ -428,8 +438,10 @@ class HttpResponseBody {
       }
     }
 
-    // Close the underline TCP socket.
-    this.#socket.end();
+    // Close TCP socket on not keep-alive connections.
+    if (!this.#keepAlive) {
+      this.#socket.end();
+    }
   }
 }
 
@@ -472,7 +484,7 @@ export function request(url, options = {}) {
   options?.signal?.throwIfAborted();
 
   const configuration = Object.assign(defaultOptions, options);
-  const request = new HttpRequest(url, configuration);
+  const request = new Request(url, configuration);
   const { signal } = configuration;
 
   // Note: In case an abort-signal has been provided we should wrap
