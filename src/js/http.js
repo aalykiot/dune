@@ -280,7 +280,7 @@ class HttpRequest {
     for await (const data of this.#socket) {
       chunks.push(data);
       const buffer = concatUint8Arrays(...chunks);
-      const response = binding.parseHttpResponse(buffer);
+      const response = binding.parseResponse(buffer);
 
       // Response headers are still incomplete.
       if (!response) continue;
@@ -369,7 +369,7 @@ class HttpResponseBody {
   #parseAvailableChunks(data) {
     // Mix current body with new data.
     const buffer = concatUint8Arrays(this.#body, data);
-    const { chunks, position, done } = binding.parseHttpChunks(buffer);
+    const { chunks, position, done } = binding.parseChunks(buffer);
 
     // Update body based on parser's cursor.
     this.#body = buffer.subarray(position);

@@ -8,23 +8,95 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
-    set_function_to(scope, target, "parseHttpResponse", parse_http_response);
-    set_function_to(scope, target, "parseHttpChunks", parse_http_chunks);
+    set_function_to(scope, target, "parseRequest", parse_incoming_request);
+    set_function_to(scope, target, "parseResponse", parse_incoming_response);
+    set_function_to(scope, target, "parseChunks", parse_body_chunks);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
 }
 
-/// Parses the HTTP response for statusCode, method and headers.
-fn parse_http_response(
+/// Parses an HTTP request received from a a client.
+fn parse_incoming_request(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get the HTTP (partial) request as ArrayBuffer.
+    let http_request: v8::Local<v8::ArrayBufferView> = args.get(0).try_into().unwrap();
+    let mut data = vec![0; http_request.byte_length()];
+
+    http_request.copy_contents(&mut data);
+
+    // Try parse the HTTP request bytes.
+    let mut request_headers = [httparse::EMPTY_HEADER; 32];
+    let mut request = httparse::Request::new(&mut request_headers);
+
+    let status = match request.parse(&data) {
+        Ok(status) => status,
+        Err(e) => {
+            let message = v8::String::new(scope, &e.to_string()).unwrap();
+            let exception = v8::Exception::error(scope, message);
+            scope.throw_exception(exception);
+            return;
+        }
+    };
+
+    // Check if the HTTP request is still incomplete.
+    if status.is_partial() {
+        rv.set(v8::null(scope).into());
+        return;
+    }
+
+    let method = request.method.unwrap_or_default().to_ascii_uppercase();
+    let method = v8::String::new(scope, &method).unwrap();
+
+    let path = request.path.unwrap_or_default();
+    let path = v8::String::new(scope, &path).unwrap();
+
+    let version = request.version.unwrap_or_default();
+    let version = v8::Integer::new(scope, version as i32);
+
+    let headers = request
+        .headers
+        .iter()
+        .map(|h| {
+            let name = h.name.to_owned().to_lowercase();
+            let value = String::from_utf8(h.value.to_vec()).unwrap();
+            (name, value)
+        })
+        .fold(v8::Object::new(scope), |acc, (name, value)| {
+            let value = v8::String::new(scope, &value).unwrap();
+            set_constant_to(scope, acc, &name, value.into());
+            acc
+        });
+
+    // Get the position the HTTP body starts.
+    let body_at = status.unwrap();
+    let body_at = v8::Integer::new(scope, body_at as i32);
+
+    // Build the v8 result object.
+    let target = v8::Object::new(scope);
+
+    set_constant_to(scope, target, "method", method.into());
+    set_constant_to(scope, target, "path", path.into());
+    set_constant_to(scope, target, "version", version.into());
+    set_constant_to(scope, target, "headers", headers.into());
+    set_constant_to(scope, target, "bodyAt", body_at.into());
+
+    rv.set(target.into());
+}
+
+/// Parses an HTTP response received from a server.
+fn parse_incoming_response(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
     // Get the HTTP (partial) response as ArrayBuffer.
     let http_response: v8::Local<v8::ArrayBufferView> = args.get(0).try_into().unwrap();
-
     let mut data = vec![0; http_response.byte_length()];
+
     http_response.copy_contents(&mut data);
 
     // Try parse the HTTP response bytes.
@@ -70,6 +142,7 @@ fn parse_http_response(
 
     // Build the v8 result object.
     let target = v8::Object::new(scope);
+
     set_constant_to(scope, target, "statusCode", status_code.into());
     set_constant_to(scope, target, "headers", headers.into());
     set_constant_to(scope, target, "bodyAt", body_at.into());
@@ -77,8 +150,8 @@ fn parse_http_response(
     rv.set(target.into());
 }
 
-/// Parses the next body chunk of the HTTP request/response.
-fn parse_http_chunks(
+/// Gets available chunks from a streaming HTTP message.
+fn parse_body_chunks(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
