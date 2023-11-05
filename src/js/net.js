@@ -140,6 +140,7 @@ export function createServer(onConnection) {
 }
 
 const kSetSocketIdUnchecked = Symbol('kSetSocketIdUnchecked');
+const kAsyncGenerator = Symbol('kAsyncGenerator');
 
 /**
  * A Socket object is a JS wrapper around a low-level TCP socket.
@@ -341,9 +342,8 @@ export class Socket extends EventEmitter {
    */
   async end(data, encoding = 'utf-8') {
     // Check socket connection.
-    if (!this.#id) {
-      throw new Error(`Socket is not connected to a remote host.`);
-    }
+    if (!this.#id) return;
+
     // If data is given, write to stream.
     if (data) {
       await this.write(data, encoding);
@@ -357,23 +357,17 @@ export class Socket extends EventEmitter {
    */
   async destroy() {
     // Check if the socket is indeed connected.
-    if (!this.#id) {
-      throw new Error('Socket is not connected to a remote host.');
-    }
-
-    // Clone pending reads before reset.
-    const pullQueue = [...this.#pullQueue];
+    if (!this.#id) return;
 
     this.#timeoutHandle?.emit('timeoutUpdate', 0);
-    this.#reset();
-
     await binding.close(this.#id);
 
-    // If we have pending reads, sink them.
-    for (const promise of pullQueue) {
+    // Ignore pending reads.
+    for (const promise of this.#pullQueue) {
       promise.resolve(null);
     }
 
+    this.#reset();
     this.emit('close');
   }
 
@@ -390,6 +384,7 @@ export class Socket extends EventEmitter {
    * Resets socket's internal state (not to be called manually).
    */
   #reset() {
+    this.#id = undefined;
     this.#pushQueue = [];
     this.#pullQueue = [];
     this.#connecting = false;
@@ -463,10 +458,7 @@ export class Socket extends EventEmitter {
     binding.readStart(this.#id, onAvailableSocketData);
   }
 
-  /**
-   * The socket should be async iterable.
-   */
-  async *[Symbol.asyncIterator](signal) {
+  async *[kAsyncGenerator](signal) {
     // Close socket on stream pipeline errors.
     if (signal) signal.on('uncaughtStreamException', () => this.destroy());
 
@@ -475,6 +467,14 @@ export class Socket extends EventEmitter {
       if (!data) break;
       yield data;
     }
+  }
+
+  /**
+   * The socket should be async iterable.
+   */
+  [Symbol.asyncIterator](signal) {
+    const iterator = { return: () => this.end() };
+    return Object.assign(this[kAsyncGenerator](signal), iterator);
   }
 }
 
@@ -633,14 +633,19 @@ export class Server extends EventEmitter {
     this.#asyncDispatch(socket);
   }
 
-  /**
-   * The server should be async iterable.
-   */
-  async *[Symbol.asyncIterator]() {
+  async *[kAsyncGenerator]() {
     let socket;
     while ((socket = await this.accept())) {
       yield socket;
     }
+  }
+
+  /**
+   * The server should be async iterable.
+   */
+  [Symbol.asyncIterator]() {
+    const iterator = { return: () => this.close() };
+    return Object.assign(this[kAsyncGenerator](), iterator);
   }
 }
 
