@@ -339,7 +339,7 @@ class IncomingResponse {
   constructor(metadata, buffer, socket) {
     this.#statusCode = metadata.statusCode;
     this.#headers = metadata.headers;
-    this.#body = new Body(metadata, this.#headers, buffer, socket, false);
+    this.#body = new Body(metadata, buffer, socket, false);
   }
 
   get statusCode() {
