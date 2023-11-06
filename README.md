@@ -162,7 +162,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 ### Net
 
-- [x] `createServer(connectionListener?)`: Creates a new TCP server.
+- [x] `createServer(connectionHandler?)`: Creates a new TCP server.
 - [x] `createConnection(options)`: Creates unix socket connection to a remote host.
 - [x] `TimeoutError`: Custom error signalling a socket (read) timeout.
 
@@ -209,7 +209,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `METHODS`: A list of the HTTP methods that are supported by the parser.
 - [x] `STATUS_CODES`: A collection of all the standard HTTP response status codes.
 - [x] `request(url, options?)`: Performs an HTTP request.
-- [ ] `createServer(requestListener?)`: Creates a new HTTP server.
+- [x] `createServer(requestHandler?)`: Creates a new HTTP server.
 
 <details><summary>Details</summary>
 <p></p>
@@ -265,10 +265,10 @@ Body Mixins
 
 - [x] `write(data)`: This sends a chunk of the response body.
 - [x] `end(data?)`: Signals that all of the response headers and body have been sent.
-- [x] `writeHead(code, message?, headers?)`: Sends a response header to the request.
+- [x] `writeHead(code, message?, headers?)`: Sends the response headers to the client.
 - [x] `setHeader(name, value)`: Sets a single header value for implicit headers.
 - [x] `getHeader(name)`: Reads out a header that's already been queued but not sent to the client.
-- [x] `getHeaderNames()`: Returns an array containing the unique names of the current outgoing headers.
+- [ ] `getHeaderNames()`: Returns an array containing the unique names of the current outgoing headers.
 - [x] `getHeaders()`: Returns a copy of the current outgoing headers.
 - [x] `hasHeader(name)`: Returns true if the header identified is currently set.
 - [x] `removeHeader(name)`: Removes a header that's queued for implicit sending.
