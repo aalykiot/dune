@@ -7,6 +7,7 @@
 // https://undici.nodejs.org/#/
 
 import net from 'net';
+import assert from 'assert';
 import { EventEmitter } from 'events';
 
 const binding = process.binding('http_parser');
@@ -285,7 +286,7 @@ class Request {
     if (this.#body && this.#isChunkedEncoding) {
       for await (const chunk of this.#body) {
         assertChunkType(chunk);
-        await this.#socket.write(`${chunk.length}\r\n`);
+        await this.#socket.write(`${chunk.length.toString(16)}\r\n`);
         await this.#socket.write(chunk);
         await this.#socket.write('\r\n');
       }
@@ -502,6 +503,7 @@ export class ServerResponse extends EventEmitter {
   #headersSent;
   #code;
   #message;
+  #writtenOnce;
 
   constructor(socket, keepAlive) {
     super();
@@ -509,10 +511,11 @@ export class ServerResponse extends EventEmitter {
     this.#headersSent = false;
     this.#code = 200;
     this.#message = STATUS_CODES[this.#code];
+    this.#writtenOnce = false;
 
     // Set default headers.
     this.#headers = new Map();
-    this.#headers.set('date', new Date());
+    this.#headers.set('date', new Date().toGMTString());
     this.#headers.set('connection', keepAlive ? 'keep-alive' : 'close');
     this.#headers.set('transfer-encoding', 'chunked');
   }
@@ -531,12 +534,13 @@ export class ServerResponse extends EventEmitter {
       );
     }
 
-    const chunkedEncoding = this.getHeader('content-length') === undefined;
     const content = toUint8Array(data, encoding);
+    const contentLength = content.length.toString(16);
 
-    // Make sure headers are sent to the client.
+    const chunkedEncoding = !this.hasHeader('content-length');
+
+    // Make sure headers are sent to client.
     if (!this.#headersSent) {
-      // Update headers on known content-type.
       if (!chunkedEncoding) {
         this.setHeader('content-length', content.length);
         this.removeHeader('transfer-encoding');
@@ -546,13 +550,15 @@ export class ServerResponse extends EventEmitter {
 
     // Chunkify the provided content.
     if (chunkedEncoding) {
-      await this.#socket.write(`${content.length}\r\n`);
+      await this.#socket.write(`${contentLength}\r\n`);
       await this.#socket.write(content);
       await this.#socket.write('\r\n');
+      this.#writtenOnce = true;
       return;
     }
 
     await this.#socket.write(content);
+    this.#writtenOnce = true;
   }
 
   /**
@@ -565,12 +571,17 @@ export class ServerResponse extends EventEmitter {
     // If data is given, write to stream.
     if (data) {
       const content = toUint8Array(data, encoding);
-      this.write(content);
+      // Check if we can define the content-length of the response.
+      if (!this.#writtenOnce && !this.headersSent) {
+        this.setHeader('content-length', content.length);
+        this.removeHeader('transfer-encoding');
+      }
+      await this.write(content);
     }
 
-    // On chunked reponses send end-chunk.
-    if (this.getHeader('content-length') === undefined) {
-      await this.write(`0\r\n\r\n`);
+    // On chunked response send end-chunk.
+    if (this.getHeader('transfer-encoding')?.includes('chunked')) {
+      await this.#socket.write(`0\r\n\r\n`);
     }
 
     this.emit('finish');
@@ -582,17 +593,11 @@ export class ServerResponse extends EventEmitter {
    * @param  {...any} args
    */
   async writeHead(...args) {
-    // Extract statusMessage and headers from variadic.
-    const [code, message, headers] = this.#parseWriteHeadArgs(...args);
+    // Parse variadic arguments.
+    const [code, message, headers] = this.#parseWriteHeadArgs(args);
 
-    // Check if statusCode has a valid type.
-    if (typeof code !== 'number') {
-      throw new TypeError('The "code" argument must be of type number.');
-    }
-
-    // Check for statusCode range validity.
     if (STATUS_CODES[code] === undefined) {
-      throw new RangeError(`Inavalid HTTP status code: ${code}`);
+      throw new RangeError(`Not valid HTTP status code "${code}".`);
     }
 
     if (typeof message !== 'string') {
@@ -604,6 +609,7 @@ export class ServerResponse extends EventEmitter {
 
     // Override headers with user-defined ones.
     for (const [name, value] of Object.entries(headers)) {
+      assert.string(name);
       this.#headers.set(name.toLowerCase(), String(value));
     }
 
@@ -611,12 +617,23 @@ export class ServerResponse extends EventEmitter {
   }
 
   #parseWriteHeadArgs(args) {
-    // Check if statusMessage was provided.
-    if (typeof args[1] === 'object') {
-      return [args[0], STATUS_CODES[args[0]], args[1]];
-    }
+    // Use default values on empty or single argument(s).
+    if (args.length < 2) return [args[0], STATUS_CODES[args[0]], {}];
 
-    return [args[0], args[1], args[3] || {}];
+    return typeof args[1] === 'object'
+      ? [args[0], STATUS_CODES[args[0]], args[1]]
+      : [args[0], args[1], args[2] || {}];
+  }
+
+  /**
+   * Checks for HTTP header violations, mutual exclusions, etc.
+   */
+  #checkHeaders() {
+    // Content-Length and Transfer-Encoding are mutual exclusive HTTP headers.
+    if (this.hasHeader('content-length')) {
+      this.removeHeader('transfer-encoding');
+    }
+    // TODO: Include more HTTP headers rules...
   }
 
   /**
@@ -626,10 +643,8 @@ export class ServerResponse extends EventEmitter {
     // Start building the HTTP message.
     const resHeaders = [`HTTP/1.1 ${this.#code} ${this.#message}`];
 
-    // Content-Length and Transfer-Encoding are mutual exclusive HTTP headers.
-    if (this.hasHeader('content-length')) {
-      this.removeHeader('transfer-encoding');
-    }
+    // Check for HTTP header rule violations.
+    this.#checkHeaders();
 
     // Format and append HTTP headers to message.
     const headers = formatHeaders(this.#headers);
