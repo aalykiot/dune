@@ -134,7 +134,7 @@ export function createServer(onConnection) {
   const server = new Server();
   if (onConnection) {
     assert.isFunction(onConnection);
-    server.onConnection = onConnection;
+    server.on('connection', onConnection);
   }
   return server;
 }
@@ -494,7 +494,6 @@ export class Server extends EventEmitter {
    */
   constructor() {
     super();
-    this.onConnection = undefined;
     this.#pushQueue = [];
     this.#pullQueue = [];
   }
@@ -620,11 +619,7 @@ export class Server extends EventEmitter {
     socket.remoteAddress = remoteAddress;
     socket.remotePort = remotePort;
 
-    if (this.onConnection) {
-      this.onConnection(socket);
-      return;
-    }
-
+    // Check if a connection handler is specified.
     if (this.listenerCount('connection') > 0) {
       this.emit('connection', socket);
       return;
