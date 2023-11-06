@@ -115,6 +115,17 @@ export const STATUS_CODES = {
   511: 'Network Authentication Required',
 };
 
+function makeDeferredPromise() {
+  // Extract the resolve method from the promise.
+  const promiseExt = {};
+  const promise = new Promise((resolve, reject) => {
+    promiseExt.resolve = resolve;
+    promiseExt.reject = reject;
+  });
+
+  return { promise, promiseExt };
+}
+
 function concatUint8Arrays(...arrays) {
   return arrays.reduce(
     (acc, array) => new Uint8Array([...acc, ...array]),
@@ -454,6 +465,137 @@ class Body {
   }
 }
 
+const kAsyncGenerator = Symbol('kAsyncGenerator');
+
+/**
+ * An object capable of serving HTTP requests.
+ */
+export class Server extends EventEmitter {
+  #tcp;
+  #pushQueue;
+  #pullQueue;
+
+  /**
+   * Creates a new Server instance.
+   *
+   * @returns {Server}
+   */
+  constructor() {
+    super();
+    this.#pushQueue = [];
+    this.#pullQueue = [];
+
+    // Setting up the underling TCP server.
+    this.#tcp = net.createServer(this.#handleConnection.bind(this));
+    this.#tcp.on('close', () => this.emit('close'));
+  }
+
+  /**
+   * Waits for a client to connect and accepts the HTTP request.
+   *
+   * @returns {Promise<(ServerRequest, ServerResponse)>}
+   */
+  accept() {
+    // No available requests yet.
+    if (this.#pushQueue.length === 0) {
+      const { promise, promiseExt } = makeDeferredPromise();
+      this.#pullQueue.push(promiseExt);
+      return promise;
+    }
+
+    const socket = this.#pushQueue.shift();
+    const action = socket instanceof Error ? Promise.reject : Promise.resolve;
+
+    return action.call(Promise, socket);
+  }
+
+  async #handleConnection(socket) {
+    // Set-up client event dispatcher.
+    socket.on('error', (err) => this.emit('clientError', err));
+
+    // Await and parse request from the client.
+    const chunks = [];
+    for await (const data of socket) {
+      chunks.push(data);
+      const buffer = concatUint8Arrays(...chunks);
+      const metadata = binding.parseRequest(buffer);
+
+      // Request headers are still incomplete.
+      if (!metadata) continue;
+
+      const keepAlive = metadata?.headers?.connection !== 'close';
+
+      // Create the request and response streams.
+      const request = new ServerRequest(metadata, buffer, socket);
+      const response = new ServerResponse(socket, keepAlive);
+
+      // Check if a request handler is specified; if so, emit the 'request' event.
+      const hasRequestHandler = this.listenerCount('request') > 0;
+
+      hasRequestHandler
+        ? this.emit('request', request, response)
+        : this.#asyncDispatch({ request, response });
+
+      // Hack: To support persistent connections, we employ this technique to delay
+      // accepting a new request from the same socket until the current
+      // request-response cycle is complete.
+      await new Promise((resolve) => response.once('finish', resolve));
+
+      // Breaking from the loop will result to a socket shutdown.
+      if (!keepAlive) {
+        break;
+      }
+
+      // Note: Technically, this is not 100% accurate because the next request could begin
+      // within the last TCP packet of the current one. In reality, the likelihood
+      // of this occurrence is low, which is why we reset the buffer.
+      chunks.splice(0);
+    }
+  }
+
+  #asyncDispatch(socket) {
+    if (this.#pullQueue.length === 0) {
+      this.#pushQueue.push(socket);
+      return;
+    }
+    const promise = this.#pullQueue.shift();
+    const action = socket instanceof Error ? promise.reject : promise.resolve;
+    action(socket);
+  }
+
+  /**
+   * Starts listening for incoming connections.
+   *
+   * @param  {...any} args
+   * @returns Promise<Object>
+   */
+  async listen(...args) {
+    return this.#tcp.listen(...args);
+  }
+
+  /**
+   * Stops the server from accepting new connections.
+   */
+  async close() {
+    await this.#tcp.close();
+  }
+
+  async *[kAsyncGenerator]() {
+    let socket;
+    while ((socket = await this.accept())) {
+      yield socket;
+    }
+  }
+
+  /**
+   * The server should be async iterable.
+   */
+  [Symbol.asyncIterator]() {
+    const iterator = { return: () => this.close() };
+    return Object.assign(this[kAsyncGenerator](), iterator);
+  }
+}
+
 /**
  * A server-side request object for handling HTTP requests.
  */
@@ -497,7 +639,7 @@ export class ServerRequest {
 /**
  * A server-side response object for handling HTTP requests.
  */
-export class ServerResponse extends EventEmitter {
+class ServerResponse extends EventEmitter {
   #socket;
   #headers;
   #headersSent;
@@ -800,4 +942,20 @@ export function request(url, options = {}) {
     : request.send();
 }
 
-export default { METHODS, STATUS_CODES, request };
+/**
+ * Creates a new HTTP server.
+ *
+ * @param {Function} [onRequest]
+ * @returns Server
+ */
+export function createServer(onRequest) {
+  // Instantiate a new HTTP server.
+  const server = new Server();
+  if (onRequest) {
+    assert.isFunction(onRequest);
+    server.on('request', onRequest);
+  }
+  return server;
+}
+
+export default { METHODS, STATUS_CODES, Server, createServer, request };

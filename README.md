@@ -241,20 +241,21 @@ Body Mixins
 
 > http.Server is a class extending `EventEmitter` and implements `@@asyncIterator`.
 
-- [ ] `listen(port, host?)` - Starts the HTTP server listening for connections.
-- [ ] `close()` - Stops the server from accepting new connections.
-- [ ] `Event: 'request'` - Emitted each time there is a request.
-- [ ] `Event: 'close'` - Emitted when the server closes.
-- [ ] `Event: 'clientError'` - Emitted when a client connection emits an 'error' event.
+- [x] `listen(port, host?)`: Starts the HTTP server listening for connections.
+- [x] `close()`: Stops the server from accepting new connections.
+- [x] `accept()`: Waits for a client to connect and accepts the HTTP request.
+- [x] `Event: 'request'`: Emitted each time there is a request.
+- [x] `Event: 'close'`: Emitted when the server closes.
+- [x] `Event: 'clientError'`: Emitted when a client connection emits an 'error' event.
 
 #### `http.ServerRequest`
 
 > http.ServerRequest implements `@@asyncIterator`.
 
-- [x] `headers` - The request headers object.
-- [x] `httpVersion` - The HTTP version sent by the client.
-- [x] `method` - The request method as a string.
-- [x] `url` - Request URL string.
+- [x] `headers`: The request headers object.
+- [x] `httpVersion`: The HTTP version sent by the client.
+- [x] `method`: The request method as a string.
+- [x] `url`: Request URL string.
 - [x] `text()`: Produces a UTF-8 string representation of the body.
 - [x] `json()`: Formats the body using JSON parsing.
 
