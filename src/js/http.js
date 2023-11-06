@@ -7,6 +7,7 @@
 // https://undici.nodejs.org/#/
 
 import net from 'net';
+import { EventEmitter } from 'events';
 
 const binding = process.binding('http_parser');
 
@@ -118,6 +119,13 @@ function concatUint8Arrays(...arrays) {
     (acc, array) => new Uint8Array([...acc, ...array]),
     new Uint8Array(0)
   );
+}
+
+function toUint8Array(data, encoding) {
+  if (!(data instanceof Uint8Array)) {
+    return new TextEncoder(encoding).encode(data);
+  }
+  return data;
 }
 
 function isIterable(input) {
@@ -446,7 +454,7 @@ class Body {
 }
 
 /**
- * Represents a server-side request object for handling HTTP requests.
+ * A server-side request object for handling HTTP requests.
  */
 export class ServerRequest {
   #body;
@@ -482,6 +490,249 @@ export class ServerRequest {
    */
   async *[Symbol.asyncIterator](signal) {
     yield* this.#body[Symbol.asyncIterator](signal);
+  }
+}
+
+/**
+ * A server-side response object for handling HTTP requests.
+ */
+export class ServerResponse extends EventEmitter {
+  #socket;
+  #headers;
+  #headersSent;
+  #code;
+  #message;
+
+  constructor(socket, keepAlive) {
+    super();
+    this.#socket = socket;
+    this.#headersSent = false;
+    this.#code = 200;
+    this.#message = STATUS_CODES[this.#code];
+
+    // Set default headers.
+    this.#headers = new Map();
+    this.#headers.set('date', new Date());
+    this.#headers.set('connection', keepAlive ? 'keep-alive' : 'close');
+    this.#headers.set('transfer-encoding', 'chunked');
+  }
+
+  /**
+   * Writes a chunk of the response body.
+   *
+   * @param {String|Uint8Array} data
+   * @param {String} encoding
+   */
+  async write(data, encoding = 'utf-8') {
+    // Check the data argument type.
+    if (!(data instanceof Uint8Array) && typeof data !== 'string') {
+      throw new TypeError(
+        `The "data" argument must be of type string or Uint8Array.`
+      );
+    }
+
+    const chunkedEncoding = this.getHeader('content-length') === undefined;
+    const content = toUint8Array(data, encoding);
+
+    // Make sure headers are sent to the client.
+    if (!this.#headersSent) {
+      // Update headers on known content-type.
+      if (!chunkedEncoding) {
+        this.setHeader('content-length', content.length);
+        this.removeHeader('transfer-encoding');
+      }
+      await this.#sendHeaders();
+    }
+
+    // Chunkify the provided content.
+    if (chunkedEncoding) {
+      await this.#socket.write(`${content.length}\r\n`);
+      await this.#socket.write(content);
+      await this.#socket.write('\r\n');
+      return;
+    }
+
+    await this.#socket.write(content);
+  }
+
+  /**
+   * Signals that all of the response headers and body have been sent.
+   *
+   * @param {String|Uint8Array} data
+   * @param {String} encoding
+   */
+  async end(data, encoding = 'utf-8') {
+    // If data is given, write to stream.
+    if (data) {
+      const content = toUint8Array(data, encoding);
+      this.write(content);
+    }
+
+    // On chunked reponses send end-chunk.
+    if (this.getHeader('content-length') === undefined) {
+      await this.write(`0\r\n\r\n`);
+    }
+
+    this.emit('finish');
+  }
+
+  /**
+   * Sends a response header to the request.
+   *
+   * @param  {...any} args
+   */
+  async writeHead(...args) {
+    // Extract statusMessage and headers from variadic.
+    const [code, message, headers] = this.#parseWriteHeadArgs(...args);
+
+    // Check if statusCode has a valid type.
+    if (typeof code !== 'number') {
+      throw new TypeError('The "code" argument must be of type number.');
+    }
+
+    // Check for statusCode range validity.
+    if (STATUS_CODES[code] === undefined) {
+      throw new RangeError(`Inavalid HTTP status code: ${code}`);
+    }
+
+    if (typeof message !== 'string') {
+      throw new TypeError('The "message" argument must be of type string.');
+    }
+
+    this.#code = code;
+    this.#message = message;
+
+    // Override headers with user-defined ones.
+    for (const [name, value] of Object.entries(headers)) {
+      this.#headers.set(name.toLowerCase(), String(value));
+    }
+
+    await this.#sendHeaders();
+  }
+
+  #parseWriteHeadArgs(args) {
+    // Check if statusMessage was provided.
+    if (typeof args[1] === 'object') {
+      return [args[0], STATUS_CODES[args[0]], args[1]];
+    }
+
+    return [args[0], args[1], args[3] || {}];
+  }
+
+  /**
+   * Writes raw headers to the TCP stream.
+   */
+  async #sendHeaders() {
+    // Start building the HTTP message.
+    const resHeaders = [`HTTP/1.1 ${this.#code} ${this.#message}`];
+
+    // Content-Length and Transfer-Encoding are mutual exclusive HTTP headers.
+    if (this.hasHeader('content-length')) {
+      this.removeHeader('transfer-encoding');
+    }
+
+    // Format and append HTTP headers to message.
+    const headers = formatHeaders(this.#headers);
+    for (const [name, value] of Object.entries(headers)) {
+      resHeaders.push(`${name.trim()}: ${value}`);
+    }
+
+    const resHeadersString = resHeaders.join('\r\n');
+    const resHeadersBytes = encoder.encode(`${resHeadersString}\r\n\r\n`);
+
+    // Write headers to the socket.
+    await this.#socket.write(resHeadersBytes);
+    this.#headersSent = true;
+  }
+
+  /**
+   * Sets a single header value for implicit headers.
+   *
+   * @param {String} name
+   * @param {String} value
+   */
+  setHeader(name, value = '') {
+    // Check for correct types on provided params.
+    if (typeof name !== 'string') {
+      throw new TypeError('The "name" argument must be of type string.');
+    }
+
+    if (this.#headersSent) {
+      throw new Error('Cannot set headers after they are sent.');
+    }
+
+    this.#headers.set(name.toLowerCase(), String(value));
+  }
+
+  /**
+   * Reads out a header value from raw headers.
+   *
+   * @param {String} name
+   * @returns String
+   */
+  getHeader(name) {
+    // Check for correct types on provided params.
+    if (typeof name !== 'string') {
+      throw new TypeError('The "name" argument must be of type string.');
+    }
+
+    return this.#headers.get(name.toLowerCase());
+  }
+
+  /**
+   * Returns true if the header identified is currently set.
+   *
+   * @param {String} name
+   * @returns Boolean
+   */
+  hasHeader(name) {
+    // Check for correct types on provided params.
+    if (typeof name !== 'string') {
+      throw new TypeError('The "name" argument must be of type string.');
+    }
+
+    return this.#headers.has(name.toLowerCase());
+  }
+
+  /**
+   * Removes a header that's queued for implicit sending.
+   *
+   * @param {String} name
+   */
+  removeHeader(name) {
+    // Check for correct types on provided params.
+    if (typeof name !== 'string') {
+      throw new TypeError('The "name" argument must be of type string.');
+    }
+
+    if (this.#headersSent) {
+      throw new Error('Cannot remove headers after they are sent.');
+    }
+
+    this.#headers.delete(name.toLowerCase());
+  }
+
+  /**
+   * Returns a copy of the current outgoing headers.
+   *
+   * @returns Object
+   */
+  getHeaders() {
+    return Object.fromEntries(this.#headers);
+  }
+
+  /**
+   * True if headers were sent, false otherwise (read-only).
+   */
+  get headersSent() {
+    return this.#headersSent;
+  }
+
+  /**
+   * Reference to the underlying TCP socket.
+   */
+  get socket() {
+    return this.#socket;
   }
 }
 

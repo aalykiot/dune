@@ -209,6 +209,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `METHODS`: A list of the HTTP methods that are supported by the parser.
 - [x] `STATUS_CODES`: A collection of all the standard HTTP response status codes.
 - [x] `request(url, options?)`: Performs an HTTP request.
+- [ ] `createServer(requestListener?)`: Creates a new HTTP server.
 
 <details><summary>Details</summary>
 <p></p>
@@ -250,29 +251,29 @@ Body Mixins
 
 > http.ServerRequest implements `@@asyncIterator`.
 
-- [ ] `headers` - The request headers object.
-- [ ] `httpVersion` - The HTTP version sent by the client.
-- [ ] `method` - The request method as a string.
-- [ ] `url` - Request URL string.
-- [ ] `text()`: Produces a UTF-8 string representation of the body.
-- [ ] `json()`: Formats the body using JSON parsing.
+- [x] `headers` - The request headers object.
+- [x] `httpVersion` - The HTTP version sent by the client.
+- [x] `method` - The request method as a string.
+- [x] `url` - Request URL string.
+- [x] `text()`: Produces a UTF-8 string representation of the body.
+- [x] `json()`: Formats the body using JSON parsing.
 
 #### `http.ServerResponse`
 
 > http.ServerResponse implements `stream.Writable`.
 
-- [ ] `write(data)`: This sends a chunk of the response body.
-- [ ] `end(data?)`: Signals that all of the response headers and body have been sent.
-- [ ] `writeHead(code, message?, headers?)`: Sends a response header to the request.
-- [ ] `setHeader(name, value)`: Sets a single header value for implicit headers.
-- [ ] `getHeader(name)`: Reads out a header that's already been queued but not sent to the client.
-- [ ] `getHeaderNames()`: Returns an array containing the unique names of the current outgoing headers.
-- [ ] `getHeaders()`: Returns a copy of the current outgoing headers.
-- [ ] `hasHeader(name)`: Returns true if the header identified is currently set.
-- [ ] `removeHeader(name)`: Removes a header that's queued for implicit sending.
-- [ ] `headersSent`: Boolean (read-only). True if headers were sent, false otherwise.
-- [ ] `socket`: Reference to the underlying socket.
-- [ ] `Event: 'finish'`: Emitted when the (full) response has been sent.
+- [x] `write(data)`: This sends a chunk of the response body.
+- [x] `end(data?)`: Signals that all of the response headers and body have been sent.
+- [x] `writeHead(code, message?, headers?)`: Sends a response header to the request.
+- [x] `setHeader(name, value)`: Sets a single header value for implicit headers.
+- [x] `getHeader(name)`: Reads out a header that's already been queued but not sent to the client.
+- [x] `getHeaderNames()`: Returns an array containing the unique names of the current outgoing headers.
+- [x] `getHeaders()`: Returns a copy of the current outgoing headers.
+- [x] `hasHeader(name)`: Returns true if the header identified is currently set.
+- [x] `removeHeader(name)`: Removes a header that's queued for implicit sending.
+- [x] `headersSent`: Boolean (read-only). True if headers were sent, false otherwise.
+- [x] `socket`: Reference to the underlying socket.
+- [x] `Event: 'finish'`: Emitted when the (full) response has been sent.
 
 ### Stream
 
