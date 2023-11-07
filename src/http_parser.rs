@@ -72,8 +72,8 @@ fn parse_incoming_request(
         });
 
     // Get the position the HTTP body starts.
-    let body_at = status.unwrap();
-    let body_at = v8::Integer::new(scope, body_at as i32);
+    let marker = status.unwrap();
+    let marker = v8::Integer::new(scope, marker as i32);
 
     // Build the v8 result object.
     let target = v8::Object::new(scope);
@@ -82,7 +82,7 @@ fn parse_incoming_request(
     set_constant_to(scope, target, "path", path.into());
     set_constant_to(scope, target, "version", version.into());
     set_constant_to(scope, target, "headers", headers.into());
-    set_constant_to(scope, target, "bodyAt", body_at.into());
+    set_constant_to(scope, target, "marker", marker.into());
 
     rv.set(target.into());
 }
@@ -137,15 +137,15 @@ fn parse_incoming_response(
         });
 
     // Get the position the HTTP body starts.
-    let body_at = status.unwrap();
-    let body_at = v8::Integer::new(scope, body_at as i32);
+    let marker = status.unwrap();
+    let marker = v8::Integer::new(scope, marker as i32);
 
     // Build the v8 result object.
     let target = v8::Object::new(scope);
 
     set_constant_to(scope, target, "statusCode", status_code.into());
     set_constant_to(scope, target, "headers", headers.into());
-    set_constant_to(scope, target, "bodyAt", body_at.into());
+    set_constant_to(scope, target, "marker", marker.into());
 
     rv.set(target.into());
 }

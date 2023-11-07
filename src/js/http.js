@@ -248,11 +248,11 @@ class Request {
     this.#headers.set('content-length', this.#bodyLength);
 
     // Check if encoding should be chunked.
-    // Content-Length and Transfer-Encoding (chunked) are mutual exclusive HTTP headers.
     if (
       isIterable(this.#body) &&
       !(isString(this.#body) || isTypedArray(this.#body))
     ) {
+      // Content-Length and Transfer-Encoding are mutual exclusive HTTP headers.
       this.#isChunkedEncoding = true;
       this.#headers.set('transfer-encoding', 'chunked');
       this.#headers.delete('content-length');
@@ -288,12 +288,12 @@ class Request {
       this.#signal.addEventListener('abort', () => this.#socket.destroy());
     }
 
-    // Write body to the socket. (sized)
+    // Write body to the socket (sized).
     if (this.#body && !this.#isChunkedEncoding) {
       this.#socket.write(this.#body);
     }
 
-    // Write body to the socket. (chunked)
+    // Write body to the socket (chunked).
     if (this.#body && this.#isChunkedEncoding) {
       for await (const chunk of this.#body) {
         assertChunkType(chunk);
@@ -305,13 +305,14 @@ class Request {
       await this.#socket.write('0\r\n\r\n');
     }
 
-    const chunks = [];
     this.#socket.setTimeout(this.#timeout);
 
-    // Await and parse response from the server.
+    // Set up a buffer to hold the incoming data.
+    let buffer = new Uint8Array();
+
     for await (const data of wrapIterable(this.#socket)) {
-      chunks.push(data);
-      const buffer = concatUint8Arrays(...chunks);
+      // Concatenate existing buffer with new data.
+      buffer = concatUint8Arrays(buffer, data);
       const metadata = binding.parseResponse(buffer);
 
       // Response headers are still incomplete.
@@ -322,6 +323,9 @@ class Request {
         const message = STATUS_CODES[metadata.statusCode];
         throw new Error(`HTTP request failed with error: "${message}"`);
       }
+
+      // Remove headers data from buffer.
+      buffer = buffer.subarray(metadata.marker);
 
       return new IncomingResponse(metadata, buffer, this.#socket);
     }
@@ -366,13 +370,13 @@ class Body {
   #isComplete;
   #keepAlive;
 
-  constructor({ headers, bodyAt }, buffer, socket, keepAlive = true) {
-    this.#socket = socket;
-    this.#body = buffer.subarray(bodyAt);
+  constructor({ headers }, buffer, socket, keepAlive = true) {
+    this.#body = buffer;
     this.#bodyLength = Number.parseInt(headers['content-length']) || 0;
     this.#isChunked = headers['transfer-encoding']?.includes('chunked');
     this.#isComplete = this.#body?.length === this.#bodyLength;
     this.#keepAlive = keepAlive;
+    this.#socket = socket;
 
     if (this.#isComplete && !this.#isChunked && !keepAlive) {
       this.#socket.end();
@@ -513,17 +517,19 @@ export class Server extends EventEmitter {
     // Set-up client event dispatcher.
     socket.on('error', (err) => this.emit('clientError', err));
 
-    // Await and parse request from the client.
-    const chunks = [];
+    // Set up a buffer to hold the incoming data.
+    let buffer = new Uint8Array();
+
     for await (const data of socket) {
-      chunks.push(data);
-      const buffer = concatUint8Arrays(...chunks);
+      // Concatenate existing buffer with new data.
+      buffer = concatUint8Arrays(buffer, data);
       const metadata = binding.parseRequest(buffer);
 
       // Request headers are still incomplete.
       if (!metadata) continue;
 
       const keepAlive = metadata?.headers?.connection !== 'close';
+      buffer = buffer.subarray(metadata.marker);
 
       // Create the request and response streams.
       const request = new ServerRequest(metadata, buffer, socket);
@@ -542,14 +548,7 @@ export class Server extends EventEmitter {
       await new Promise((resolve) => response.once('finish', resolve));
 
       // Breaking from the loop will result to a socket shutdown.
-      if (!keepAlive) {
-        break;
-      }
-
-      // Note: Technically, this is not 100% accurate because the next request could begin
-      // within the last TCP packet of the current one. In reality, the likelihood
-      // of this occurrence is low, which is why we reset the buffer.
-      chunks.splice(0);
+      if (!keepAlive) break;
     }
   }
 
