@@ -16,7 +16,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     v8::Global::new(scope, target)
 }
 
-/// Parses an HTTP request received from a a client.
+/// Parses an HTTP request received from a client.
 fn parse_incoming_request(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
@@ -51,7 +51,7 @@ fn parse_incoming_request(
     let method = request.method.unwrap_or_default().to_ascii_uppercase();
     let method = v8::String::new(scope, &method).unwrap();
 
-    let path = request.path.unwrap_or_default();
+    let path = request.path.unwrap_or("/");
     let path = v8::String::new(scope, &path).unwrap();
 
     let version = request.version.unwrap_or_default();

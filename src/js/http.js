@@ -605,7 +605,7 @@ export class ServerRequest {
   constructor(metadata, buffer, socket) {
     this.httpVersion = `1.${metadata.version}`;
     this.method = metadata.method;
-    this.url = metadata.url || '/';
+    this.url = metadata.path;
     this.headers = metadata.headers;
     this.#body = new Body(metadata, buffer, socket);
   }
@@ -834,6 +834,15 @@ class ServerResponse extends EventEmitter {
     }
 
     return this.#headers.get(name.toLowerCase());
+  }
+
+  /**
+   * Returns an array containing the unique names of the current outgoing headers.
+   *
+   * @returns Array<String>
+   */
+  getHeaderNames() {
+    return Array.from(this.#headers.keys());
   }
 
   /**
