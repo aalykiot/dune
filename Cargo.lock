@@ -1972,9 +1972,9 @@ dependencies = [
 
 [[package]]
 name = "swc_bundler"
-version = "0.222.17"
+version = "0.222.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30d53f076e172c4d83bb408b56ba09b270bc067ecbbacbc8819fad2e3c969443"
+checksum = "4f7b79bb63d16771cff52cf4e7ed2284850c8b0d1c1051b73782e1a896549e4a"
 dependencies = [
  "anyhow",
  "crc",
@@ -2172,9 +2172,9 @@ dependencies = [
 
 [[package]]
 name = "swc_ecma_transforms_optimization"
-version = "0.195.11"
+version = "0.195.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f41ba9a60a15791db0f7d1311c8d02f443404f88de56456a92914425b96723c"
+checksum = "f759e9821398112e108b697cb2fc972e4452aa552eb752503cf0881b591c0ae4"
 dependencies = [
  "dashmap",
  "indexmap 1.9.3",
