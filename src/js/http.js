@@ -408,20 +408,6 @@ class Body {
     return JSON.parse(data);
   }
 
-  #parseAvailableChunks(data) {
-    // Mix current body with new data.
-    const buffer = concatUint8Arrays(this.#body, data);
-    const { chunks, position, done } = binding.parseChunks(buffer);
-
-    // Update body based on parser's cursor.
-    this.#body = buffer.subarray(position);
-
-    return {
-      chunks: chunks.map((v) => new Uint8Array(v)),
-      done,
-    };
-  }
-
   /**
    * The HTTP body should be async iterable.
    */
@@ -429,9 +415,10 @@ class Body {
     // Close socket on stream pipeline errors.
     if (signal) signal.on('uncaughtStreamException', () => this.#socket.end());
 
-    // Check if the full body has been received.
     if (this.#isComplete && !this.#isChunked) {
-      yield this.#body;
+      const remainingContent = this.#body.subarray(this.#bodyLength);
+      this.#body = this.#body.subarray(remainingContent.length);
+      yield remainingContent;
       return;
     }
 
@@ -439,33 +426,33 @@ class Body {
     // Node.js for example combines the first chunk with the HTTP headers when
     // sending responses with chunked encoding.
 
-    let bytesReceived = this.#body.length;
+    for await (const newData of wrapIterable(this.#socket)) {
+      // Mix current body with new data.
+      this.#body = concatUint8Arrays(this.#body, newData);
 
-    // Process incoming data from the TCP socket.
-    for await (const data of wrapIterable(this.#socket)) {
-      // HTTP body is received in chunks.
       if (this.#isChunked) {
-        const { chunks, done } = this.#parseAvailableChunks(data);
-        yield* chunks;
-        if (done) break;
-        continue;
-      }
-
-      // Note: The following code handles the case when the HTTP's body
-      // length is already known from the `Content-Length` header
-      // but, it comes to us in multiple TCP packets.
-      yield data;
-      bytesReceived += data.length;
-
-      if (bytesReceived === this.#bodyLength) {
-        break;
+        // Try extracting available chunks.
+        const result = binding.parseChunks(this.#body);
+        // No results means not enough bytes to extract the next chunk.
+        if (result) {
+          this.#body = this.#body.subarray(result.position);
+          yield* result.chunks;
+          if (result.done) break;
+        }
+      } else {
+        // Note: The following code handles the case when the HTTP's body
+        // length is already known from the `Content-Length` header
+        // but, it comes to us in multiple TCP packets.
+        if (this.#body.length >= this.#bodyLength) {
+          yield this.#body.subarray(0, this.#bodyLength);
+          this.#body = this.#body.subarray(this.#bodyLength);
+          break;
+        }
       }
     }
 
     // Close TCP socket on not keep-alive connections.
-    if (!this.#keepAlive) {
-      this.#socket.end();
-    }
+    if (!this.#keepAlive) this.#socket.end();
   }
 }
 
