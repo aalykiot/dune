@@ -61,8 +61,8 @@ impl TypeScript {
 
         let mut parser = Parser::new_from(lexer);
 
-        let module = match parser
-            .parse_module()
+        let program = match parser
+            .parse_program()
             .map_err(|e| e.into_diagnostic(&handler).emit())
         {
             Ok(module) => module,
@@ -74,7 +74,7 @@ impl TypeScript {
 
         GLOBALS.set(&globals, || {
             // Apply the rest SWC transforms to generated code.
-            let module = module
+            let program = program
                 .fold_with(&mut resolver(Mark::new(), Mark::new(), true))
                 .fold_with(&mut strip(Mark::new()))
                 .fold_with(&mut hygiene())
@@ -88,7 +88,7 @@ impl TypeScript {
                     wr: JsWriter::new(cm, "\n", &mut buffer, None),
                 };
 
-                emitter.emit_module(&module).unwrap();
+                emitter.emit_program(&program).unwrap();
             }
         });
 
