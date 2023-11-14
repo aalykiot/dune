@@ -44,6 +44,7 @@ lazy_static! {
             ("@web/abort", include_str!("./js/abort-controller.js")),
             ("@web/text_encoding", include_str!("./js/text-encoding.js")),
             ("@web/clone", include_str!("./js/structured-clone.js")),
+            ("@web/fetch", include_str!("./js/fetch.js")),
         ];
         HashMap::from_iter(modules.into_iter())
     };

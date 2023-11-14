@@ -1,4 +1,5 @@
 import timers from 'timers';
+import fetch from '@web/fetch';
 import structuredClone from '@web/clone';
 import { Console, prompt } from 'console';
 import { cloneFunction, parseEnvVariable } from 'util';
@@ -97,6 +98,7 @@ makeGlobal('TextDecoder', TextDecoder);
 makeGlobal('structuredClone', structuredClone);
 makeGlobal('AbortController', AbortController);
 makeGlobal('AbortSignal', AbortSignal);
+makeGlobal('fetch', fetch);
 
 /* Loading env variables from .env file automatically. */
 

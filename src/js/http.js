@@ -189,9 +189,6 @@ async function* wrapIterable(iterable) {
   }
 }
 
-const encoder = new TextEncoder('utf-8');
-const decoder = new TextDecoder('utf-8');
-
 const urlRegex = new RegExp('^(.*:)//([A-Za-z0-9-.]+)(:[0-9]+)?(.*)$');
 
 /**
@@ -268,6 +265,7 @@ class Request {
 
   async send() {
     // Start building the HTTP message.
+    const encoder = new TextEncoder();
     const reqHeaders = [`${this.#method} ${this.#path} HTTP/1.1`];
 
     // Format and append HTTP headers to message.
@@ -391,6 +389,7 @@ class Body {
    */
   async text() {
     const string = [];
+    const decoder = new TextDecoder();
     const asyncIterator = this[Symbol.asyncIterator]();
     for await (const chunk of asyncIterator) {
       string.push(decoder.decode(chunk));
@@ -794,6 +793,7 @@ class ServerResponse extends EventEmitter {
    */
   async #sendHeaders() {
     // Start building the HTTP message.
+    const encoder = new TextEncoder();
     const resHeaders = [
       `HTTP/1.${this.#version} ${this.#code} ${this.#message}`,
     ];

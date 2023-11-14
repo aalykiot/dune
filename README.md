@@ -104,7 +104,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `process`: An object that provides info about the current dune process.
 - [x] `structuredClone`: Creates a deep clone of a given value.
 - [x] `AbortController` / `AbortSignal`: Allows you to communicate with a request and abort it.
-- [ ] `fetch`: A wrapper around `http.request` (not compatible with WHATWG fetch).
+- [x] `fetch`: A wrapper around `http.request` (not compatible with WHATWG fetch).
 
 ### Module Metadata
 
@@ -268,7 +268,7 @@ Body Mixins
 - [x] `writeHead(code, message?, headers?)`: Sends the response headers to the client.
 - [x] `setHeader(name, value)`: Sets a single header value for implicit headers.
 - [x] `getHeader(name)`: Reads out a header that's already been queued but not sent to the client.
-- [ ] `getHeaderNames()`: Returns an array containing the unique names of the current outgoing headers.
+- [x] `getHeaderNames()`: Returns an array containing the unique names of the current outgoing headers.
 - [x] `getHeaders()`: Returns a copy of the current outgoing headers.
 - [x] `hasHeader(name)`: Returns true if the header identified is currently set.
 - [x] `removeHeader(name)`: Removes a header that's queued for implicit sending.
