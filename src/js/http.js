@@ -509,7 +509,16 @@ export class Server extends EventEmitter {
     for await (const data of socket) {
       // Concatenate existing buffer with new data.
       buffer = concatUint8Arrays(buffer, data);
-      const metadata = binding.parseRequest(buffer);
+
+      // Try parsing the HTTP headers.
+      let metadata;
+      try {
+        metadata = binding.parseRequest(buffer);
+      } catch (_) {
+        const message = 'HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n';
+        await socket.write(message);
+        break;
+      }
 
       // Request headers are still incomplete.
       if (!metadata) continue;
