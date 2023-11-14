@@ -104,7 +104,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `process`: An object that provides info about the current dune process.
 - [x] `structuredClone`: Creates a deep clone of a given value.
 - [x] `AbortController` / `AbortSignal`: Allows you to communicate with a request and abort it.
-- [x] `fetch`: A wrapper around `http.request` (not compatible with WHATWG fetch).
+- [x] `fetch`: A wrapper around `http.request` (not fully compatible with WHATWG fetch).
 
 ### Module Metadata
 
