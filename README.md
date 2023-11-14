@@ -54,9 +54,9 @@ const server = net.createServer(async (socket) => {
   await socket.destroy();
 });
 
-console.log('Server is listening on port 3000...');
-
 await server.listen(3000, '127.0.0.1');
+
+console.log('Server is listening on port 3000...');
 ```
 
 JSX/TSX files are also supported for server side rendering.
@@ -104,6 +104,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `process`: An object that provides info about the current dune process.
 - [x] `structuredClone`: Creates a deep clone of a given value.
 - [x] `AbortController` / `AbortSignal`: Allows you to communicate with a request and abort it.
+- [x] `fetch`: A wrapper around `http.request` (not fully compatible with WHATWG fetch).
 
 ### Module Metadata
 
@@ -117,7 +118,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `cwd()`: Current working directory.
 - [x] `env`: An object containing the user environment.
 - [x] `exit(code?)`: Exits the program with the given code.
-- [ ] `getActiveResourcesInfo()`: An array of strings containing the types of the active resources that are currently keeping the event loop alive.
+- [ ] `getActiveResourcesInfo()`: An array of strings containing the types of the active resources that are currently keeping the event loop alive. 🚧
 - [x] `memoryUsage()`: An object describing the memory usage.
 - [x] `nextTick(cb, ...args?)`: Adds callback to the "next tick queue".
 - [x] `pid`: PID of the process.
@@ -161,13 +162,13 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 ### Net
 
-- [x] `createServer(connectionListener?)`: Creates a new TCP server.
+- [x] `createServer(connectionHandler?)`: Creates a new TCP server.
 - [x] `createConnection(options)`: Creates unix socket connection to a remote host.
 - [x] `TimeoutError`: Custom error signalling a socket (read) timeout.
 
-### Net.Server
+#### `net.Server`
 
-> Net.Server is a class extending `EventEmitter` and implements `@@asyncIterator`.
+> net.Server is a class extending `EventEmitter` and implements `@@asyncIterator`.
 
 - [x] `listen(port, host?)`: Begin accepting connections on the specified port and host.
 - [x] `accept()`: Waits for a TCP client to connect and accepts the connection.
@@ -178,9 +179,9 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `Event: 'close'`: Emitted when the server stops accepting new connections.
 - [x] `Event: 'error'`: Emitted when an error occurs.
 
-### Net.Socket
+#### `net.Socket`
 
-> Net.Socket is a class extending `EventEmitter` and implements `@@asyncIterator`.
+> net.Socket is a class extending `EventEmitter` and implements `@@asyncIterator`.
 
 - [x] `connect(options)`: Opens the connection for a given socket.
 - [x] `setEncoding(encoding)`: Sets the encoding for the socket.
@@ -208,6 +209,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `METHODS`: A list of the HTTP methods that are supported by the parser.
 - [x] `STATUS_CODES`: A collection of all the standard HTTP response status codes.
 - [x] `request(url, options?)`: Performs an HTTP request.
+- [x] `createServer(requestHandler?)`: Creates a new HTTP server.
 
 <details><summary>Details</summary>
 <p></p>
@@ -234,6 +236,45 @@ Body Mixins
 - [x] `text()`: Produces a UTF-8 string representation of the body.
 - [x] `json()`: Formats the body using JSON parsing.
 </details>
+
+#### `http.Server`
+
+> http.Server is a class extending `EventEmitter` and implements `@@asyncIterator`.
+
+- [x] `listen(port, host?)`: Starts the HTTP server listening for connections.
+- [x] `close()`: Stops the server from accepting new connections.
+- [x] `accept()`: Waits for a client to connect and accepts the HTTP request.
+- [x] `Event: 'request'`: Emitted each time there is a request.
+- [x] `Event: 'close'`: Emitted when the server closes.
+- [x] `Event: 'clientError'`: Emitted when a client connection emits an 'error' event.
+
+#### `http.ServerRequest`
+
+> http.ServerRequest implements `@@asyncIterator`.
+
+- [x] `headers`: The request headers object.
+- [x] `httpVersion`: The HTTP version sent by the client.
+- [x] `method`: The request method as a string.
+- [x] `url`: Request URL string.
+- [x] `text()`: Produces a UTF-8 string representation of the body.
+- [x] `json()`: Formats the body using JSON parsing.
+
+#### `http.ServerResponse`
+
+> http.ServerResponse implements `stream.Writable`.
+
+- [x] `write(data)`: This sends a chunk of the response body.
+- [x] `end(data?)`: Signals that all of the response headers and body have been sent.
+- [x] `writeHead(code, message?, headers?)`: Sends the response headers to the client.
+- [x] `setHeader(name, value)`: Sets a single header value for implicit headers.
+- [x] `getHeader(name)`: Reads out a header that's already been queued but not sent to the client.
+- [x] `getHeaderNames()`: Returns an array containing the unique names of the current outgoing headers.
+- [x] `getHeaders()`: Returns a copy of the current outgoing headers.
+- [x] `hasHeader(name)`: Returns true if the header identified is currently set.
+- [x] `removeHeader(name)`: Removes a header that's queued for implicit sending.
+- [x] `headersSent`: Boolean (read-only). True if headers were sent, false otherwise.
+- [x] `socket`: Reference to the underlying socket.
+- [x] `Event: 'finish'`: Emitted when the (full) response has been sent.
 
 ### Stream
 
