@@ -70,6 +70,7 @@ class Response {
       const chunk = new Uint8Array(data);
       chunks.push(chunk);
     }
+    this.#bodyUsed = true;
     const content = concatUint8Arrays(...chunks);
     return content.buffer;
   }
