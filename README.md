@@ -54,9 +54,9 @@ const server = net.createServer(async (socket) => {
   await socket.destroy();
 });
 
-console.log('Server is listening on port 3000...');
-
 await server.listen(3000, '127.0.0.1');
+
+console.log('Server is listening on port 3000...');
 ```
 
 JSX/TSX files are also supported for server side rendering.

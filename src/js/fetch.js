@@ -7,7 +7,7 @@
 
 import http from 'http';
 
-// Utility function that combibes uint8arrays.
+// Utility function that combines uint8arrays.
 function concatUint8Arrays(...arrays) {
   return arrays.reduce(
     (acc, array) => new Uint8Array([...acc, ...array]),
