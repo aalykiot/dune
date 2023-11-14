@@ -515,12 +515,11 @@ export class Server extends EventEmitter {
       // Request headers are still incomplete.
       if (!metadata) continue;
 
-      const keepAlive = metadata?.headers?.connection !== 'close';
       buffer = buffer.subarray(metadata.marker);
 
       // Create the request and response streams.
       const request = new ServerRequest(metadata, buffer, socket);
-      const response = new ServerResponse(socket, keepAlive);
+      const response = new ServerResponse(metadata, socket);
 
       // Check if a request handler is specified; if so, emit the 'request' event.
       const hasRequestHandler = this.listenerCount('request') > 0;
@@ -534,8 +533,8 @@ export class Server extends EventEmitter {
       // request-response cycle is complete.
       await new Promise((resolve) => response.once('finish', resolve));
 
-      // Breaking from the loop will result to a socket shutdown.
-      if (!keepAlive) break;
+      // Connection should close based on headers.
+      if (response.getHeader('connection') === 'close') break;
     }
   }
 
@@ -632,14 +631,18 @@ class ServerResponse extends EventEmitter {
   #code;
   #message;
   #writtenOnce;
+  #version;
 
-  constructor(socket, keepAlive) {
+  constructor({ version, headers }, socket) {
     super();
     this.#socket = socket;
     this.#headersSent = false;
     this.#code = 200;
     this.#message = STATUS_CODES[this.#code];
     this.#writtenOnce = false;
+    this.#version = version;
+
+    const keepAlive = headers?.connection !== 'close';
 
     // Set default headers.
     this.#headers = new Map();
@@ -663,22 +666,18 @@ class ServerResponse extends EventEmitter {
     }
 
     const content = toUint8Array(data, encoding);
-    const contentLength = content.length.toString(16);
-
-    const chunkedEncoding = !this.hasHeader('content-length');
 
     // Make sure headers are sent to client.
     if (!this.#headersSent) {
-      if (!chunkedEncoding) {
-        this.setHeader('content-length', content.length);
-        this.removeHeader('transfer-encoding');
-      }
       await this.#sendHeaders();
     }
 
+    const chunkLength = content.length.toString(16);
+    const chunkedEncoding = this.hasHeader('transfer-encoding');
+
     // Chunkify the provided content.
     if (chunkedEncoding) {
-      await this.#socket.write(`${contentLength}\r\n`);
+      await this.#socket.write(`${chunkLength}\r\n`);
       await this.#socket.write(content);
       await this.#socket.write('\r\n');
       this.#writtenOnce = true;
@@ -699,10 +698,11 @@ class ServerResponse extends EventEmitter {
     // If data is given, write to stream.
     if (data) {
       const content = toUint8Array(data, encoding);
-      // Check if we can define the content-length of the response.
-      if (!this.#writtenOnce && !this.headersSent) {
+      const shouldSetLength = !this.#writtenOnce && !this.#headersSent;
+      // Note: If the `.end` is called without any `.write` we can
+      // set the content-length of the response.
+      if (shouldSetLength) {
         this.setHeader('content-length', content.length);
-        this.removeHeader('transfer-encoding');
       }
       await this.write(content);
     }
@@ -721,6 +721,11 @@ class ServerResponse extends EventEmitter {
    * @param  {...any} args
    */
   async writeHead(...args) {
+    // Do not send headers multiple times.
+    if (this.#headersSent) {
+      throw new Error('Cannot set headers after they are sent.');
+    }
+
     // Parse variadic arguments.
     const [code, message, headers] = this.#parseWriteHeadArgs(args);
 
@@ -757,11 +762,31 @@ class ServerResponse extends EventEmitter {
    * Checks for HTTP header violations, mutual exclusions, etc.
    */
   #checkHeaders() {
-    // Content-Length and Transfer-Encoding are mutual exclusive HTTP headers.
-    if (this.hasHeader('content-length')) {
+    // HTTP 1.0 doesn't support other encoding.
+    if (this.#version === 0) {
+      this.removeHeader('transfer-encoding');
+      this.removeHeader('content-length');
+      this.setHeader('connection', 'close');
+    }
+
+    // Per section 3.3.1 of RFC7230:
+    // A server MUST NOT send a Transfer-Encoding header field in any response
+    // with a status code of 1xx (Informational) or 204 (No Content).
+    if (this.#code < 200 || this.#code === 204) {
       this.removeHeader('transfer-encoding');
     }
-    // TODO: Include more HTTP headers rules...
+
+    // Content-Length and Transfer-Encoding are mutual exclusive HTTP headers.
+    let hasLength = this.hasHeader('content-length');
+    let hasEncoding = this.hasHeader('transfer-encoding') && !hasLength;
+
+    if (hasLength) {
+      this.removeHeader('transfer-encoding');
+    }
+
+    if (hasEncoding) {
+      this.removeHeader('content-length');
+    }
   }
 
   /**
@@ -769,7 +794,9 @@ class ServerResponse extends EventEmitter {
    */
   async #sendHeaders() {
     // Start building the HTTP message.
-    const resHeaders = [`HTTP/1.1 ${this.#code} ${this.#message}`];
+    const resHeaders = [
+      `HTTP/1.${this.#version} ${this.#code} ${this.#message}`,
+    ];
 
     // Check for HTTP header rule violations.
     this.#checkHeaders();
