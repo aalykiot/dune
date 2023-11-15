@@ -100,12 +100,14 @@ makeGlobal('AbortController', AbortController);
 makeGlobal('AbortSignal', AbortSignal);
 makeGlobal('fetch', fetch);
 
-/* Loading env variables from .env file automatically. */
+/**
+ * Loading env variables from .env file automatically.
+ */
 
-const DOTENV_FILE = process.cwd() + '/.env';
+const DOTENV_FILE = process.env.DOTENV_FILE;
 const DOTENV_COMMENTS = /(?<=^([^"']|"[^"']*")*)#.*/g;
 
-try {
+if (DOTENV_FILE) {
   const dotenvContent = readFileSync(DOTENV_FILE, 'utf-8');
   const dotenv = dotenvContent
     .split('\n')
@@ -116,6 +118,4 @@ try {
     const [key, value] = env.split('=');
     process.env[key.trim()] = parseEnvVariable(value);
   });
-} catch (_) {
-  // We don't care about handling this error.
 }
