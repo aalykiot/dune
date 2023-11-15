@@ -17,7 +17,7 @@ const pipeStream = (iterator, stream, signal) => async () => {
 
   // Consume the async iterator.
   for await (const chunk of iterator) {
-    stream.write(chunk);
+    await stream.write(chunk);
   }
   stream.end();
 };

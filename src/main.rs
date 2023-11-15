@@ -46,6 +46,18 @@ fn load_import_map(filename: Option<String>) -> Option<ImportMap> {
     }
 }
 
+fn load_env_file(filepath: Option<String>) {
+    if let Some(path) = filepath {
+        match fs::canonicalize(path) {
+            Ok(path) => env::set_var("DOTENV_FILE", path.to_string_lossy().as_ref()),
+            Err(e) => {
+                eprintln!("{}: {}", "Error".red().bold(), e);
+                std::process::exit(1);
+            }
+        };
+    }
+}
+
 fn run_command(mut args: ArgMatches) {
     // Extract options from cli arguments.
     let script = args.remove_one::<String>("SCRIPT").unwrap();
@@ -61,6 +73,10 @@ fn run_command(mut args: ArgMatches) {
         .map(|val| val.parse::<usize>().unwrap_or_default());
 
     let import_map = load_import_map(import_map);
+
+    // Load custom .env files.
+    let env_file = args.remove_one::<String>("env-file");
+    load_env_file(env_file);
 
     // NOTE: The following code tries to resolve the given filename
     // to an absolute path. If the first time fails we will append `./` to
@@ -112,6 +128,10 @@ fn test_command(mut args: ArgMatches) {
             std::process::exit(1);
         }
     };
+
+    // Load custom .env files.
+    let env_file = args.remove_one::<String>("env-file");
+    load_env_file(env_file);
 
     // Extract options from cli arguments.
     let fail_fast = args.remove_one::<bool>("fail-fast").unwrap_or_default();
@@ -307,7 +327,8 @@ fn main() {
                 .arg(arg!(<SCRIPT> "The script that will run").required(true))
                 .arg(arg!(-r --reload "Reload every URL import (cache is ignored)"))
                 .arg(arg!(--seed <NUMBER> "Make the Math.random() method predictable"))
-                .arg(arg!(--"import-map" <FILE> "Load import map file from local file"))
+                .arg(arg!(--"env-file" <FILE> "Load configuration from local file"))
+                .arg(arg!(--"import-map" <FILE> "Load import map from local file"))
                 .arg(arg!(--"threadpool-size" <NUMBER> "Set the number of threads used for I/O"))
                 .arg(arg!(--watch <FILES>... "Watch for file changes and restart process automatically")
                 .num_args(0..)),
@@ -338,7 +359,8 @@ fn main() {
                 .arg(arg!(--filter <FILTER> "Run tests with this regex pattern in test description"))
                 .arg(arg!(-r --reload "Reload every URL import (cache is ignored)"))
                 .arg(arg!(--seed <NUMBER> "Make the Math.random() method predictable"))
-                .arg(arg!(--"import-map" <FILE> "Load import map file from local file"))
+                .arg(arg!(--"env-file" <FILE> "Load configuration from local file"))
+                .arg(arg!(--"import-map" <FILE> "Load import map from local file"))
                 .arg(arg!(--"threadpool-size" <NUMBER> "Set the number of threads used for I/O"))
         )
         .subcommand(Command::new("upgrade").about("Upgrade to the latest dune version"))
