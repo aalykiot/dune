@@ -1,5 +1,6 @@
 mod bindings;
 mod dns;
+mod dotenv;
 mod errors;
 mod event_loop;
 mod file;
@@ -46,18 +47,6 @@ fn load_import_map(filename: Option<String>) -> Option<ImportMap> {
     }
 }
 
-fn load_env_file(filepath: Option<String>) {
-    if let Some(path) = filepath {
-        match fs::canonicalize(path) {
-            Ok(path) => env::set_var("DOTENV_FILE", path.to_string_lossy().as_ref()),
-            Err(e) => {
-                eprintln!("{}: {}", "Error".red().bold(), e);
-                std::process::exit(1);
-            }
-        };
-    }
-}
-
 fn run_command(mut args: ArgMatches) {
     // Extract options from cli arguments.
     let script = args.remove_one::<String>("SCRIPT").unwrap();
@@ -74,9 +63,14 @@ fn run_command(mut args: ArgMatches) {
 
     let import_map = load_import_map(import_map);
 
-    // Load custom .env files.
-    let env_file = args.remove_one::<String>("env-file");
-    load_env_file(env_file);
+    // Load custom .env file if specified.
+    if let Some(path) = args.remove_one::<String>("env-file") {
+        // Try to parse the .env file.
+        if let Err(e) = dotenv::load_env_file(path) {
+            eprintln!("{}: {}", "Error".red().bold(), e);
+            std::process::exit(1);
+        }
+    }
 
     // NOTE: The following code tries to resolve the given filename
     // to an absolute path. If the first time fails we will append `./` to
@@ -129,9 +123,14 @@ fn test_command(mut args: ArgMatches) {
         }
     };
 
-    // Load custom .env files.
-    let env_file = args.remove_one::<String>("env-file");
-    load_env_file(env_file);
+    // Load custom .env file if specified.
+    if let Some(path) = args.remove_one::<String>("env-file") {
+        // Try to parse the .env file.
+        if let Err(e) = dotenv::load_env_file(path) {
+            eprintln!("{}: {}", "Error".red().bold(), e);
+            std::process::exit(1);
+        }
+    }
 
     // Extract options from cli arguments.
     let fail_fast = args.remove_one::<bool>("fail-fast").unwrap_or_default();
