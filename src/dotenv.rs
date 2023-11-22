@@ -1,8 +1,15 @@
-// The .env files are parsed based on the file format defined here:
+// Dotenv File Format
+//
+// The parsing of the .env files is conducted in accordance with the
+// specified file format outlined in the following document.
+//
 // https://hexdocs.pm/dotenvy/dotenv-file-format.html
 
+use anyhow::bail;
+use anyhow::Error as E;
 use anyhow::Result;
 use lazy_static::lazy_static;
+use path_absolutize::*;
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
@@ -25,12 +32,21 @@ enum Env {
 
 /// Populates system variables with custom ones.
 pub fn load_env_file<P: AsRef<Path>>(path: P) -> Result<()> {
-    // Get .env content from the disk and parse it.
-    let source = fs::read_to_string(path)?;
-    for (key, value) in parse_dotenv(&source)? {
-        env::set_var(key, value);
-    }
-    Ok(())
+    // Get .env content from the disk.
+    let path = path.as_ref().absolutize()?;
+    let source = match fs::read_to_string(&path) {
+        Ok(source) => source,
+        Err(_) => bail!("File not found \"{}\"", path.display()),
+    };
+    // Use custom parser for dotenv files.
+    parse_dotenv(&source)
+        .map_err(|e| E::msg(format!("Couldn't parse environment variables:\n{:?}", e)))
+        .and_then(|variables| {
+            for (key, value) in variables {
+                env::set_var(key, value);
+            }
+            Ok(())
+        })
 }
 
 /// Parse the .env file source.
