@@ -93,10 +93,10 @@ fn parse_value(pair: Pair<Rule>) -> Env {
 
     // Handle each type the correct way.
     match inner.as_rule() {
-        Rule::quote => Env::Populate(trim(value, 1, 1)),
-        Rule::literal => Env::Ready(trim(value, 1, 1)),
-        Rule::multi_quote => Env::Populate(trim(value, 3, 3)),
-        Rule::multi_literal => Env::Ready(trim(value, 3, 3)),
+        Rule::quote => Env::Populate(substring(value, 1, 1)),
+        Rule::literal => Env::Ready(substring(value, 1, 1)),
+        Rule::multi_quote => Env::Populate(substring(value, 3, 3).trim().into()),
+        Rule::multi_literal => Env::Ready(substring(value, 3, 3).trim().into()),
         Rule::chars => Env::Populate(value.into()),
         _ => unreachable!(),
     }
@@ -116,10 +116,11 @@ fn populate(value: &str, vars: &HashMap<String, String>) -> String {
         .find_iter(value)
         .fold(value.to_owned(), |result, variable| {
             // Extract the key and perform a search in envs table.
-            let key = trim(variable.as_str(), 2, 1);
-            let replacement = SYS_VARIABLES
+            let key = substring(variable.as_str(), 2, 1);
+            let system = SYS_VARIABLES.iter();
+            let replacement = vars
                 .iter()
-                .chain(vars.iter())
+                .chain(system)
                 .find(|(k, _)| k == &&key)
                 .map(|(_, v)| v.to_owned())
                 .unwrap_or_default();
@@ -130,8 +131,94 @@ fn populate(value: &str, vars: &HashMap<String, String>) -> String {
 }
 
 /// Trims n chars from the start and m chars from the end of the string.
-fn trim(value: &'_ str, n: usize, m: usize) -> String {
+fn substring(value: &'_ str, n: usize, m: usize) -> String {
     let value = String::from(value);
     let value = &value[n..(value.len() - m)];
     value.into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_dotenv;
+    use std::collections::HashMap;
+
+    #[test]
+    fn empty() {
+        assert_eq!(parse_dotenv("").unwrap(), HashMap::new())
+    }
+
+    #[test]
+    fn single_variable() {
+        let chars = parse_dotenv("FOO=BAR").unwrap();
+        let quotes = parse_dotenv("FOO=\"BAR\"").unwrap();
+        let literal = parse_dotenv("FOO='BAR'").unwrap();
+        let expected = HashMap::from_iter(vec![("FOO".into(), "BAR".into())]);
+        assert_eq!(chars, expected);
+        assert_eq!(quotes, expected);
+        assert_eq!(literal, expected);
+    }
+
+    #[test]
+    fn single_variable_with_export() {
+        let variables = parse_dotenv("export FOO = BAR").unwrap();
+        let expected = HashMap::from_iter(vec![("FOO".into(), "BAR".into())]);
+        assert_eq!(variables, expected);
+    }
+
+    #[test]
+    fn variable_interpolation() {
+        let source = r#"
+            USER=admin
+            EMAIL=${USER}@example.org
+        "#;
+        let expected = HashMap::from_iter(vec![
+            ("USER".into(), "admin".into()),
+            ("EMAIL".into(), "admin@example.org".into()),
+        ]);
+        assert_eq!(parse_dotenv(&source).unwrap(), expected);
+    }
+
+    #[test]
+    fn multi_line_quote() {
+        let source = r#"
+            MESSAGE_TEMPLATE="""
+                Hello,
+                Nice to meet you!
+            """
+        "#;
+        let expected = HashMap::from_iter(vec![(
+            "MESSAGE_TEMPLATE".into(),
+            "Hello,\n                Nice to meet you!".into(),
+        )]);
+        assert_eq!(parse_dotenv(&source).unwrap(), expected);
+    }
+
+    #[test]
+    fn multi_line_literal() {
+        let source = r#"
+            MESSAGE_TEMPLATE='''
+                Hello,
+                Nice to meet you!
+            '''
+        "#;
+        let expected = HashMap::from_iter(vec![(
+            "MESSAGE_TEMPLATE".into(),
+            "Hello,\n                Nice to meet you!".into(),
+        )]);
+        assert_eq!(parse_dotenv(&source).unwrap(), expected);
+    }
+
+    #[test]
+    fn comments() {
+        let source = r#"
+            # This is a comment
+            SECRET_KEY=YOURSECRETKEYGOESHERE # also a comment
+            SECRET_HASH="--#-this-is-not-a-comment"
+        "#;
+        let expected = HashMap::from_iter(vec![
+            ("SECRET_KEY".into(), "YOURSECRETKEYGOESHERE".into()),
+            ("SECRET_HASH".into(), "--#-this-is-not-a-comment".into()),
+        ]);
+        assert_eq!(parse_dotenv(&source).unwrap(), expected);
+    }
 }
