@@ -6,7 +6,6 @@
 // https://hexdocs.pm/dotenvy/dotenv-file-format.html
 
 use anyhow::bail;
-use anyhow::Error as E;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use path_absolutize::*;
@@ -30,23 +29,24 @@ enum Env {
     Populate(String),
 }
 
-/// Populates system variables with custom ones.
 pub fn load_env_file<P: AsRef<Path>>(path: P) -> Result<()> {
-    // Get .env content from the disk.
+    // Load the file that contains the environment variables.
     let path = path.as_ref().absolutize()?;
     let source = match fs::read_to_string(&path) {
         Ok(source) => source,
         Err(_) => bail!("File not found \"{}\"", path.display()),
     };
     // Use custom parser for dotenv files.
-    parse_dotenv(&source)
-        .map_err(|e| E::msg(format!("Couldn't parse environment variables:\n{:?}", e)))
-        .and_then(|variables| {
-            for (key, value) in variables {
-                env::set_var(key, value);
-            }
-            Ok(())
-        })
+    let env_variables = match parse_dotenv(&source) {
+        Ok(variables) => variables,
+        Err(e) => bail!("Couldn't parse environment variables:\n{:?}", e),
+    };
+    // Populate current process' env variables.
+    for (key, value) in env_variables {
+        env::set_var(key, value);
+    }
+
+    Ok(())
 }
 
 /// Parse the .env file source.
