@@ -19,6 +19,7 @@ use crate::modules::ImportMap;
 use crate::modules::ModuleGraph;
 use crate::modules::ModuleMap;
 use crate::modules::ModuleStatus;
+use crate::process;
 use anyhow::bail;
 use anyhow::Error;
 use anyhow::Ok;
@@ -214,6 +215,9 @@ impl JsRuntime {
             eprintln!("{exception:?}");
             std::process::exit(1);
         }
+
+        // Initialize process static values.
+        process::refresh(tc_scope);
     }
 
     /// Executes traditional JavaScript code (traditional = not ES modules).

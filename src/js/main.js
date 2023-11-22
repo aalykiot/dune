@@ -2,10 +2,9 @@ import timers from 'timers';
 import fetch from '@web/fetch';
 import structuredClone from '@web/clone';
 import { Console, prompt } from 'console';
-import { cloneFunction, parseEnvVariable } from 'util';
+import { cloneFunction } from 'util';
 import { TextEncoder, TextDecoder } from '@web/text_encoding';
 import { AbortController, AbortSignal } from '@web/abort';
-import { readFileSync } from 'fs';
 
 globalThis.global = globalThis;
 
@@ -99,23 +98,3 @@ makeGlobal('structuredClone', structuredClone);
 makeGlobal('AbortController', AbortController);
 makeGlobal('AbortSignal', AbortSignal);
 makeGlobal('fetch', fetch);
-
-/**
- * Loading env variables from .env file automatically.
- */
-
-const DOTENV_FILE = process.env.DOTENV_FILE;
-const DOTENV_COMMENTS = /(?<=^([^"']|"[^"']*")*)#.*/g;
-
-if (DOTENV_FILE) {
-  const dotenvContent = readFileSync(DOTENV_FILE, 'utf-8');
-  const dotenv = dotenvContent
-    .split('\n')
-    .map((env) => env.replace(DOTENV_COMMENTS, '').trim())
-    .filter((env) => env !== '');
-
-  dotenv.forEach((env) => {
-    const [key, value] = env.split('=');
-    process.env[key.trim()] = parseEnvVariable(value);
-  });
-}

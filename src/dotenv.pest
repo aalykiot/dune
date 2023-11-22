@@ -1,0 +1,12 @@
+WHITESPACE    = _{ " " | "\t" }
+COMMENT       = _{ "#" ~ (!NEWLINE ~ ANY)* }
+export        = _{ "export" }
+chars         =  { (!(NEWLINE | "#") ~ ANY)* }
+literal       = @{ "'" ~ (!("'" | NEWLINE) ~ ANY)* ~ "'" }
+quote         = @{ "\"" ~ (!("\"" | NEWLINE) ~ ANY)* ~ "\"" }
+multi_quote   = @{ "\""{3} ~ (!"\""{3} ~ ANY)* ~ "\""{3} }
+multi_literal = @{ "'"{3} ~ (!"'"{3} ~ ANY)* ~ "'"{3} }
+key           = @{ ("_" | ASCII_ALPHA) ~ (ASCII_ALPHANUMERIC | "_")* }
+value         =  { multi_literal | multi_quote | literal | quote | chars }
+variable      =  { export? ~ key ~ "=" ~ value }
+dotenv        =  { SOI ~ NEWLINE* ~ (variable ~ NEWLINE*)* ~ EOI }

@@ -31,6 +31,39 @@ pub fn initialize<'s>(
     // This represents the global `process` object.
     let process = create_object_under(scope, global, "process");
 
+    // `process.cwd()` - current working directory.
+    set_function_to(scope, process, "cwd", cwd);
+
+    // `process.exit([code])` - exits the program with the given code.
+    set_function_to(scope, process, "exit", exit);
+
+    // `process.memoryUsage()` - an object describing the memory usage.
+    set_function_to(scope, process, "memoryUsage", memory_usage);
+
+    // `process.nextTick()` - adds callback to the "next tick queue".
+    set_function_to(scope, process, "nextTick", next_tick);
+
+    // `process.uptime()` - a number describing the amount of time (in seconds) the process is running.
+    set_function_to(scope, process, "uptime", uptime);
+
+    // `process.kill()` - sends the signal to the process identified by pid.
+    set_function_to(scope, process, "kill", kill);
+
+    // `process.binding()` - exposes native modules to JavaScript.
+    set_function_to(scope, process, "binding", bind);
+
+    process
+}
+
+/// Refreshes the static values of the process object.
+pub fn refresh(scope: &mut v8::HandleScope) {
+    // Get access to the process object.
+    let context = scope.get_current_context();
+    let global = context.global(scope);
+    let key = v8::String::new(scope, "process").unwrap();
+    let process = global.get(scope, key.into()).unwrap();
+    let process = v8::Local::<v8::Object>::try_from(process).unwrap();
+
     // `process.argv` - an array containing the command-line arguments passed
     //  when the dune process was launched.
     let arguments: Vec<String> = env::args().collect();
@@ -39,14 +72,10 @@ pub fn initialize<'s>(
     arguments.iter().enumerate().for_each(|(i, arg)| {
         let index = i as u32;
         let value = v8::String::new(scope, arg.as_str()).unwrap();
-
         argv.set_index(scope, index, value.into()).unwrap();
     });
 
     set_property_to(scope, process, "argv", argv.into());
-
-    // `process.cwd()` - current working directory.
-    set_function_to(scope, process, "cwd", cwd);
 
     // `process.env` - an object containing the user environment.
     let environment: Vec<(String, String)> = env::vars().collect();
@@ -59,25 +88,15 @@ pub fn initialize<'s>(
 
     set_property_to(scope, process, "env", env.into());
 
-    // `process.exit([code])` - exits the program with the given code.
-    set_function_to(scope, process, "exit", exit);
-
-    // `process.memoryUsage()` - an object describing the memory usage.
-    set_function_to(scope, process, "memoryUsage", memory_usage);
-
-    // `process.nextTick()` - adds callback to the "next tick queue".
-    set_function_to(scope, process, "nextTick", next_tick);
-
     // `process.pid` - PID of the current process.
     let id = v8::Number::new(scope, std::process::id() as f64);
+
     set_property_to(scope, process, "pid", id.into());
 
     // `process.platform` - a string identifying the operating system platform.
     let platform = v8::String::new(scope, env::consts::OS).unwrap();
-    set_property_to(scope, process, "platform", platform.into());
 
-    // `process.uptime()` - a number describing the amount of time (in seconds) the process is running.
-    set_function_to(scope, process, "uptime", uptime);
+    set_property_to(scope, process, "platform", platform.into());
 
     // `process.version` - the dune version.
     let version = format!("v{}", VERSIONS.get("dune").unwrap());
@@ -94,14 +113,6 @@ pub fn initialize<'s>(
     });
 
     set_property_to(scope, process, "versions", versions.into());
-
-    // `process.kill` - sends the signal to the process identified by pid.
-    set_function_to(scope, process, "kill", kill);
-
-    // `process.binding` - exposes native modules to JavaScript.
-    set_function_to(scope, process, "binding", bind);
-
-    process
 }
 
 /// Current working directory.

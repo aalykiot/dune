@@ -1,6 +1,6 @@
 [package]
 name = "dune"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["Alex Alikiotis <alexalikiotis5@gmail.com>"]
 edition = "2021"
 license = "MIT"
@@ -58,6 +58,8 @@ tempdir = "0.3.7"
 zstd = "0.13.0"
 notify = "6.1.1"
 httparse = "1.8.0"
+pest = "2.7.5"
+pest_derive = "2.7.5"
 
 [dev-dependencies]
 assert_fs = "1.0.7"
