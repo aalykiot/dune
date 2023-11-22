@@ -216,7 +216,7 @@ impl JsRuntime {
             std::process::exit(1);
         }
 
-        // Initialize static process values.
+        // Initialize process static values.
         process::refresh(tc_scope);
     }
 
