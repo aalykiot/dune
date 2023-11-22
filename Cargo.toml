@@ -21,7 +21,7 @@ enable-ansi-support = "0.2.1"
 
 [dependencies]
 v8 = { version = "0.81.0", default-features = false }
-clap = "4.0.27"
+clap = "4.4.8"
 anyhow = "1.0.52"
 colored = "2.0.0"
 path-clean = "1.0.1"
