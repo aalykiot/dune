@@ -175,6 +175,14 @@ impl JsRuntime {
             event_loop,
         };
 
+        // TODO: VERY MUCH IN PROGRESS (DO REMOVE)...
+        {
+            let address = "127.0.0.1:3000".parse().unwrap();
+            let mut inspector = crate::inspector::Inspector::new(address);
+
+            inspector.start();
+        }
+
         runtime.load_main_environment();
         runtime
     }

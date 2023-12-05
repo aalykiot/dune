@@ -54,6 +54,8 @@ serde = { version = "1.0.142", features = ["derive"] }
 serde_json = "1.0.88"
 dns-lookup = "2.0.0"
 mio = { version = "0.8.4", features = ["os-poll", "net"] }
+tokio = { version = "1.34.0", features = ["rt"] }
+warp = "0.3.6"
 tempdir = "0.3.7"
 zstd = "0.13.0"
 notify = "6.1.1"
