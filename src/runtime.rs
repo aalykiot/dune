@@ -9,6 +9,7 @@ use crate::hooks::host_import_module_dynamically_cb;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
 use crate::hooks::promise_reject_cb;
+use crate::inspector::JsRuntimeInspector;
 use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
 use crate::modules::load_import;
@@ -76,7 +77,7 @@ pub struct JsRuntimeOptions {
     pub reload: bool,
     // Holds user defined import maps for module loading.
     pub import_map: Option<ImportMap>,
-    // The numbers of threads used by the threadpool.
+    // The numbers of threads used by the thread-pool.
     pub num_threads: Option<usize>,
     // Indicates if we're running JavaScript tests.
     pub test_mode: bool,
@@ -88,6 +89,8 @@ pub struct JsRuntime {
     isolate: v8::OwnedIsolate,
     /// The event-loop instance that takes care of polling for I/O.
     pub event_loop: EventLoop,
+    ///
+    pub inspector: Rc<RefCell<JsRuntimeInspector>>,
 }
 
 impl JsRuntime {
@@ -157,7 +160,7 @@ impl JsRuntime {
         // Store state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
-            context,
+            context: context.clone(),
             module_map: ModuleMap::new(),
             handle: event_loop.handle(),
             interrupt_handle: event_loop.interrupt_handle(),
@@ -170,24 +173,23 @@ impl JsRuntime {
             wake_event_queued: false,
         })));
 
+        let address = "127.0.0.1:9229".parse().unwrap();
+        let handle = event_loop.interrupt_handle();
+        let inspector = JsRuntimeInspector::new(&mut isolate, context, handle, true);
+
         let mut runtime = JsRuntime {
             isolate,
             event_loop,
+            inspector,
         };
 
-        // TODO: VERY MUCH IN PROGRESS (DO REMOVE)...
-        {
-            let address = "127.0.0.1:3000".parse().unwrap();
-            let mut inspector = crate::inspector::Inspector::new(address);
-
-            inspector.start();
-        }
-
         runtime.load_main_environment();
+        runtime.inspector.borrow_mut().start_agent(address);
+
         runtime
     }
 
-    /// Initializes synchronously the core environment. (see lib/main.js)
+    /// Initializes synchronously the core environment (see lib/main.js).
     fn load_main_environment(&mut self) {
         let name = "dune:environment/main";
         let source = include_str!("./js/main.js");
@@ -325,6 +327,7 @@ impl JsRuntime {
 
     /// Runs a single tick of the event-loop.
     pub fn tick_event_loop(&mut self) {
+        self.inspector.borrow_mut().poll_sessions();
         run_next_tick_callbacks(&mut self.handle_scope());
         self.event_loop.tick();
         self.run_pending_futures();
