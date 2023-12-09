@@ -128,7 +128,7 @@ impl JsRuntimeInspector {
         // Build the shared state for axum.
         let state = AppState {
             id: Uuid::new_v4(),
-            address: address.clone(),
+            address,
             outbound_tx: self.outbound_tx.clone(),
             inbound_tx: self.inbound_tx.clone(),
             handle: self.handle.clone(),
@@ -157,7 +157,8 @@ impl JsRuntimeInspector {
     /// to pause at the next statement.
     fn wait_for_session_and_break_on_next_statement(&mut self) {
         // Wait until a ws connection is established.
-        let _ = self.sessions_rx.recv().unwrap();
+        self.sessions_rx.recv().unwrap();
+
         // Poll sessions for CDP messages.
         self.poll_sessions();
         self.session.as_mut().unwrap().break_on_next_statement();
@@ -353,8 +354,7 @@ impl AppState {
 
 async fn serve(state: AppState) {
     // Bind to specified address using hyper.
-    let address = state.address.clone();
-    let listener = TcpListener::bind(address).await.unwrap();
+    let listener = TcpListener::bind(state.address).await.unwrap();
 
     // Build our application with some routes.
     let app = Router::new()

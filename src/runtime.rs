@@ -179,7 +179,7 @@ impl JsRuntime {
             promise_exceptions: HashMap::new(),
             options,
             wake_event_queued: false,
-            inspector: Some(inspector.clone()),
+            inspector: Some(inspector),
         })));
 
         let mut runtime = JsRuntime {
@@ -187,10 +187,14 @@ impl JsRuntime {
             event_loop,
         };
 
-        runtime.load_main_environment();
-
         let address = "127.0.0.1:9229".parse().unwrap();
-        inspector.borrow_mut().start_agent(address);
+
+        runtime.load_main_environment();
+        runtime
+            .inspector()
+            .unwrap()
+            .borrow_mut()
+            .start_agent(address);
 
         runtime
     }
@@ -579,10 +583,7 @@ impl JsRuntime {
     pub fn inspector(&mut self) -> Option<Rc<RefCell<JsRuntimeInspector>>> {
         let state = self.get_state();
         let state = state.borrow();
-        match state.inspector.as_ref() {
-            Some(inspector) => Some(inspector.clone()),
-            None => None,
-        }
+        state.inspector.as_ref().cloned()
     }
 }
 
