@@ -15,7 +15,6 @@ use axum::Router;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use serde::Serialize;
-use std::cell::Cell;
 use std::cell::RefCell;
 use std::mem::MaybeUninit;
 use std::net::SocketAddrV4;
@@ -68,11 +67,11 @@ pub struct JsRuntimeInspector {
     inbound_rx: mpsc::Receiver<FrontendMessage>,
     inbound_tx: mpsc::Sender<FrontendMessage>,
     handle: LoopInterruptHandle,
-    sessions_tx: mpsc::Sender<()>,
-    sessions_rx: mpsc::Receiver<()>,
-    on_pause: Rc<Cell<bool>>,
-    waiting_for_session: Rc<Cell<bool>>,
+    handshake_tx: mpsc::Sender<()>,
+    handshake_rx: mpsc::Receiver<()>,
     outbound_tx: broadcast::Sender<InspectorMessage>,
+    on_pause: bool,
+    waiting_for_session: bool,
 }
 
 impl JsRuntimeInspector {
@@ -80,13 +79,13 @@ impl JsRuntimeInspector {
         isolate: &mut v8::Isolate,
         context: v8::Global<v8::Context>,
         handle: LoopInterruptHandle,
-        wait_and_break: bool,
+        waiting_for_session: bool,
     ) -> Rc<RefCell<Self>> {
         // Create a JsRuntimeInspector instance.
         let v8_inspector_client = v8::inspector::V8InspectorClientBase::new::<Self>();
         let (inbound_tx, inbound_rx) = mpsc::channel::<FrontendMessage>();
-        let (sessions_tx, sessions_rx) = mpsc::channel::<()>();
-        let (outbound_tx, _outbound_rx) = broadcast::channel::<InspectorMessage>(16);
+        let (handshake_tx, handshake_rx) = mpsc::channel::<()>();
+        let (outbound_tx, _outbound_rx) = broadcast::channel::<InspectorMessage>(64);
 
         let inspector = Rc::new(RefCell::new(Self {
             v8_inspector_client,
@@ -95,11 +94,11 @@ impl JsRuntimeInspector {
             inbound_tx,
             inbound_rx,
             handle,
-            sessions_tx,
-            sessions_rx,
-            on_pause: Rc::new(Cell::new(false)),
-            waiting_for_session: Rc::new(Cell::new(wait_and_break)),
+            handshake_tx,
+            handshake_rx,
             outbound_tx,
+            on_pause: false,
+            waiting_for_session,
         }));
 
         let scope = &mut v8::HandleScope::new(isolate);
@@ -132,7 +131,7 @@ impl JsRuntimeInspector {
             outbound_tx: self.outbound_tx.clone(),
             inbound_tx: self.inbound_tx.clone(),
             handle: self.handle.clone(),
-            sessions_tx: self.sessions_tx.clone(),
+            handshake_tx: self.handshake_tx.clone(),
         };
 
         let executor = tokio::runtime::Runtime::new().unwrap();
@@ -146,7 +145,14 @@ impl JsRuntimeInspector {
     }
 
     // Polls the inbound channel for available CDP messages.
-    pub fn poll_sessions(&mut self) {
+    pub fn poll_session(&mut self, should_block: bool) {
+        // Block the thread util a devtools message is received.
+        if should_block {
+            let message = self.inbound_rx.recv().unwrap();
+            self.session.as_mut().unwrap().dispatch_message(message);
+            return;
+        }
+        // Check for pending devtools messages.
         for message in self.inbound_rx.try_iter() {
             self.session.as_mut().unwrap().dispatch_message(message);
         }
@@ -157,10 +163,10 @@ impl JsRuntimeInspector {
     /// to pause at the next statement.
     fn wait_for_session_and_break_on_next_statement(&mut self) {
         // Wait until a ws connection is established.
-        self.sessions_rx.recv().unwrap();
+        self.handshake_rx.recv().unwrap();
 
         // Poll sessions for CDP messages.
-        self.poll_sessions();
+        self.poll_session(false);
         self.session.as_mut().unwrap().break_on_next_statement();
     }
 
@@ -221,20 +227,20 @@ impl v8::inspector::V8InspectorClientImpl for JsRuntimeInspector {
     fn run_message_loop_on_pause(&mut self, context_group_id: i32) {
         // Context id should always be the same.
         assert_eq!(context_group_id, CONTEXT_GROUP_ID);
-        self.on_pause.set(true);
+        self.on_pause = true;
         // Poll session while we're on the "pause" state.
-        while self.on_pause.get() {
-            self.poll_sessions();
+        while self.on_pause {
+            self.poll_session(true);
         }
     }
 
     fn quit_message_loop_on_pause(&mut self) {
-        self.on_pause.set(false);
+        self.on_pause = false;
     }
 
     fn run_if_waiting_for_debugger(&mut self, context_group_id: i32) {
         assert_eq!(context_group_id, CONTEXT_GROUP_ID);
-        self.waiting_for_session.set(false);
+        self.waiting_for_session = false;
     }
 }
 
@@ -284,7 +290,7 @@ impl InspectorSession {
     // Dispatch message to outbound channel.
     fn send_message(&self, msg: v8::UniquePtr<v8::inspector::StringBuffer>) {
         let message = msg.unwrap().string().to_string();
-        let _ = self.outbound_tx.send(message);
+        self.outbound_tx.send(message).unwrap();
     }
 
     // Schedule a v8 break on next statement.
@@ -333,7 +339,7 @@ struct AppState {
     pub address: SocketAddrV4,
     pub outbound_tx: broadcast::Sender<InspectorMessage>,
     pub inbound_tx: mpsc::Sender<FrontendMessage>,
-    pub sessions_tx: mpsc::Sender<()>,
+    pub handshake_tx: mpsc::Sender<()>,
     pub handle: LoopInterruptHandle,
 }
 
@@ -413,7 +419,7 @@ async fn websocket(socket: WebSocket, state: AppState) {
             state.handle.interrupt();
             // Notify main thread that a debugger is attached and ready.
             if data.contains("Runtime.runIfWaitingForDebugger") {
-                state.sessions_tx.send(()).unwrap();
+                state.handshake_tx.send(()).unwrap();
             }
         }
     });

@@ -344,18 +344,18 @@ impl JsRuntime {
     }
 
     /// Polls the inspector for new devtools messages.
-    pub fn poll_inspect_sessions(&mut self) {
+    pub fn poll_inspect_session(&mut self) {
         let state = self.get_state();
         let mut state_rc = state.borrow_mut();
         if let Some(inspector) = state_rc.inspector.as_mut() {
-            inspector.borrow_mut().poll_sessions();
+            inspector.borrow_mut().poll_session(false);
         }
     }
 
     /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
         // Check for pending devtools messages.
-        self.poll_inspect_sessions();
+        self.poll_inspect_session();
         // Run callbacks/promises from next-tick and micro-task queues.
         run_next_tick_callbacks(&mut self.handle_scope());
 
@@ -366,7 +366,7 @@ impl JsRuntime {
             || self.has_next_tick_callbacks()
         {
             // Check for pending devtools messages.
-            self.poll_inspect_sessions();
+            self.poll_inspect_session();
             // Tick the event-loop one cycle.
             self.tick_event_loop();
 
