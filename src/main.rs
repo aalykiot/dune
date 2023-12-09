@@ -34,6 +34,7 @@ use runtime::JsRuntime;
 use runtime::JsRuntimeOptions;
 use std::env;
 use std::fs;
+use std::net::SocketAddrV4;
 use std::path::Path;
 use std::path::PathBuf;
 use tools::bundle;
@@ -46,6 +47,19 @@ fn load_import_map(filename: Option<String>) -> Option<ImportMap> {
         Ok(contents) => Some(unwrap_or_exit(ImportMap::parse_from_json(&contents))),
         Err(_) => None,
     }
+}
+
+type Inspect = (SocketAddrV4, bool);
+
+fn parse_inspect_args(inspect: Option<String>, inspect_brk: Option<String>) -> Option<Inspect> {
+    inspect
+        .map(|address| unwrap_or_exit(address.parse::<SocketAddrV4>().map_err(Into::into)))
+        .map(|address| (address, false))
+        .or_else(|| {
+            inspect_brk
+                .map(|address| unwrap_or_exit(address.parse::<SocketAddrV4>().map_err(Into::into)))
+                .map(|address| (address, true))
+        })
 }
 
 fn run_command(mut args: ArgMatches) {
@@ -73,6 +87,11 @@ fn run_command(mut args: ArgMatches) {
         }
     }
 
+    // Check if we need to enable the inspector.
+    let inspect = args.remove_one::<String>("inspect");
+    let inspect_brk = args.remove_one::<String>("inspect-brk");
+    let inspector = parse_inspect_args(inspect, inspect_brk);
+
     // NOTE: The following code tries to resolve the given filename
     // to an absolute path. If the first time fails we will append `./` to
     // it first, and retry the resolution in case the user forgot to specify it.
@@ -97,6 +116,7 @@ fn run_command(mut args: ArgMatches) {
         reload,
         import_map,
         num_threads,
+        inspector,
         ..Default::default()
     };
 
@@ -179,6 +199,7 @@ fn test_command(mut args: ArgMatches) {
         import_map,
         num_threads,
         reload,
+        ..Default::default()
     };
 
     // Create new JS runtime.
@@ -330,8 +351,11 @@ fn main() {
                 .arg(arg!(--"env-file" <FILE> "Load configuration from local file"))
                 .arg(arg!(--"import-map" <FILE> "Load import map from local file"))
                 .arg(arg!(--"threadpool-size" <NUMBER> "Set the number of threads used for I/O"))
-                .arg(arg!(--watch <FILES>... "Watch for file changes and restart process automatically")
-                .num_args(0..)),
+                .arg(arg!(--watch <FILES>... "Watch for file changes and restart process automatically").num_args(0..))
+                .arg(arg!(--inspect <ADDRESS> "Enable inspector agent (127.0.0.1:9229)")
+                .default_missing_value("127.0.0.1:9229").num_args(..=1))
+                .arg(arg!(--"inspect-brk" <ADDRESS> "Enable inspector agent, break before user code starts")
+                .default_missing_value("127.0.0.1:9229").num_args(..=1))
         )
         .subcommand(
             Command::new("bundle")

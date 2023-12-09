@@ -24,7 +24,6 @@ use std::thread;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use uuid::Uuid;
-use v8::HandleScope;
 
 // Dune supports only a single context in `JsRuntime`.
 const CONTEXT_GROUP_ID: i32 = 1;
@@ -140,8 +139,9 @@ impl JsRuntimeInspector {
         // Spawn the web-socket server thread.
         thread::spawn(move || executor.block_on(serve(state)));
 
-        // Wait for session to connect if requested.
-        self.wait_for_session_and_break_on_next_statement();
+        if self.waiting_for_session {
+            self.wait_for_session_and_break_on_next_statement();
+        }
     }
 
     // Polls the inbound channel for available CDP messages.
@@ -184,9 +184,9 @@ impl JsRuntimeInspector {
     }
 
     // Notify the inspector that the context is about to destroyed.
-    pub fn context_destroyed(&mut self, scope: &mut HandleScope, context: v8::Global<v8::Context>) {
+    pub fn context_destroyed(&mut self, scope: &mut v8::HandleScope, ctx: v8::Global<v8::Context>) {
         // Get a local context reference.
-        let context = v8::Local::new(scope, context);
+        let context = v8::Local::new(scope, ctx);
 
         // Get a mut reference to v8 inspector.
         let mut inspector_rc = self.v8_inspector.borrow_mut();

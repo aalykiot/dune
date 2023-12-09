@@ -27,6 +27,7 @@ use anyhow::Ok;
 use std::cell::RefCell;
 use std::cmp;
 use std::collections::HashMap;
+use std::net::SocketAddrV4;
 use std::rc::Rc;
 use std::sync::Once;
 use std::time::Instant;
@@ -70,7 +71,7 @@ pub struct JsRuntimeState {
     pub inspector: Option<Rc<RefCell<JsRuntimeInspector>>>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 #[allow(dead_code)]
 pub struct JsRuntimeOptions {
     // The seed used in Math.random() method.
@@ -83,6 +84,8 @@ pub struct JsRuntimeOptions {
     pub num_threads: Option<usize>,
     // Indicates if we're running JavaScript tests.
     pub test_mode: bool,
+    // Defines the inspector listening address and wait option.
+    pub inspector: Option<(SocketAddrV4, bool)>,
 }
 
 pub struct JsRuntime {
@@ -158,12 +161,14 @@ impl JsRuntime {
             .as_millis();
 
         // Initialize the v8 inspector.
-        let inspector = JsRuntimeInspector::new(
-            &mut isolate,
-            context.clone(),
-            event_loop.interrupt_handle(),
-            true,
-        );
+        let inspector = options.inspector.map(|(_, waiting_for_session)| {
+            JsRuntimeInspector::new(
+                &mut isolate,
+                context.clone(),
+                event_loop.interrupt_handle(),
+                waiting_for_session,
+            )
+        });
 
         // Store state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
@@ -177,9 +182,9 @@ impl JsRuntime {
             time_origin,
             next_tick_queue: Vec::new(),
             promise_exceptions: HashMap::new(),
-            options,
+            options: options.clone(),
             wake_event_queued: false,
-            inspector: Some(inspector),
+            inspector,
         })));
 
         let mut runtime = JsRuntime {
@@ -187,14 +192,13 @@ impl JsRuntime {
             event_loop,
         };
 
-        let address = "127.0.0.1:9229".parse().unwrap();
-
         runtime.load_main_environment();
-        runtime
-            .inspector()
-            .unwrap()
-            .borrow_mut()
-            .start_agent(address);
+
+        if let Some(inspector) = runtime.inspector().as_mut() {
+            inspector
+                .borrow_mut()
+                .start_agent(options.inspector.unwrap().0);
+        }
 
         runtime
     }
