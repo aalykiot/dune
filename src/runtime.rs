@@ -66,6 +66,8 @@ pub struct JsRuntimeState {
     pub options: JsRuntimeOptions,
     /// Tracks wake event for current loop iteration.
     pub wake_event_queued: bool,
+    /// A structure responsible for providing inspector interface to the runtime.
+    pub inspector: Option<Rc<RefCell<JsRuntimeInspector>>>,
 }
 
 #[derive(Debug, Default)]
@@ -89,8 +91,6 @@ pub struct JsRuntime {
     isolate: v8::OwnedIsolate,
     /// The event-loop instance that takes care of polling for I/O.
     pub event_loop: EventLoop,
-    ///
-    pub inspector: Rc<RefCell<JsRuntimeInspector>>,
 }
 
 impl JsRuntime {
@@ -157,10 +157,18 @@ impl JsRuntime {
             .unwrap()
             .as_millis();
 
+        // Initialize the v8 inspector.
+        let inspector = JsRuntimeInspector::new(
+            &mut isolate,
+            context.clone(),
+            event_loop.interrupt_handle(),
+            true,
+        );
+
         // Store state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
-            context: context.clone(),
+            context,
             module_map: ModuleMap::new(),
             handle: event_loop.handle(),
             interrupt_handle: event_loop.interrupt_handle(),
@@ -171,20 +179,18 @@ impl JsRuntime {
             promise_exceptions: HashMap::new(),
             options,
             wake_event_queued: false,
+            inspector: Some(inspector.clone()),
         })));
-
-        let address = "127.0.0.1:9229".parse().unwrap();
-        let handle = event_loop.interrupt_handle();
-        let inspector = JsRuntimeInspector::new(&mut isolate, context, handle, true);
 
         let mut runtime = JsRuntime {
             isolate,
             event_loop,
-            inspector,
         };
 
         runtime.load_main_environment();
-        runtime.inspector.borrow_mut().start_agent(address);
+
+        let address = "127.0.0.1:9229".parse().unwrap();
+        inspector.borrow_mut().start_agent(address);
 
         runtime
     }
@@ -327,15 +333,25 @@ impl JsRuntime {
 
     /// Runs a single tick of the event-loop.
     pub fn tick_event_loop(&mut self) {
-        self.inspector.borrow_mut().poll_sessions();
         run_next_tick_callbacks(&mut self.handle_scope());
         self.event_loop.tick();
         self.run_pending_futures();
         self.fast_forward_imports();
     }
 
+    /// Polls the inspector for new devtools messages.
+    pub fn poll_inspect_sessions(&mut self) {
+        let state = self.get_state();
+        let mut state_rc = state.borrow_mut();
+        if let Some(inspector) = state_rc.inspector.as_mut() {
+            inspector.borrow_mut().poll_sessions();
+        }
+    }
+
     /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
+        // Check for pending devtools messages.
+        self.poll_inspect_sessions();
         // Run callbacks/promises from next-tick and micro-task queues.
         run_next_tick_callbacks(&mut self.handle_scope());
 
@@ -345,6 +361,8 @@ impl JsRuntime {
             || self.has_pending_imports()
             || self.has_next_tick_callbacks()
         {
+            // Check for pending devtools messages.
+            self.poll_inspect_sessions();
             // Tick the event-loop one cycle.
             self.tick_event_loop();
 
@@ -353,6 +371,14 @@ impl JsRuntime {
                 println!("{:?}", self.promise_rejections().remove(0));
                 std::process::exit(1);
             }
+        }
+
+        // We can now notify debugger that the program has finished running
+        // and we're ready to exit the process.
+        if let Some(inspector) = self.inspector() {
+            let context = self.context();
+            let scope = &mut self.handle_scope();
+            inspector.borrow_mut().context_destroyed(scope, context);
         }
     }
 
@@ -547,6 +573,16 @@ impl JsRuntime {
         let state = self.get_state();
         let state = state.borrow();
         state.context.clone()
+    }
+
+    /// Returns the inspector created for the runtime.
+    pub fn inspector(&mut self) -> Option<Rc<RefCell<JsRuntimeInspector>>> {
+        let state = self.get_state();
+        let state = state.borrow();
+        match state.inspector.as_ref() {
+            Some(inspector) => Some(inspector.clone()),
+            None => None,
+        }
     }
 }
 
