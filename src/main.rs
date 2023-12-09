@@ -49,19 +49,6 @@ fn load_import_map(filename: Option<String>) -> Option<ImportMap> {
     }
 }
 
-type Inspect = (SocketAddrV4, bool);
-
-fn parse_inspect_args(inspect: Option<String>, inspect_brk: Option<String>) -> Option<Inspect> {
-    inspect
-        .map(|address| unwrap_or_exit(address.parse::<SocketAddrV4>().map_err(Into::into)))
-        .map(|address| (address, false))
-        .or_else(|| {
-            inspect_brk
-                .map(|address| unwrap_or_exit(address.parse::<SocketAddrV4>().map_err(Into::into)))
-                .map(|address| (address, true))
-        })
-}
-
 fn run_command(mut args: ArgMatches) {
     // Extract options from cli arguments.
     let script = args.remove_one::<String>("SCRIPT").unwrap();
@@ -87,11 +74,6 @@ fn run_command(mut args: ArgMatches) {
         }
     }
 
-    // Check if we need to enable the inspector.
-    let inspect = args.remove_one::<String>("inspect");
-    let inspect_brk = args.remove_one::<String>("inspect-brk");
-    let inspector = parse_inspect_args(inspect, inspect_brk);
-
     // NOTE: The following code tries to resolve the given filename
     // to an absolute path. If the first time fails we will append `./` to
     // it first, and retry the resolution in case the user forgot to specify it.
@@ -99,6 +81,31 @@ fn run_command(mut args: ArgMatches) {
         resolve_import(None, &script, true, import_map.clone())
             .or_else(|_| resolve_import(None, &format!("./{script}"), true, import_map.clone())),
     );
+
+    // Check if we need to enable the inspector.
+    let inspect = args.remove_one::<String>("inspect").map(|address| {
+        // Parse to IPv4 address.
+        match address.parse::<SocketAddrV4>() {
+            Ok(address) => (address, false),
+            Err(e) => {
+                eprintln!("{}: {}", "Error".red().bold(), e);
+                std::process::exit(1);
+            }
+        }
+    });
+    // Check if we need to enable the inspector.
+    let inspect_brk = args.remove_one::<String>("inspect-brk").map(|address| {
+        // Parse to IPv4 address.
+        match address.parse::<SocketAddrV4>() {
+            Ok(address) => (address, true),
+            Err(e) => {
+                eprintln!("{}: {}", "Error".red().bold(), e);
+                std::process::exit(1);
+            }
+        }
+    });
+
+    let inspect = inspect.or(inspect_brk);
 
     // Check if we have to run on `watch` mode.
     if args.contains_id("watch") {
@@ -116,8 +123,8 @@ fn run_command(mut args: ArgMatches) {
         reload,
         import_map,
         num_threads,
-        inspector,
-        ..Default::default()
+        inspect,
+        test_mode: false,
     };
 
     // Create new JS runtime.

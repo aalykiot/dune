@@ -84,8 +84,8 @@ pub struct JsRuntimeOptions {
     pub num_threads: Option<usize>,
     // Indicates if we're running JavaScript tests.
     pub test_mode: bool,
-    // Defines the inspector listening address and wait option.
-    pub inspector: Option<(SocketAddrV4, bool)>,
+    // Defines the inspector listening options.
+    pub inspect: Option<(SocketAddrV4, bool)>,
 }
 
 pub struct JsRuntime {
@@ -161,7 +161,8 @@ impl JsRuntime {
             .as_millis();
 
         // Initialize the v8 inspector.
-        let inspector = options.inspector.map(|(_, waiting_for_session)| {
+        let address = options.inspect.map(|(address, _)| address);
+        let inspector = options.inspect.map(|(_, waiting_for_session)| {
             JsRuntimeInspector::new(
                 &mut isolate,
                 context.clone(),
@@ -182,9 +183,9 @@ impl JsRuntime {
             time_origin,
             next_tick_queue: Vec::new(),
             promise_exceptions: HashMap::new(),
-            options: options.clone(),
-            wake_event_queued: false,
+            options,
             inspector,
+            wake_event_queued: false,
         })));
 
         let mut runtime = JsRuntime {
@@ -194,10 +195,10 @@ impl JsRuntime {
 
         runtime.load_main_environment();
 
+        // Start inspector agent is requested.
         if let Some(inspector) = runtime.inspector().as_mut() {
-            inspector
-                .borrow_mut()
-                .start_agent(options.inspector.unwrap().0);
+            let address = address.unwrap();
+            inspector.borrow_mut().start_agent(address);
         }
 
         runtime
