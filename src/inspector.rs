@@ -25,6 +25,7 @@ use std::thread;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use uuid::Uuid;
+use v8::HandleScope;
 
 // Dune supports only a single context in `JsRuntime`.
 const CONTEXT_GROUP_ID: i32 = 1;
@@ -114,10 +115,9 @@ impl JsRuntimeInspector {
         ));
 
         // Tell the inspector about the global context.
-        this.context_created(context, "global context", r#"{"isDefault": true}"#);
-
-        // Note: In order to return the `JsRuntimeInspector` we need to release
-        // the borrow we have with `this`.
+        let context_name = "global context";
+        let aux_data = r#"{"isDefault": true}"#;
+        this.context_created(context, context_name, aux_data);
         drop(this);
 
         inspector
@@ -174,6 +174,29 @@ impl JsRuntimeInspector {
         let inspector = inspector_rc.as_mut().unwrap();
 
         inspector.context_created(context, CONTEXT_GROUP_ID, context_name, aux_data_view);
+    }
+
+    // Notify the inspector that the context is about to destroyed.
+    pub fn context_destroyed(&mut self, scope: &mut HandleScope, context: v8::Global<v8::Context>) {
+        // Get a local context reference.
+        let context = v8::Local::new(scope, context);
+
+        // Get a mut reference to v8 inspector.
+        let mut inspector_rc = self.v8_inspector.borrow_mut();
+        let inspector = inspector_rc.as_mut().unwrap();
+
+        // Tell the inspector about the deleted context.
+        inspector.context_destroyed(context);
+    }
+}
+
+impl Drop for JsRuntimeInspector {
+    fn drop(&mut self) {
+        // V8 automatically deletes all sessions when an `V8Inspector` instance is
+        // deleted, however InspectorSession also has a drop handler that cleans
+        // up after itself. To avoid a double free, make sure the inspector is
+        // dropped last.
+        self.session.take();
     }
 }
 
