@@ -78,6 +78,8 @@ pub struct JsRuntimeOptions {
     pub seed: Option<i64>,
     // Reloads every URL import.
     pub reload: bool,
+    // The main entry point for the program.
+    pub root: Option<String>,
     // Holds user defined import maps for module loading.
     pub import_map: Option<ImportMap>,
     // The numbers of threads used by the thread-pool.
@@ -161,13 +163,14 @@ impl JsRuntime {
             .as_millis();
 
         // Initialize the v8 inspector.
-        let address = options.inspect.map(|(address, _)| address);
+        let address = options.inspect.map(|(address, _)| (address));
         let inspector = options.inspect.map(|(_, waiting_for_session)| {
             JsRuntimeInspector::new(
                 &mut isolate,
                 context.clone(),
                 event_loop.interrupt_handle(),
                 waiting_for_session,
+                options.root.clone(),
             )
         });
 

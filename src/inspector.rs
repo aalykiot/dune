@@ -71,6 +71,7 @@ pub struct JsRuntimeInspector {
     outbound_tx: broadcast::Sender<InspectorMessage>,
     on_pause: bool,
     waiting_for_session: bool,
+    root: Option<String>,
 }
 
 impl JsRuntimeInspector {
@@ -79,6 +80,7 @@ impl JsRuntimeInspector {
         context: v8::Global<v8::Context>,
         handle: LoopInterruptHandle,
         waiting_for_session: bool,
+        root: Option<String>,
     ) -> Rc<RefCell<Self>> {
         // Create a JsRuntimeInspector instance.
         let v8_inspector_client = v8::inspector::V8InspectorClientBase::new::<Self>();
@@ -98,6 +100,7 @@ impl JsRuntimeInspector {
             outbound_tx,
             on_pause: false,
             waiting_for_session,
+            root,
         }));
 
         let scope = &mut v8::HandleScope::new(isolate);
@@ -131,10 +134,13 @@ impl JsRuntimeInspector {
             inbound_tx: self.inbound_tx.clone(),
             handle: self.handle.clone(),
             handshake_tx: self.handshake_tx.clone(),
+            root: self.root.clone(),
         };
 
         let executor = tokio::runtime::Runtime::new().unwrap();
+
         println!("Debugger listening on ws://{}/{}", address, state.id);
+        println!("Visit chrome://inspect to connect to the debugger.");
 
         // Spawn the web-socket server thread.
         thread::spawn(move || executor.block_on(serve(state)));
@@ -341,6 +347,7 @@ struct AppState {
     pub inbound_tx: mpsc::Sender<FrontendMessage>,
     pub handshake_tx: mpsc::Sender<()>,
     pub handle: LoopInterruptHandle,
+    pub root: Option<String>,
 }
 
 impl AppState {
@@ -388,7 +395,7 @@ async fn json(State(state): State<AppState>) -> Json<Vec<Details>> {
         id: state.id.to_string(),
         title: format!("dune [pid: {}]", std::process::id()),
         type_: "node".into(),
-        url: "TBD".into(),
+        url: state.root.to_owned().unwrap_or_default(),
         web_socket_debugger_url: format!("ws://{}", state.url()),
     }])
 }

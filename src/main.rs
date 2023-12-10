@@ -118,12 +118,19 @@ fn run_command(mut args: ArgMatches) {
         };
     }
 
+    // Local files must start with `file://`.
+    let root = match filename.starts_with("http") {
+        true => Some(filename.clone()),
+        false => Some(format!("file://{}", filename.clone())),
+    };
+
     let options = JsRuntimeOptions {
         seed,
         reload,
         import_map,
         num_threads,
         inspect,
+        root,
         test_mode: false,
     };
 
