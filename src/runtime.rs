@@ -100,10 +100,12 @@ impl JsRuntime {
     pub fn with_options(options: JsRuntimeOptions) -> JsRuntime {
         // Configuration flags for V8.
         let flags = concat!(
-            " --harmony-import-assertions",
-            " --turbo_fast_api_calls",
             " --no-validate-asm",
-            " --harmony-change-array-by-copy"
+            " --turbo_fast_api_calls",
+            " --harmony-change-array-by-copy",
+            " --harmony-import-assertions",
+            " --harmony-array-from_async",
+            " --harmony-iterator-helpers"
         );
 
         if options.seed.is_some() {
