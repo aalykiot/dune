@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use anyhow::Result;
 use downcast_rs::impl_downcast;
 use downcast_rs::Downcast;
@@ -338,7 +339,7 @@ impl EventLoop {
                 // Run timer's callback.
                 (timer.cb)(handle);
 
-                // If the timer is repeatable reschedule him, otherwise drop him.
+                // If the timer is repeatable reschedule it, otherwise drop it.
                 if timer.repeat {
                     let time_key = Instant::now() + timer.expires_at;
                     self.timer_queue.insert(time_key, *index);
@@ -369,12 +370,17 @@ impl EventLoop {
         let mut events = Events::with_capacity(1024);
 
         // Poll for new network events (this will block the thread).
-        self.poll.poll(&mut events, timeout).unwrap();
+        if let Err(e) = self.poll.poll(&mut events, timeout) {
+            match e.kind() {
+                io::ErrorKind::Interrupted => return,
+                _ => panic!("{}", e),
+            };
+        }
 
         for event in &events {
             // Note: Token(0) is a special token signaling that someone woke us up.
             if event.token() == Token(0) {
-                break;
+                continue;
             }
 
             let event_type = match (
@@ -478,16 +484,16 @@ impl EventLoop {
         let tcp_wrap = resource.downcast_mut::<TcpStreamWrap>().unwrap();
 
         // Check if the socket is in error state.
-        if let Ok(Some(err)) | Err(err) = tcp_wrap.socket.take_error() {
+        if let Ok(Some(e)) | Err(e) = tcp_wrap.socket.take_error() {
             // If `on_connection` is available it means the socket error happened
             // while trying to connect.
             if let Some(on_connection) = tcp_wrap.on_connection.take() {
-                (on_connection)(handle, index, Result::Err(err.into()));
+                (on_connection)(handle, index, Result::Err(e.into()));
                 return;
             }
             // Otherwise the error happened while writing.
             if let Some((_, on_write)) = tcp_wrap.write_queue.pop_front() {
-                (on_write)(handle, index, Result::Err(err.into()));
+                (on_write)(handle, index, Result::Err(e.into()));
                 return;
             }
         }
@@ -499,7 +505,7 @@ impl EventLoop {
         if let Some(on_connection) = tcp_wrap.on_connection.take() {
             // Run socket's on_connection callback.
             (on_connection)(
-                handle,
+                handle.clone(),
                 index,
                 Ok(TcpSocketInfo {
                     id: index,
@@ -513,20 +519,41 @@ impl EventLoop {
             self.network_events
                 .reregister(&mut tcp_wrap.socket, token, Interest::READABLE)
                 .unwrap();
-
-            return;
         }
 
-        // Connection is OK, let's write some bytes...
-        let (data, on_write) = match tcp_wrap.write_queue.pop_front() {
-            Some(value) => value,
-            None => return,
-        };
+        loop {
+            // Due to loop ownership issues we need to clone the handle.
+            let handle = handle.clone();
 
-        match tcp_wrap.socket.write(&data) {
-            Ok(n) => (on_write)(handle, index, Result::Ok(n)),
-            Err(err) => (on_write)(handle, index, Result::Err(err.into())),
-        };
+            // Connection is OK, let's write some bytes...
+            let (data, on_write) = match tcp_wrap.write_queue.pop_front() {
+                Some(value) => value,
+                None => break,
+            };
+
+            match tcp_wrap.socket.write(&data) {
+                // We want to write the entire `data` buffer in a single go. If we
+                // write less we'll return a short write error (same as
+                // `io::Write::write_all` does).
+                Ok(n) if n < data.len() => {
+                    let err_message = io::ErrorKind::WriteZero.to_string();
+                    (on_write)(handle, index, Result::Err(anyhow!("{}", err_message)));
+                }
+                // All bytes were written to socket.
+                Ok(n) => (on_write)(handle, index, Result::Ok(n)),
+                // Would block "errors" are the OS's way of saying that the
+                // connection is not actually ready to perform this I/O operation.
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    // Since we couldn't send this data we need to put it
+                    // back into the write_queue.
+                    tcp_wrap.write_queue.push_front((data, on_write));
+                    break;
+                }
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                // An important error seems to have accrued.
+                Err(e) => (on_write)(handle, index, Result::Err(e.into())),
+            };
+        }
 
         // Unregister write interest if the write_queue is empty.
         if tcp_wrap.write_queue.is_empty() {
@@ -577,10 +604,10 @@ impl EventLoop {
                 Ok(n) => data.extend_from_slice(&data_buf[..n]),
                 // Would block "errors" are the OS's way of saying that the
                 // connection is not actually ready to perform this I/O operation.
-                Err(err) if err.kind() == io::ErrorKind::WouldBlock => break,
-                Err(err) if err.kind() == io::ErrorKind::Interrupted => continue,
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => break,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
                 // Other errors we'll be considered fatal.
-                Err(err) => read_error = Some(err),
+                Err(e) => read_error = Some(e),
             }
         }
 
@@ -592,15 +619,20 @@ impl EventLoop {
             Some(on_read) => on_read,
             None if !connection_closed => return,
             None => {
+                // Deregister any interest on that socket.
+                self.network_events
+                    .deregister(&mut tcp_wrap.socket)
+                    .unwrap();
+                // Schedule resource clean-up.
                 self.close_queue.push((index, None));
                 return;
             }
         };
 
         // Check if we had any errors while reading.
-        if let Some(err) = read_error {
+        if let Some(e) = read_error {
             // Run on_read callback.
-            (on_read)(handle, index, Result::Err(err.into()));
+            (on_read)(handle, index, Result::Err(e.into()));
             return;
         }
 
@@ -637,50 +669,60 @@ impl EventLoop {
         };
 
         let on_connection = tcp_wrap.on_connection.as_mut();
+        let mut new_resources = vec![];
 
-        // Received an event for the TCP server socket, which indicates we can accept a connection.
-        let (socket, _) = match tcp_wrap.socket.accept() {
-            Ok(sock) => sock,
-            // If we get a `WouldBlock` error we know our
-            // listener has no more incoming connections queued,
-            // so we can return to polling and wait for some
-            // more.
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => return,
-            Err(e) => {
-                (on_connection)(handle, index, Result::Err(e.into()));
-                return;
-            }
-        };
+        loop {
+            // Create a new handle.
+            let handle = handle.clone();
 
-        // Create a new ID for the socket.
-        let id = handle.index();
+            // Received an event for the TCP server socket, which indicates we can accept a connections.
+            let (socket, _) = match tcp_wrap.socket.accept() {
+                Ok(sock) => sock,
+                // If we get a `WouldBlock` error we know our
+                // listener has no more incoming connections queued,
+                // so we can return to polling and wait for some
+                // more.
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => break,
+                Err(e) => {
+                    (on_connection)(handle, index, Result::Err(e.into()));
+                    break;
+                }
+            };
 
-        // Create a TCP wrap from the raw socket.
-        let mut stream = TcpStreamWrap {
-            id,
-            socket,
-            on_connection: None,
-            on_read: None,
-            write_queue: LinkedList::new(),
-        };
+            // Create a new ID for the socket.
+            let id = handle.index();
 
-        (on_connection)(
-            handle,
-            id,
-            Ok(TcpSocketInfo {
+            // Create a TCP wrap from the raw socket.
+            let mut stream = TcpStreamWrap {
                 id,
-                host: stream.socket.local_addr().unwrap(),
-                remote: stream.socket.peer_addr().unwrap(),
-            }),
-        );
+                socket,
+                on_connection: None,
+                on_read: None,
+                write_queue: LinkedList::new(),
+            };
 
-        // Initialize socket with a READABLE event.
-        self.network_events
-            .register(&mut stream.socket, Token(id as usize), Interest::READABLE)
-            .unwrap();
+            (on_connection)(
+                handle,
+                id,
+                Ok(TcpSocketInfo {
+                    id,
+                    host: stream.socket.local_addr().unwrap(),
+                    remote: stream.socket.peer_addr().unwrap(),
+                }),
+            );
 
-        // Register the new TCP stream to the event-loop.
-        self.resources.insert(id, Box::new(stream));
+            // Initialize socket with a READABLE event.
+            self.network_events
+                .register(&mut stream.socket, Token(id as usize), Interest::READABLE)
+                .unwrap();
+
+            new_resources.push((id, Box::new(stream)));
+        }
+
+        // Register the new TCP streams to the event-loop.
+        for (id, stream) in new_resources.drain(..) {
+            self.resources.insert(id, stream);
+        }
     }
 
     /// Runs callback referring to specific fs event.
@@ -790,7 +832,7 @@ impl EventLoop {
         // Push data to socket's write queue.
         tcp_wrap.write_queue.push_back((data, on_write));
 
-        let interest = Interest::WRITABLE | Interest::READABLE;
+        let interest = Interest::READABLE.add(Interest::WRITABLE);
 
         self.network_events
             .reregister(&mut tcp_wrap.socket, token, interest)
@@ -813,7 +855,7 @@ impl EventLoop {
 
         let interest = match tcp_wrap.write_queue.len() {
             0 => Interest::READABLE,
-            _ => Interest::READABLE | Interest::WRITABLE,
+            _ => Interest::READABLE.add(Interest::WRITABLE),
         };
 
         self.network_events
@@ -1122,6 +1164,7 @@ impl LoopHandle {
     }
 }
 
+#[derive(Clone)]
 pub struct LoopInterruptHandle {
     waker: Arc<Waker>,
 }
