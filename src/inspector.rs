@@ -54,13 +54,15 @@ struct Versions {
 
 // Messages sent by the connected frontend devtools.
 type InspectorMessage = String;
-// Messages send by the ws server to inspector.
-type FrontendMessage = String;
 
-/// Indicates the status of the session debugger.
-enum SessionStatus {
+#[derive(Debug)]
+enum FrontendMessage {
+    /// A new debugger session has been successfully connected.
     Connected,
+    /// The current debugger session has been disconnected.
     Disconnected,
+    /// A command message received from devtools.
+    Command(String),
 }
 
 /// This structure is used responsible for providing inspector
@@ -75,8 +77,6 @@ pub struct JsRuntimeInspector {
     handshake_tx: mpsc::Sender<()>,
     handshake_rx: mpsc::Receiver<()>,
     outbound_tx: broadcast::Sender<InspectorMessage>,
-    session_tx: mpsc::Sender<SessionStatus>,
-    session_rx: mpsc::Receiver<SessionStatus>,
     on_pause: bool,
     waiting_for_session: bool,
     root: Option<String>,
@@ -95,7 +95,6 @@ impl JsRuntimeInspector {
         let (inbound_tx, inbound_rx) = mpsc::channel::<FrontendMessage>();
         let (handshake_tx, handshake_rx) = mpsc::channel::<()>();
         let (outbound_tx, _outbound_rx) = broadcast::channel::<InspectorMessage>(64);
-        let (session_tx, session_rx) = mpsc::channel::<SessionStatus>();
 
         let inspector = Rc::new(RefCell::new(Self {
             v8_inspector_client,
@@ -110,8 +109,6 @@ impl JsRuntimeInspector {
             on_pause: false,
             waiting_for_session,
             root,
-            session_tx,
-            session_rx,
         }));
 
         let scope = &mut v8::HandleScope::new(isolate);
@@ -142,7 +139,6 @@ impl JsRuntimeInspector {
             handle: self.handle.clone(),
             handshake_tx: self.handshake_tx.clone(),
             root: self.root.clone(),
-            session_tx: self.session_tx.clone(),
         };
 
         let executor = tokio::runtime::Runtime::new().unwrap();
@@ -196,33 +192,40 @@ impl JsRuntimeInspector {
         inspector.context_destroyed(context);
     }
 
+    /// Polls the debugger session for incoming messages from the frontend (devtools).
     pub fn poll_session(&mut self) {
-        // Check for status changes for the attached debugger.
-        if let Ok(status) = self.session_rx.try_recv() {
-            match status {
-                SessionStatus::Connected => {
-                    self.session = Some(InspectorSession::new(
-                        self.v8_inspector.clone(),
-                        self.outbound_tx.clone(),
-                    ));
-                }
-                SessionStatus::Disconnected => {
-                    self.session.take();
-                }
-            };
+        // Block the thread until a devtools message is received.
+        if self.on_pause {
+            let message = self.inbound_rx.recv().unwrap();
+            self.process_incoming_message(message);
+            return;
         }
-        if let Some(session) = self.session.as_mut() {
-            // Block the thread util a devtools message is received.
-            if self.on_pause {
-                let message = self.inbound_rx.recv().unwrap();
-                session.dispatch_message(message);
-                return;
-            }
-            // Check for pending devtools messages.
-            for message in self.inbound_rx.try_iter() {
-                session.dispatch_message(message);
-            }
+        // Check for and process any pending devtools messages.
+        while let Some(message) = self.inbound_rx.try_iter().next() {
+            self.process_incoming_message(message);
         }
+    }
+
+    /// Processes the received messages, such as establishing or disconnecting a session
+    /// and dispatching commands to the active session.
+    fn process_incoming_message(&mut self, message: FrontendMessage) {
+        match message {
+            // Establish a new InspectorSession upon frontend connection.
+            FrontendMessage::Connected => {
+                self.session = Some(InspectorSession::new(
+                    self.v8_inspector.clone(),
+                    self.outbound_tx.clone(),
+                ));
+            }
+            // Drop the current session and perform clean-ups.
+            FrontendMessage::Disconnected => {
+                self.session.take();
+            }
+            // Dispatch the received command to the active session.
+            FrontendMessage::Command(data) => {
+                self.session.as_mut().unwrap().dispatch_message(data);
+            }
+        };
     }
 }
 
@@ -369,7 +372,6 @@ struct AppState {
     pub outbound_tx: broadcast::Sender<InspectorMessage>,
     pub inbound_tx: mpsc::Sender<FrontendMessage>,
     pub handshake_tx: mpsc::Sender<()>,
-    pub session_tx: mpsc::Sender<SessionStatus>,
     pub handle: LoopInterruptHandle,
     pub root: Option<String>,
 }
@@ -444,13 +446,13 @@ async fn websocket(socket: WebSocket, state: AppState) {
     let mut outbound_tx = state.outbound_tx.subscribe();
 
     // Notify that a debugger was attached.
-    state.session_tx.send(SessionStatus::Connected).unwrap();
+    state.inbound_tx.send(FrontendMessage::Connected).unwrap();
 
     // Spawn the task that listens for devtools frontend messages.
     let mut receive_task = tokio::spawn(async move {
         while let Some(Ok(Message::Text(data))) = receiver.next().await {
             // Wake up the event-loop if necessary.
-            inbound_tx.send(data.clone()).unwrap();
+            let _ = inbound_tx.send(FrontendMessage::Command(data.clone()));
             handle.interrupt();
             // Notify main thread that a debugger is attached and ready.
             if data.contains("Runtime.runIfWaitingForDebugger") {
@@ -476,7 +478,7 @@ async fn websocket(socket: WebSocket, state: AppState) {
     }
 
     // Notify that the debugger detached.
-    state.session_tx.send(SessionStatus::Disconnected).unwrap();
+    let _ = state.inbound_tx.send(FrontendMessage::Disconnected);
     state.handle.interrupt();
 }
 

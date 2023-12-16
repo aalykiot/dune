@@ -175,7 +175,7 @@ mod tests {
             ("USER".into(), "admin".into()),
             ("EMAIL".into(), "admin@example.org".into()),
         ]);
-        assert_eq!(parse_dotenv(&source).unwrap(), expected);
+        assert_eq!(parse_dotenv(source).unwrap(), expected);
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
             "MESSAGE_TEMPLATE".into(),
             "Hello,\n                Nice to meet you!".into(),
         )]);
-        assert_eq!(parse_dotenv(&source).unwrap(), expected);
+        assert_eq!(parse_dotenv(source).unwrap(), expected);
     }
 
     #[test]
@@ -205,7 +205,7 @@ mod tests {
             "MESSAGE_TEMPLATE".into(),
             "Hello,\n                Nice to meet you!".into(),
         )]);
-        assert_eq!(parse_dotenv(&source).unwrap(), expected);
+        assert_eq!(parse_dotenv(source).unwrap(), expected);
     }
 
     #[test]
@@ -219,6 +219,6 @@ mod tests {
             ("SECRET_KEY".into(), "YOURSECRETKEYGOESHERE".into()),
             ("SECRET_HASH".into(), "--#-this-is-not-a-comment".into()),
         ]);
-        assert_eq!(parse_dotenv(&source).unwrap(), expected);
+        assert_eq!(parse_dotenv(source).unwrap(), expected);
     }
 }
