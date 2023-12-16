@@ -57,6 +57,12 @@ type InspectorMessage = String;
 // Messages send by the ws server to inspector.
 type FrontendMessage = String;
 
+/// Indicates the status of the session debugger.
+enum SessionStatus {
+    Connected,
+    Disconnected,
+}
+
 /// This structure is used responsible for providing inspector
 /// interface to the `JsRuntime`.
 pub struct JsRuntimeInspector {
@@ -69,6 +75,8 @@ pub struct JsRuntimeInspector {
     handshake_tx: mpsc::Sender<()>,
     handshake_rx: mpsc::Receiver<()>,
     outbound_tx: broadcast::Sender<InspectorMessage>,
+    session_tx: mpsc::Sender<SessionStatus>,
+    session_rx: mpsc::Receiver<SessionStatus>,
     on_pause: bool,
     waiting_for_session: bool,
     root: Option<String>,
@@ -87,6 +95,7 @@ impl JsRuntimeInspector {
         let (inbound_tx, inbound_rx) = mpsc::channel::<FrontendMessage>();
         let (handshake_tx, handshake_rx) = mpsc::channel::<()>();
         let (outbound_tx, _outbound_rx) = broadcast::channel::<InspectorMessage>(64);
+        let (session_tx, session_rx) = mpsc::channel::<SessionStatus>();
 
         let inspector = Rc::new(RefCell::new(Self {
             v8_inspector_client,
@@ -101,6 +110,8 @@ impl JsRuntimeInspector {
             on_pause: false,
             waiting_for_session,
             root,
+            session_tx,
+            session_rx,
         }));
 
         let scope = &mut v8::HandleScope::new(isolate);
@@ -109,10 +120,6 @@ impl JsRuntimeInspector {
         let mut this = inspector.borrow_mut();
         this.v8_inspector = Rc::new(RefCell::new(
             v8::inspector::V8Inspector::create(scope, &mut *this).into(),
-        ));
-        this.session = Some(InspectorSession::new(
-            this.v8_inspector.clone(),
-            this.outbound_tx.clone(),
         ));
 
         // Tell the inspector about the global context.
@@ -135,6 +142,7 @@ impl JsRuntimeInspector {
             handle: self.handle.clone(),
             handshake_tx: self.handshake_tx.clone(),
             root: self.root.clone(),
+            session_tx: self.session_tx.clone(),
         };
 
         let executor = tokio::runtime::Runtime::new().unwrap();
@@ -150,20 +158,6 @@ impl JsRuntimeInspector {
         }
     }
 
-    // Polls the inbound channel for available CDP messages.
-    pub fn poll_session(&mut self, should_block: bool) {
-        // Block the thread util a devtools message is received.
-        if should_block {
-            let message = self.inbound_rx.recv().unwrap();
-            self.session.as_mut().unwrap().dispatch_message(message);
-            return;
-        }
-        // Check for pending devtools messages.
-        for message in self.inbound_rx.try_iter() {
-            self.session.as_mut().unwrap().dispatch_message(message);
-        }
-    }
-
     /// This function blocks the thread until at least one inspector client has
     /// established a websocket connection. After that, it instructs V8
     /// to pause at the next statement.
@@ -172,7 +166,7 @@ impl JsRuntimeInspector {
         self.handshake_rx.recv().unwrap();
 
         // Poll sessions for CDP messages.
-        self.poll_session(false);
+        self.poll_session();
         self.session.as_mut().unwrap().break_on_next_statement();
     }
 
@@ -200,6 +194,35 @@ impl JsRuntimeInspector {
 
         // Tell the inspector about the deleted context.
         inspector.context_destroyed(context);
+    }
+
+    pub fn poll_session(&mut self) {
+        // Check for status changes for the attached debugger.
+        if let Ok(status) = self.session_rx.try_recv() {
+            match status {
+                SessionStatus::Connected => {
+                    self.session = Some(InspectorSession::new(
+                        self.v8_inspector.clone(),
+                        self.outbound_tx.clone(),
+                    ));
+                }
+                SessionStatus::Disconnected => {
+                    self.session.take();
+                }
+            };
+        }
+        if let Some(session) = self.session.as_mut() {
+            // Block the thread util a devtools message is received.
+            if self.on_pause {
+                let message = self.inbound_rx.recv().unwrap();
+                session.dispatch_message(message);
+                return;
+            }
+            // Check for pending devtools messages.
+            for message in self.inbound_rx.try_iter() {
+                session.dispatch_message(message);
+            }
+        }
     }
 }
 
@@ -236,7 +259,7 @@ impl v8::inspector::V8InspectorClientImpl for JsRuntimeInspector {
         self.on_pause = true;
         // Poll session while we're on the "pause" state.
         while self.on_pause {
-            self.poll_session(true);
+            self.poll_session();
         }
     }
 
@@ -301,7 +324,7 @@ impl InspectorSession {
 
     // Schedule a v8 break on next statement.
     pub fn break_on_next_statement(&mut self) {
-        let reason = v8::inspector::StringView::from(&b"debugCommand"[..]);
+        let reason = v8::inspector::StringView::from(&b"Break on start"[..]);
         let details = v8::inspector::StringView::empty();
         (*self.v8_session).schedule_pause_on_next_statement(reason, details);
     }
@@ -346,6 +369,7 @@ struct AppState {
     pub outbound_tx: broadcast::Sender<InspectorMessage>,
     pub inbound_tx: mpsc::Sender<FrontendMessage>,
     pub handshake_tx: mpsc::Sender<()>,
+    pub session_tx: mpsc::Sender<SessionStatus>,
     pub handle: LoopInterruptHandle,
     pub root: Option<String>,
 }
@@ -415,15 +439,19 @@ async fn websocket(socket: WebSocket, state: AppState) {
     // By splitting, we can send and receive at the same time.
     let (mut sender, mut receiver) = socket.split();
 
+    let handle = state.handle.clone();
     let inbound_tx = state.inbound_tx.clone();
     let mut outbound_tx = state.outbound_tx.subscribe();
+
+    // Notify that a debugger was attached.
+    state.session_tx.send(SessionStatus::Connected).unwrap();
 
     // Spawn the task that listens for devtools frontend messages.
     let mut receive_task = tokio::spawn(async move {
         while let Some(Ok(Message::Text(data))) = receiver.next().await {
             // Wake up the event-loop if necessary.
             inbound_tx.send(data.clone()).unwrap();
-            state.handle.interrupt();
+            handle.interrupt();
             // Notify main thread that a debugger is attached and ready.
             if data.contains("Runtime.runIfWaitingForDebugger") {
                 state.handshake_tx.send(()).unwrap();
@@ -441,11 +469,15 @@ async fn websocket(socket: WebSocket, state: AppState) {
         }
     });
 
-    // If any one of the tasks run to completion, we abort the other.
+    // If any one of the tasks completes, abort the other.
     tokio::select! {
         _ = (&mut send_task) => receive_task.abort(),
         _ = (&mut receive_task) => send_task.abort(),
     }
+
+    // Notify that the debugger detached.
+    state.session_tx.send(SessionStatus::Disconnected).unwrap();
+    state.handle.interrupt();
 }
 
 fn new_box_with<T>(new_fn: impl FnOnce(*mut T) -> T) -> Box<T> {

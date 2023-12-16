@@ -340,6 +340,7 @@ impl JsRuntime {
         };
 
         state.handle.spawn(task, Some(task_cb));
+
         Ok(())
     }
 
@@ -356,7 +357,7 @@ impl JsRuntime {
         let state = self.get_state();
         let mut state_rc = state.borrow_mut();
         if let Some(inspector) = state_rc.inspector.as_mut() {
-            inspector.borrow_mut().poll_session(false);
+            inspector.borrow_mut().poll_session();
         }
     }
 
