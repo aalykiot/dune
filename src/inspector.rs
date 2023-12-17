@@ -22,6 +22,7 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
 use tokio::net::TcpListener;
+use tokio::runtime::Builder;
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
@@ -141,7 +142,13 @@ impl JsRuntimeInspector {
             root: self.root.clone(),
         };
 
-        let executor = tokio::runtime::Runtime::new().unwrap();
+        // Build a single threaded tokio runtime.
+        let executor = Builder::new_current_thread()
+            .thread_name("dune-inspector-thread")
+            .worker_threads(2)
+            .enable_io()
+            .build()
+            .unwrap();
 
         println!("Debugger listening on ws://{}/{}", address, state.id);
         println!("Visit chrome://inspect to connect to the debugger.");
