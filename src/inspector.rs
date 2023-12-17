@@ -334,7 +334,7 @@ impl InspectorSession {
 
     // Schedule a v8 break on next statement.
     pub fn break_on_next_statement(&mut self) {
-        let reason = v8::inspector::StringView::from(&b"Break on start"[..]);
+        let reason = v8::inspector::StringView::from(&b"debugCommand"[..]);
         let details = v8::inspector::StringView::empty();
         (*self.v8_session).schedule_pause_on_next_statement(reason, details);
     }
