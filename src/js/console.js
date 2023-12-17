@@ -9,6 +9,7 @@
 
 import { performance } from 'perf_hooks';
 import { green, yellow, cyan, red, bright_black } from 'colors';
+import { cloneFunction } from 'util';
 
 // Returns a string with as many spaces as the parameter specified.
 function pre(amount) {
@@ -361,32 +362,39 @@ export class Console {
    *
    * @param  {...any} args
    */
-
   log(...args) {
     const output = args.map((arg) => stringify(arg)).join(' ');
     process.stdout.write(`${output}\n`);
   }
 
-  info = this.log;
-  debug = this.log;
+  info(...args) {
+    const output = args.map((arg) => stringify(arg)).join(' ');
+    process.stdout.write(`${output}\n`);
+  }
+
+  debug(...args) {
+    const output = args.map((arg) => stringify(arg)).join(' ');
+    process.stdout.write(`${output}\n`);
+  }
 
   /**
    * Same as console.log but prepends the output with "WARNING".
    *
    * @param  {...any} args
    */
-
   warn(...args) {
     const output = args.map((arg) => stringify(arg)).join(' ');
     process.stderr.write(`WARNING: ${output}\n`);
   }
 
-  error = this.warn;
+  error(...args) {
+    const output = args.map((arg) => stringify(arg)).join(' ');
+    process.stderr.write(`WARNING: ${output}\n`);
+  }
 
   /**
    * Clears the console if the environment allows it.
    */
-
   clear() {
     try {
       process.binding('stdio').clear();
@@ -444,4 +452,32 @@ export class Console {
   }
 }
 
-export default { Console, prompt };
+// This wrapper forwards console messages to V8's internal console implementation,
+// triggering the `Runtime.consoleAPICalled` event. This ensures that the
+// attached debugger (if exists) is notified about the console call.
+//
+// https://github.com/v8/v8/blob/master/src/inspector/v8-console.cc
+// https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#event-consoleAPICalled
+//
+export function wrapConsole(console, consoleFromV8) {
+  // Get the property names of the console prototype.
+  const prototype = Object.getPrototypeOf(console);
+  const propertyNames = Object.getOwnPropertyNames(prototype);
+
+  for (const key of Object.keys(consoleFromV8)) {
+    // If global console has the same method as inspector console,
+    // then wrap these two methods into one.
+    if (propertyNames.includes(key)) {
+      const consoleFn = cloneFunction(console[key]);
+      console[key] = function (...args) {
+        consoleFn.apply(this, args);
+        consoleFromV8[key].apply(this, args);
+      };
+    } else {
+      // Add additional console APIs from the inspector.
+      console[key] = consoleFromV8[key];
+    }
+  }
+}
+
+export default { Console, prompt, wrapConsole };
