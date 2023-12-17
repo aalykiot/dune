@@ -11,6 +11,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "writeError", write_error);
     set_function_to(scope, target, "read", read);
     set_function_to(scope, target, "clear", clear);
+    set_function_to(scope, target, "callConsole", call_console);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
@@ -57,4 +58,29 @@ fn clear(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, _: v8::R
     if let Err(e) = clearscreen::clear() {
         throw_exception(scope, &e.to_string());
     }
+}
+
+/// Native wrapper that will preserve the original stack.
+/// https://github.com/denoland/deno_core/blob/main/core/runtime/bindings.rs#L504-L529
+fn call_console(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    assert!(args.length() >= 2);
+    assert!(args.get(0).is_function());
+    assert!(args.get(1).is_function());
+
+    // Collect arguments that will be passed to the console call.
+    let params = (2..args.length()).fold(vec![], |mut params, i| {
+        params.push(args.get(i));
+        params
+    });
+
+    let this = args.this();
+    let console_method = v8::Local::<v8::Function>::try_from(args.get(0)).unwrap();
+    let console_v8_method = v8::Local::<v8::Function>::try_from(args.get(1)).unwrap();
+
+    console_v8_method.call(scope, this.into(), &params);
+    console_method.call(scope, this.into(), &params);
 }

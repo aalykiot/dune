@@ -9,7 +9,8 @@
 
 import { performance } from 'perf_hooks';
 import { green, yellow, cyan, red, bright_black } from 'colors';
-import { cloneFunction } from 'util';
+
+const { callConsole } = process.binding('stdio');
 
 // Returns a string with as many spaces as the parameter specified.
 function pre(amount) {
@@ -468,11 +469,11 @@ export function wrapConsole(console, consoleFromV8) {
     // If global console has the same method as inspector console,
     // then wrap these two methods into one.
     if (propertyNames.includes(key)) {
-      const consoleFn = cloneFunction(console[key]);
-      console[key] = function (...args) {
-        consoleFn.apply(this, args);
-        consoleFromV8[key].apply(this, args);
-      };
+      console[key] = callConsole.bind(
+        console,
+        consoleFromV8[key],
+        console[key]
+      );
     } else {
       // Add additional console APIs from the inspector.
       console[key] = consoleFromV8[key];
