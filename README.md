@@ -408,6 +408,29 @@ In a Chromium-based browser like Google Chrome or Microsoft Edge, navigate to `c
 
 > Unfortunately, debugging TypeScript programs in Dune is currently suboptimal due to the absence of source maps during the transpilation process to JavaScript. :(
 
+### VSCode
+
+Currently, there is no extension available for Dune in VSCode. However, you can debug your application in VSCode, <ins>with certain limitations</ins>, by utilizing the following launch configuration:
+
+```json
+{
+  "type": "node",
+  "request": "launch",
+  "name": "Debug 'Dune' application",
+  "cwd": "${workspaceFolder}",
+  "program": "<ENTRY-SCRIPT>",
+  "runtimeExecutable": "dune",
+  "runtimeArgs": [
+    "run",
+    "--inspect",
+  ],
+  "attachSimplePort": 9229,
+  "console": "integratedTerminal"
+}
+```
+
+> ⚠️ Due to compatibility issues with newer VSCode versions, we choose `--inspect` over `--inspect-brk`. Yet, for brief programs, VSCode might not attach before the process concludes due to the non-waiting behavior of `--inspect`.
+
 ## Contributing
 
 Contributions are always welcome!
