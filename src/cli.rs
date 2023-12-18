@@ -10,6 +10,8 @@ use crate::runtime::JsRuntime;
 use crate::runtime::JsRuntimeOptions;
 use crate::upgrade;
 use crate::watcher;
+use anyhow::bail;
+use anyhow::Result;
 use clap::ArgAction;
 use clap::Parser;
 use clap::Subcommand;
@@ -252,7 +254,7 @@ struct TestArgs {
 
 const PORT_RANGE: RangeInclusive<usize> = 1..=65535;
 
-fn parse_inspect_address(s: &str) -> Result<SocketAddrV4, String> {
+fn parse_inspect_address(s: &str) -> Result<SocketAddrV4> {
     // Try to parse full string as IPv4 address.
     if let Ok(address) = s.parse::<SocketAddrV4>() {
         return Ok(address);
@@ -266,14 +268,14 @@ fn parse_inspect_address(s: &str) -> Result<SocketAddrV4, String> {
         }
         _ => {}
     }
-    Err(format!("Value can't be parsed into an IPv4 address"))
+    bail!("Value can't be parsed into an IPv4 address")
 }
 
 fn load_import_map(filename: Option<&PathBuf>) -> Option<ImportMap> {
-    filename.and_then(|file| {
+    filename.map(|file| {
         let contents = fs::read_to_string(file).map_err(|e| e.into());
         let contents = unwrap_or_exit(contents);
-        Some(unwrap_or_exit(ImportMap::parse_from_json(&contents)))
+        unwrap_or_exit(ImportMap::parse_from_json(&contents))
     })
 }
 
