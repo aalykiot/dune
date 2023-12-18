@@ -35,5 +35,6 @@ jobs:
           tar: none
           zip: all
           include: LICENSE.md,README.md
+          target: ${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
