@@ -173,7 +173,7 @@ type CompileArgs = BundleArgs;
 #[derive(Debug, Parser)]
 struct TestArgs {
     #[arg(
-        help = "List of file names or directories",
+        help = "Path to a test file or directory",
         value_name = "PATH",
         value_hint = ValueHint::FilePath,
         value_delimiter = ',',
