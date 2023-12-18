@@ -228,6 +228,26 @@ struct TestArgs {
         value_name = "NUMBER"
     )]
     thread_pool_size: Option<usize>,
+    #[arg(
+        help = "Enable inspector agent (default: 127.0.0.1:9229)",
+        value_name = "ADDRESS",
+        long = "inspect",
+        require_equals = true,
+        default_missing_value = "127.0.0.1:9229",
+        num_args = ..=1,
+        value_parser = parse_inspect_address
+    )]
+    inspect: Option<SocketAddrV4>,
+    #[arg(
+        help = "Enable inspector agent, break before user code starts",
+        value_name = "ADDRESS",
+        long = "inspect-brk",
+        require_equals = true,
+        default_missing_value = "127.0.0.1:9229",
+        num_args = ..=1,
+        value_parser = parse_inspect_address
+    )]
+    inspect_brk: Option<SocketAddrV4>,
 }
 
 const PORT_RANGE: RangeInclusive<usize> = 1..=65535;
@@ -358,6 +378,12 @@ fn test_command(args: &TestArgs) {
         None => "undefined".into(),
     };
 
+    // Check if we need to enable the inspector.
+    let inspect = args
+        .inspect
+        .map(|address| (address, false))
+        .or(args.inspect_brk.map(|address| (address, true)));
+
     // Note: The env variable method is used to address an issue on Windows where
     // the test path entry is injected into the test script in a slightly
     // altered manner, leading to errors.
@@ -383,6 +409,7 @@ fn test_command(args: &TestArgs) {
         num_threads: args.thread_pool_size.to_owned(),
         test_mode: true,
         import_map,
+        inspect,
         ..Default::default()
     };
 
