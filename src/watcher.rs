@@ -1,7 +1,6 @@
 use crate::modules::load_import;
 use anyhow::bail;
 use anyhow::Result;
-use clap::ArgMatches;
 use colored::*;
 use notify::event::DataChange;
 use notify::event::ModifyKind;
@@ -66,7 +65,7 @@ impl EventHandler for WatcherHandler {
 }
 
 /// Starts the file-system watcher.
-pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
+pub fn start(script: &str, watch_paths: Vec<String>) -> Result<()> {
     // Check if entry point is a local file.
     let windows_regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
 
@@ -79,15 +78,12 @@ pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
         bail!(e.to_string());
     }
 
-    // Get the paths we need to add a watcher on.
-    let watch_paths: Vec<_> = arguments.get_many::<String>("watch").unwrap().collect();
-
     // Remove the `--watch` CLI arguments.
     let mut args = env::args()
         .skip(3)
         .filter(|arg| !arg.starts_with("--watch"))
         .filter(|arg| !arg.starts_with("--watch="))
-        .filter(|arg| !watch_paths.iter().any(|path| *path == arg))
+        .filter(|arg| !watch_paths.iter().any(|path| path == arg))
         .collect::<Vec<String>>();
 
     args.insert(0, "run".into());
@@ -115,7 +111,7 @@ pub fn start(script: &str, arguments: ArgMatches) -> Result<()> {
     } else {
         // Start watching requested paths.
         for path in watch_paths.clone() {
-            match watcher.watch(Path::new(path), RecursiveMode::Recursive) {
+            match watcher.watch(Path::new(&path), RecursiveMode::Recursive) {
                 Ok(_) => {}
                 Err(e) => bail!(e),
             }
