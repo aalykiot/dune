@@ -80,7 +80,8 @@ pub fn start(script: &str, watch_paths: Vec<String>) -> Result<()> {
 
     // Remove the `--watch` CLI arguments.
     let mut args = env::args()
-        .skip(3)
+        .skip(2)
+        .filter(|arg| !script.contains(arg))
         .filter(|arg| !arg.starts_with("--watch"))
         .filter(|arg| !arg.starts_with("--watch="))
         .filter(|arg| !watch_paths.iter().any(|path| path == arg))
