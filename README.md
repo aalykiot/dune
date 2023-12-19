@@ -388,7 +388,6 @@ Dune embraces the [V8 Inspector Protocol](https://v8.dev/docs/inspector), a stan
 
 To enable debugging capabilities, execute Dune with either the `--inspect` or `--inspect-brk` flags.
 
-
 The `--inspect` flag permits attaching the debugger at any moment, whereas the `--inspect-brk` option will await the debugger to attach and will pause the execution on the next statement.
 
 > When employing the `--inspect` flag, the code will commence execution promptly. If your program is brief, there may not be sufficient time to establish a debugger connection before the program concludes its execution. In such scenarios, consider using the `--inspect-brk` flag instead.
@@ -406,11 +405,9 @@ Visit chrome://inspect to connect to the debugger.
 
 In a Chromium-based browser like Google Chrome or Microsoft Edge, navigate to `chrome://inspect` and select "Inspect" next to the target.
 
-> Unfortunately, debugging TypeScript programs in Dune is currently suboptimal due to the absence of source maps during the transpilation process to JavaScript. :(
+### VS Code
 
-### VSCode
-
-Currently, there is no extension available for Dune in VSCode. However, you can debug your application in VSCode, <ins>with certain limitations</ins>, by utilizing the following launch configuration:
+Currently, there is no extension available for Dune in VS Code. However, you can debug your application in VS Code, by utilizing the following launch configuration in `.vscode/launch.json`:
 
 ```json
 {
@@ -420,16 +417,13 @@ Currently, there is no extension available for Dune in VSCode. However, you can 
   "cwd": "${workspaceFolder}",
   "program": "<ENTRY-SCRIPT>",
   "runtimeExecutable": "dune",
-  "runtimeArgs": [
-    "run",
-    "--inspect",
-  ],
+  "runtimeArgs": ["run", "--inspect-brk"],
   "attachSimplePort": 9229,
   "console": "integratedTerminal"
 }
 ```
 
-> ⚠️ Due to compatibility issues with newer VSCode versions, we choose `--inspect` over `--inspect-brk`. Yet, for brief programs, VSCode might not attach before the process concludes due to the non-waiting behavior of `--inspect`.
+> Unfortunately, debugging TypeScript programs in Dune is currently suboptimal due to the absence of source maps during the transpilation process to JavaScript. :(
 
 ## Contributing
 

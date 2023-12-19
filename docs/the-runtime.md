@@ -221,6 +221,8 @@ pub struct JsRuntimeState {
   pub options: JsRuntimeOptions,
   /// Tracks wake event for current loop iteration.
   pub wake_event_queued: bool,
+  /// A structure responsible for providing inspector interface to the runtime.
+  pub inspector: Option<Rc<RefCell<JsRuntimeInspector>>>,
 }
 ```
 

@@ -21,6 +21,7 @@ use std::net::SocketAddrV4;
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::sync::broadcast;
@@ -79,6 +80,7 @@ pub struct JsRuntimeInspector {
     handshake_rx: mpsc::Receiver<()>,
     outbound_tx: broadcast::Sender<InspectorMessage>,
     on_pause: bool,
+    break_on_start: bool,
     waiting_for_session: bool,
     root: Option<String>,
 }
@@ -88,7 +90,7 @@ impl JsRuntimeInspector {
         isolate: &mut v8::Isolate,
         context: v8::Global<v8::Context>,
         handle: LoopInterruptHandle,
-        waiting_for_session: bool,
+        break_on_start: bool,
         root: Option<String>,
     ) -> Rc<RefCell<Self>> {
         // Create a JsRuntimeInspector instance.
@@ -108,7 +110,8 @@ impl JsRuntimeInspector {
             handshake_rx,
             outbound_tx,
             on_pause: false,
-            waiting_for_session,
+            waiting_for_session: true,
+            break_on_start,
             root,
         }));
 
@@ -155,22 +158,6 @@ impl JsRuntimeInspector {
 
         // Spawn the web-socket server thread.
         thread::spawn(move || executor.block_on(serve(state)));
-
-        if self.waiting_for_session {
-            self.wait_for_session_and_break_on_next_statement();
-        }
-    }
-
-    /// This function blocks the thread until at least one inspector client has
-    /// established a websocket connection. After that, it instructs V8
-    /// to pause at the next statement.
-    fn wait_for_session_and_break_on_next_statement(&mut self) {
-        // Wait until a ws connection is established.
-        self.handshake_rx.recv().unwrap();
-
-        // Poll sessions for CDP messages.
-        self.poll_session();
-        self.session.as_mut().unwrap().break_on_next_statement();
     }
 
     // Notify the inspector about the newly created context.
@@ -202,7 +189,7 @@ impl JsRuntimeInspector {
     /// Polls the debugger session for incoming messages from the frontend (devtools).
     pub fn poll_session(&mut self) {
         // Block the thread until a devtools message is received.
-        if self.on_pause {
+        if self.on_pause || self.waiting_for_session {
             let message = self.inbound_rx.recv().unwrap();
             self.process_incoming_message(message);
             return;
@@ -213,12 +200,38 @@ impl JsRuntimeInspector {
         }
     }
 
+    /// This function "blocks" the thread until at least one inspector client has
+    /// established a handshake with the inspector. After that, it instructs V8
+    /// to pause at the next statement.
+    pub fn wait_for_session_and_break_on_next_statement(&mut self) {
+        // We need to periodically wake up to allow V8 to respond
+        // to incoming messages (before the handshake).
+        let timeout = Duration::from_millis(200);
+
+        loop {
+            // We don't want a busy loop thus the timeout on channel recv.
+            match self.handshake_rx.recv_timeout(timeout) {
+                // Handshake established, pause execution.
+                Ok(_) => {
+                    self.poll_session();
+                    self.break_on_next_statement();
+                    break;
+                }
+                Err(_) => {
+                    // Continue polling session for CDP messages.
+                    self.poll_session();
+                }
+            }
+        }
+    }
+
     /// Processes the received messages, such as establishing or disconnecting a session
     /// and dispatching commands to the active session.
     fn process_incoming_message(&mut self, message: FrontendMessage) {
         match message {
             // Establish a new InspectorSession upon frontend connection.
             FrontendMessage::Connected => {
+                self.waiting_for_session = false;
                 self.session = Some(InspectorSession::new(
                     self.v8_inspector.clone(),
                     self.outbound_tx.clone(),
@@ -233,6 +246,17 @@ impl JsRuntimeInspector {
                 self.session.as_mut().unwrap().dispatch_message(data);
             }
         };
+    }
+
+    /// Instructs V8 to pause at the next statement.
+    fn break_on_next_statement(&mut self) {
+        if let Some(session) = self.session.as_mut() {
+            session.break_on_next_statement();
+        }
+    }
+
+    pub fn should_break_on_start(&self) -> bool {
+        self.break_on_start
     }
 }
 
