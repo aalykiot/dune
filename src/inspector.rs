@@ -3,6 +3,8 @@
 // http://hyperandroid.com/2020/02/12/v8-inspector-from-an-embedder-standpoint/
 // https://github.com/ahmadov/v8_inspector_example/tree/master/
 
+use crate::errors::generic_error;
+use crate::errors::unwrap_or_exit;
 use crate::event_loop::LoopInterruptHandle;
 use axum::extract::ws::Message;
 use axum::extract::ws::WebSocket;
@@ -152,9 +154,6 @@ impl JsRuntimeInspector {
             .enable_io()
             .build()
             .unwrap();
-
-        println!("Debugger listening on ws://{}/{}", address, state.id);
-        println!("Visit chrome://inspect to connect to the debugger.");
 
         // Spawn the web-socket server thread.
         thread::spawn(move || executor.block_on(serve(state)));
@@ -423,8 +422,12 @@ impl AppState {
 }
 
 async fn serve(state: AppState) {
-    // Bind to specified address using hyper.
-    let listener = TcpListener::bind(state.address).await.unwrap();
+    // Bind to specified address, handle errors gracefully.
+    let listener = TcpListener::bind(state.address).await;
+    let listener = unwrap_or_exit(listener.map_err(|e| generic_error(e.to_string())));
+
+    println!("Debugger listening on ws://{}/{}", state.address, state.id);
+    println!("Visit chrome://inspect to connect to the debugger.");
 
     // Build our application with some routes.
     let app = Router::new()
