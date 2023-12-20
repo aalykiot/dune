@@ -9,6 +9,7 @@ use crate::hooks::host_import_module_dynamically_cb;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
 use crate::hooks::promise_reject_cb;
+use crate::inspector::JsRuntimeInspector;
 use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
 use crate::modules::load_import;
@@ -26,6 +27,7 @@ use anyhow::Ok;
 use std::cell::RefCell;
 use std::cmp;
 use std::collections::HashMap;
+use std::net::SocketAddrV4;
 use std::rc::Rc;
 use std::sync::Once;
 use std::time::Instant;
@@ -65,21 +67,27 @@ pub struct JsRuntimeState {
     pub options: JsRuntimeOptions,
     /// Tracks wake event for current loop iteration.
     pub wake_event_queued: bool,
+    /// A structure responsible for providing inspector interface to the runtime.
+    pub inspector: Option<Rc<RefCell<JsRuntimeInspector>>>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 #[allow(dead_code)]
 pub struct JsRuntimeOptions {
     // The seed used in Math.random() method.
     pub seed: Option<i64>,
     // Reloads every URL import.
     pub reload: bool,
+    // The main entry point for the program.
+    pub root: Option<String>,
     // Holds user defined import maps for module loading.
     pub import_map: Option<ImportMap>,
-    // The numbers of threads used by the threadpool.
+    // The numbers of threads used by the thread-pool.
     pub num_threads: Option<usize>,
     // Indicates if we're running JavaScript tests.
     pub test_mode: bool,
+    // Defines the inspector listening options.
+    pub inspect: Option<(SocketAddrV4, bool)>,
 }
 
 pub struct JsRuntime {
@@ -154,6 +162,18 @@ impl JsRuntime {
             .unwrap()
             .as_millis();
 
+        // Initialize the v8 inspector.
+        let address = options.inspect.map(|(address, _)| (address));
+        let inspector = options.inspect.map(|(_, waiting_for_session)| {
+            JsRuntimeInspector::new(
+                &mut isolate,
+                context.clone(),
+                event_loop.interrupt_handle(),
+                waiting_for_session,
+                options.root.clone(),
+            )
+        });
+
         // Store state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
@@ -167,6 +187,7 @@ impl JsRuntime {
             next_tick_queue: Vec::new(),
             promise_exceptions: HashMap::new(),
             options,
+            inspector,
             wake_event_queued: false,
         })));
 
@@ -176,10 +197,17 @@ impl JsRuntime {
         };
 
         runtime.load_main_environment();
+
+        // Start inspector agent is requested.
+        if let Some(inspector) = runtime.inspector().as_mut() {
+            let address = address.unwrap();
+            inspector.borrow_mut().start_agent(address);
+        }
+
         runtime
     }
 
-    /// Initializes synchronously the core environment. (see lib/main.js)
+    /// Initializes synchronously the core environment (see lib/main.js).
     fn load_main_environment(&mut self) {
         let name = "dune:environment/main";
         let source = include_str!("./js/main.js");
@@ -312,6 +340,7 @@ impl JsRuntime {
         };
 
         state.handle.spawn(task, Some(task_cb));
+
         Ok(())
     }
 
@@ -323,8 +352,19 @@ impl JsRuntime {
         self.fast_forward_imports();
     }
 
+    /// Polls the inspector for new devtools messages.
+    pub fn poll_inspect_session(&mut self) {
+        let state = self.get_state();
+        let mut state_rc = state.borrow_mut();
+        if let Some(inspector) = state_rc.inspector.as_mut() {
+            inspector.borrow_mut().poll_session();
+        }
+    }
+
     /// Runs the event-loop until no more pending events exists.
     pub fn run_event_loop(&mut self) {
+        // Check for pending devtools messages.
+        self.poll_inspect_session();
         // Run callbacks/promises from next-tick and micro-task queues.
         run_next_tick_callbacks(&mut self.handle_scope());
 
@@ -334,6 +374,8 @@ impl JsRuntime {
             || self.has_pending_imports()
             || self.has_next_tick_callbacks()
         {
+            // Check for pending devtools messages.
+            self.poll_inspect_session();
             // Tick the event-loop one cycle.
             self.tick_event_loop();
 
@@ -342,6 +384,14 @@ impl JsRuntime {
                 println!("{:?}", self.promise_rejections().remove(0));
                 std::process::exit(1);
             }
+        }
+
+        // We can now notify debugger that the program has finished running
+        // and we're ready to exit the process.
+        if let Some(inspector) = self.inspector() {
+            let context = self.context();
+            let scope = &mut self.handle_scope();
+            inspector.borrow_mut().context_destroyed(scope, context);
         }
     }
 
@@ -536,6 +586,13 @@ impl JsRuntime {
         let state = self.get_state();
         let state = state.borrow();
         state.context.clone()
+    }
+
+    /// Returns the inspector created for the runtime.
+    pub fn inspector(&mut self) -> Option<Rc<RefCell<JsRuntimeInspector>>> {
+        let state = self.get_state();
+        let state = state.borrow();
+        state.inspector.as_ref().cloned()
     }
 }
 

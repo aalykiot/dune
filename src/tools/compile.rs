@@ -9,12 +9,13 @@ use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
 use std::path::Path;
+use std::path::PathBuf;
 
 const SIGNATURE: &[u8; 8] = b"4tr31d1s";
 
 pub type Options = bundle::Options;
 
-pub fn run_compile(entry: &str, output: Option<String>, options: &Options) -> Result<()> {
+pub fn run_compile(entry: &str, output: Option<&PathBuf>, options: &Options) -> Result<()> {
     // Create a JavaScript bundle and compress it using the zstd algorithm.
     let bundle = run_bundle(entry, options)?;
     let bundle = zstd::bulk::compress(bundle.as_bytes(), 0)?;

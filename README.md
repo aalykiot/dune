@@ -382,6 +382,49 @@ Test result: 1 ok; 0 failed; 0 ignored (0 ms)
 
 For more testing examples look at the <a href="./examples/testing/">examples/testing</a> directory.
 
+## Debugging Your Code
+
+Dune embraces the [V8 Inspector Protocol](https://v8.dev/docs/inspector), a standard employed by Chrome, Edge, and Node.js. This enables the debugging of Dune programs through the utilization of Chrome DevTools or other clients that are compatible with this protocol.
+
+To enable debugging capabilities, execute Dune with either the `--inspect` or `--inspect-brk` flags.
+
+The `--inspect` flag permits attaching the debugger at any moment, whereas the `--inspect-brk` option will await the debugger to attach and will pause the execution on the next statement.
+
+> When employing the `--inspect` flag, the code will commence execution promptly. If your program is brief, there may not be sufficient time to establish a debugger connection before the program concludes its execution. In such scenarios, consider using the `--inspect-brk` flag instead.
+
+### Chrome DevTools
+
+Let's attempt debugging a program using Chrome DevTools:
+
+```sh
+$ dune run examples/httpServer.js --inspect-brk
+Debugger listening on ws://127.0.0.1:9229/1513ff37-2f3e-48a3-a4bf-9e3330dc4544
+Visit chrome://inspect to connect to the debugger.
+...
+```
+
+In a Chromium-based browser like Google Chrome or Microsoft Edge, navigate to `chrome://inspect` and select "Inspect" next to the target.
+
+### VS Code
+
+Currently, there is no extension available for Dune in VS Code. However, you can debug your application in VS Code, by utilizing the following launch configuration in `.vscode/launch.json`:
+
+```json
+{
+  "type": "node",
+  "request": "launch",
+  "name": "Debug 'Dune' application",
+  "cwd": "${workspaceFolder}",
+  "program": "<SCRIPT>",
+  "runtimeExecutable": "dune",
+  "runtimeArgs": ["run", "--inspect-brk"],
+  "attachSimplePort": 9229,
+  "console": "integratedTerminal"
+}
+```
+
+> Unfortunately, debugging TypeScript programs in Dune is currently suboptimal due to the absence of source maps during the transpilation process to JavaScript. :(
+
 ## Contributing
 
 Contributions are always welcome!

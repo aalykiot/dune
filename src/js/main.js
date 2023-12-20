@@ -1,10 +1,10 @@
 import timers from 'timers';
 import fetch from '@web/fetch';
 import structuredClone from '@web/clone';
-import { Console, prompt } from 'console';
 import { cloneFunction } from 'util';
-import { TextEncoder, TextDecoder } from '@web/text_encoding';
+import { Console, prompt, wrapConsole } from 'console';
 import { AbortController, AbortSignal } from '@web/abort';
+import { TextEncoder, TextDecoder } from '@web/text_encoding';
 
 globalThis.global = globalThis;
 
@@ -52,7 +52,7 @@ process.nextTick = (callback, ...args) => {
   nextTick(() => callback(...args));
 };
 
-// Setting up STDOUT, STDIN and STDERR streams.
+/* Setting up STDOUT, STDIN and STDERR streams. */
 
 Object.defineProperty(process, 'stdout', {
   get() {
@@ -82,7 +82,14 @@ Object.defineProperty(process, 'stderr', {
   configurable: true,
 });
 
-makeGlobal('console', new Console());
+const console = new Console();
+const consoleFromV8 = globalThis['console'];
+
+wrapConsole(console, consoleFromV8);
+
+/* Initialize global environment for user script */
+
+makeGlobal('console', console);
 makeGlobal('prompt', prompt);
 
 makeGlobal('setTimeout', timers.setTimeout);
