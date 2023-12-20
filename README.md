@@ -392,7 +392,7 @@ The `--inspect` flag permits attaching the debugger at any moment, whereas the `
 
 > When employing the `--inspect` flag, the code will commence execution promptly. If your program is brief, there may not be sufficient time to establish a debugger connection before the program concludes its execution. In such scenarios, consider using the `--inspect-brk` flag instead.
 
-### Chrome Devtools
+### Chrome DevTools
 
 Let's attempt debugging a program using Chrome DevTools:
 
@@ -415,7 +415,7 @@ Currently, there is no extension available for Dune in VS Code. However, you can
   "request": "launch",
   "name": "Debug 'Dune' application",
   "cwd": "${workspaceFolder}",
-  "program": "<ENTRY-SCRIPT>",
+  "program": "<SCRIPT>",
   "runtimeExecutable": "dune",
   "runtimeArgs": ["run", "--inspect-brk"],
   "attachSimplePort": 9229,
