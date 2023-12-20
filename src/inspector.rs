@@ -157,6 +157,10 @@ impl JsRuntimeInspector {
 
         // Spawn the web-socket server thread.
         thread::spawn(move || executor.block_on(serve(state)));
+
+        if self.break_on_start {
+            self.wait_for_session_and_break_on_next_statement();
+        }
     }
 
     // Notify the inspector about the newly created context.
@@ -252,10 +256,6 @@ impl JsRuntimeInspector {
         if let Some(session) = self.session.as_mut() {
             session.break_on_next_statement();
         }
-    }
-
-    pub fn should_break_on_start(&self) -> bool {
-        self.break_on_start
     }
 }
 

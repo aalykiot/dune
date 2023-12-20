@@ -494,15 +494,6 @@ impl JsRuntime {
                 std::process::exit(1);
             }
 
-            // Check if we need to break at first line of user script when the inspector
-            // is alive (this will run only for the main graph).
-            if let Some(inspector_rc) = state_rc.borrow_mut().inspector.as_mut() {
-                let mut inspector = inspector_rc.borrow_mut();
-                if inspector.should_break_on_start() {
-                    inspector.wait_for_session_and_break_on_next_statement();
-                }
-            }
-
             let _ = module.evaluate(tc_scope);
 
             if module.get_status() == v8::ModuleStatus::Errored {
