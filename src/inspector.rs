@@ -92,7 +92,7 @@ impl JsRuntimeInspector {
         isolate: &mut v8::Isolate,
         context: v8::Global<v8::Context>,
         handle: LoopInterruptHandle,
-        break_on_start: bool,
+        should_wait: bool,
         root: Option<String>,
     ) -> Rc<RefCell<Self>> {
         // Create a JsRuntimeInspector instance.
@@ -112,8 +112,8 @@ impl JsRuntimeInspector {
             handshake_rx,
             outbound_tx,
             on_pause: false,
-            waiting_for_session: true,
-            break_on_start,
+            waiting_for_session: should_wait,
+            break_on_start: should_wait,
             root,
         }));
 
