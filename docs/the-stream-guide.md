@@ -1,4 +1,4 @@
-# Dune - The Stream Interface
+# Dune - The Stream Guide
 
 Hi again! 🖖 You've discovered the technical overview detailing how Dune incorporates the concept of streams. This README is crafted to help you understand how streams operate in Dune, along with the reasoning behind specific technical choices.
 
@@ -144,7 +144,7 @@ await stream.end();
 
 Duplex streams are streams that facilitate both `reading` and `writing` of data, essentially combining the characteristics of `Readable` and `Writable` streams. They are commonly used in network communication and other scenarios where both reading and writing are essential.
 
-Technically, an object that adheres to the `@@asyncIterator` protocol and includes both a `write()` and `end()` function is considered a Duplex stream by Dune. A classic example is the [Socket](https://github.com/aalykiot/dune/blob/main/src/js/net.js#L148)  class in the net module.
+Technically, an object that adheres to the `@@asyncIterator` protocol and includes both a `write()` and `end()` function is considered a Duplex stream by Dune. A classic example is the [Socket](https://github.com/aalykiot/dune/blob/main/src/js/net.js#L148) class in the net module.
 
 #### `Transform`
 
@@ -228,7 +228,7 @@ Lastly, as mentioned earlier, a pull-based stream works effectively when we can 
 To tackle this issue, every internal Dune object, such as `net.Socket` or `http.Server`, that satisfies the `Readable` interface utilizes a double queue mechanism.
 
 <br />
-<img src="./assets/the-stream-interface-01.svg" height="185px" />
+<img src="./assets/the-stream-guide-01.svg" height="185px" />
 
 #### `Push Queue`
 
