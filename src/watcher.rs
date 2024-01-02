@@ -33,7 +33,7 @@ struct WatcherHandler {
 impl EventHandler for WatcherHandler {
     fn handle_event(&mut self, event: notify::Result<Event>) {
         let event = event.unwrap();
-        let path = event.paths.get(0).unwrap().to_owned();
+        let path = event.paths.first().unwrap().to_owned();
         let path_ext = path.extension().unwrap_or_default().to_str().unwrap();
 
         // We only care to monitor files with specific extensions.
