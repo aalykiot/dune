@@ -1,3 +1,4 @@
+use crate::bindings::set_exception_code;
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
 use crate::errors::JsError;
@@ -83,7 +84,7 @@ impl JsFuture for TcpConnectFuture {
                 // Reject the promise.
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-
+                set_exception_code(scope, exception, &e);
                 self.promise.open(scope).reject(scope, exception).unwrap();
             }
         }
@@ -128,10 +129,12 @@ fn connect(
 
     // Check if the tcp_connect failed early.
     if let Err(e) = connect {
+        // Drop state to avoid panics.
+        drop(state);
         // Create the JavaScript error.
         let message = v8::String::new(scope, &e.to_string()).unwrap();
         let exception = v8::Exception::error(scope, message);
-
+        set_exception_code(scope, exception, &e);
         promise_resolver.reject(scope, exception).unwrap();
         return;
     }
@@ -230,7 +233,7 @@ impl JsFuture for TcpWriteFuture {
                 // Reject the promise.
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-
+                set_exception_code(scope, exception, &e);
                 self.promise.open(scope).reject(scope, exception).unwrap();
             }
         }
@@ -361,6 +364,7 @@ fn listen(
     if let Err(e) = server_id {
         let message = v8::String::new(scope, &e.to_string()).unwrap();
         let exception = v8::Exception::error(scope, message);
+        set_exception_code(scope, exception, &e);
         scope.throw_exception(exception);
         return;
     }

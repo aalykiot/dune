@@ -1,5 +1,6 @@
 use crate::bindings::get_internal_ref;
 use crate::bindings::set_constant_to;
+use crate::bindings::set_exception_code;
 use crate::bindings::set_function_to;
 use crate::bindings::set_internal_ref;
 use crate::bindings::set_property_to;
@@ -101,7 +102,7 @@ impl JsFuture for FsOpenFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -222,7 +223,7 @@ impl JsFuture for FsReadFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -269,7 +270,6 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
         None => {
             let message = v8::String::new(scope, "File is closed.").unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise.
             promise_resolver.reject(scope, exception);
             rv.set(promise.into());
             return;
@@ -373,7 +373,7 @@ impl JsFuture for FsWriteFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -411,7 +411,6 @@ fn write(
         None => {
             let message = v8::String::new(scope, "File is closed.").unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise.
             promise_resolver.reject(scope, exception);
             rv.set(promise.into());
             return;
@@ -493,7 +492,7 @@ impl JsFuture for FsStatFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -590,7 +589,7 @@ impl JsFuture for FsMkdirFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -682,7 +681,7 @@ impl JsFuture for FsRmdirFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -761,7 +760,7 @@ impl JsFuture for ReadDirFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -880,7 +879,7 @@ impl JsFuture for FsRmFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -1012,7 +1011,7 @@ impl JsFuture for FsRenameFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }

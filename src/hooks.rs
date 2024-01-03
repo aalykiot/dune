@@ -1,3 +1,4 @@
+use crate::bindings::set_exception_code;
 use crate::bindings::throw_type_error;
 use crate::errors::unwrap_or_exit;
 use crate::event_loop::LoopHandle;
@@ -161,8 +162,10 @@ pub fn host_import_module_dynamically_cb<'s>(
     let specifier = match resolve_import(Some(&base), &specifier, false, import_map) {
         Ok(specifier) => specifier,
         Err(e) => {
+            drop(state);
             let exception = v8::String::new(scope, &e.to_string()[18..]).unwrap();
             let exception = v8::Exception::error(scope, exception);
+            set_exception_code(scope, exception, &e);
             promise_resolver.reject(scope, exception);
             return Some(promise);
         }
