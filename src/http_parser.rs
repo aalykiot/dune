@@ -170,7 +170,7 @@ fn parse_body_chunks(
         Err(e) => {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception, &e.into());
+            set_exception_code(scope, exception, &e);
             scope.throw_exception(exception);
             return;
         }

@@ -476,7 +476,7 @@ export class Server extends EventEmitter {
     this.#pullQueue = [];
 
     // Setting up the underling TCP server.
-    this.#tcp = net.createServer(this.#handleConnection.bind(this));
+    this.#tcp = net.createServer(this.#handleConnectionSafely.bind(this));
     this.#tcp.on('close', () => this.emit('close'));
   }
 
@@ -497,6 +497,17 @@ export class Server extends EventEmitter {
     const action = socket instanceof Error ? Promise.reject : Promise.resolve;
 
     return action.call(Promise, socket);
+  }
+
+  async #handleConnectionSafely(socket) {
+    try {
+      await this.#handleConnection(socket);
+    } catch (err) {
+      // Don't crash the server for a single misbehaving socket.
+      if (err?.code !== 'ERR_CONNECTION_RESET') {
+        throw err;
+      }
+    }
   }
 
   async #handleConnection(socket) {

@@ -34,7 +34,7 @@ impl JsFuture for DnsLookupFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception.into(), &e);
+            set_exception_code(scope, exception, &e);
             // Reject the promise on failure.
             self.promise.open(scope).reject(scope, exception);
             return;
