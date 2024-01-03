@@ -202,7 +202,7 @@ fn open_sync(
             rv.set(file_wrapper.into());
         }
         Err(e) => {
-            throw_exception(scope, &e.to_string());
+            throw_exception(scope, &e);
         }
     }
 }
@@ -327,7 +327,7 @@ fn read_sync(
     let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
         Some(file) => file.try_clone().unwrap(),
         None => {
-            throw_exception(scope, "File is closed.");
+            throw_exception(scope, &anyhow!("File is closed."));
             return;
         }
     };
@@ -343,7 +343,7 @@ fn read_sync(
             rv.set(bytes_read.into());
         }
         Err(e) => {
-            throw_exception(scope, &e.to_string());
+            throw_exception(scope, &e);
         }
     }
 }
@@ -462,7 +462,7 @@ fn write_sync(
     let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
         Some(file) => file.try_clone().unwrap(),
         None => {
-            throw_exception(scope, "File is closed.");
+            throw_exception(scope, &anyhow!("File is closed."));
             return;
         }
     };
@@ -474,7 +474,7 @@ fn write_sync(
     data.copy_contents(&mut buffer);
 
     if let Err(e) = write_file_op(&mut file, &buffer) {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e);
     }
 }
 
@@ -560,7 +560,7 @@ fn stat_sync(
 
     match stats_op(path) {
         Ok(stats) => rv.set(create_v8_stats_object(scope, stats).into()),
-        Err(e) => throw_exception(scope, &e.to_string()),
+        Err(e) => throw_exception(scope, &e),
     };
 }
 
@@ -652,7 +652,7 @@ fn mkdir_sync(
     let recursive = args.get(1).to_rust_string_lossy(scope) == "true";
 
     if let Err(e) = mkdir_op(path, recursive) {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e);
     }
 }
 
@@ -742,7 +742,7 @@ fn rmdir_sync(
     let path = args.get(0).to_rust_string_lossy(scope);
 
     if let Err(e) = rmdir_op(path) {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e);
     }
 }
 
@@ -850,7 +850,7 @@ fn readdir_sync(
 
             rv.set(directory_value.into());
         }
-        Err(e) => throw_exception(scope, &e.to_string()),
+        Err(e) => throw_exception(scope, &e),
     }
 }
 
@@ -932,7 +932,7 @@ fn rm_sync(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: 
     let path = args.get(0).to_rust_string_lossy(scope);
 
     if let Err(e) = rm_op(path) {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e);
     }
 }
 
@@ -983,7 +983,7 @@ fn close_sync(
         return drop(file);
     }
 
-    throw_exception(scope, "File is closed.");
+    throw_exception(scope, &anyhow!("File is closed."));
 }
 
 /// Describes what will run after the async rename_op completes.
@@ -1076,7 +1076,7 @@ fn rename_sync(
     let to = args.get(1).to_rust_string_lossy(scope);
 
     if let Err(e) = rename_op(from, to) {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e);
     }
 }
 
@@ -1155,7 +1155,7 @@ fn watch(
     let index = match state.handle.fs_event_start(path, recursive, on_event) {
         Ok(index) => v8::Integer::new(scope, index as i32),
         Err(e) => {
-            throw_exception(scope, &e.to_string());
+            throw_exception(scope, &e);
             return;
         }
     };

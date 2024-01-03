@@ -7,9 +7,12 @@ use crate::process;
 use crate::promise;
 use crate::stdio;
 use crate::timers;
+use anyhow::Error;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::ffi::c_void;
+use std::io::Error as IoError;
+use std::io::ErrorKind;
 
 /// Function pointer for the bindings initializers.
 type BindingInitFn = fn(&mut v8::HandleScope<'_>) -> v8::Global<v8::Object>;
@@ -138,10 +141,51 @@ pub fn get_internal_ref<'s, T>(
     unsafe { &mut *stored_item }
 }
 
+/// Returns a string representation of the IO error's code.
+fn extract_error_code(err: &IoError) -> Option<&'static str> {
+    match err.kind() {
+        ErrorKind::AddrInUse => Some("ADDR_IN_USE"),
+        ErrorKind::AddrNotAvailable => Some("ADDR_NOT_AVAILABLE"),
+        ErrorKind::AlreadyExists => Some("ALREADY_EXISTS"),
+        ErrorKind::BrokenPipe => Some("BROKEN_PIPE"),
+        ErrorKind::ConnectionAborted => Some("CONNECTION_ABORTED"),
+        ErrorKind::ConnectionRefused => Some("CONNECTION_REFUSED"),
+        ErrorKind::ConnectionReset => Some("CONNECTION_RESET"),
+        ErrorKind::Interrupted => Some("INTERRUPTED"),
+        ErrorKind::InvalidData => Some("INVALID_DATA"),
+        ErrorKind::NotConnected => Some("NOT_CONNECTED"),
+        ErrorKind::NotFound => Some("NOT_FOUND"),
+        ErrorKind::PermissionDenied => Some("PERMISSION_DENIED"),
+        ErrorKind::TimedOut => Some("TIMED_OUT"),
+        ErrorKind::UnexpectedEof => Some("UNEXPECTED_EOF"),
+        ErrorKind::WouldBlock => Some("WOULD_BLOCK"),
+        ErrorKind::WriteZero => Some("WRITE_ZERO"),
+        _ => None,
+    }
+}
+
+/// Adds error codes to exception if available.
+pub fn set_exception_code(
+    scope: &mut v8::HandleScope<'_>,
+    exception: v8::Local<v8::Value>,
+    error: &Error,
+) {
+    let exception = exception.to_object(scope).unwrap();
+    if let Some(e) = error.downcast_ref::<IoError>() {
+        if let Some(code) = extract_error_code(e) {
+            let key = v8::String::new(scope, "code").unwrap();
+            let value = v8::String::new(scope, &format!("ERR_{code}")).unwrap();
+            exception.set(scope, key.into(), value.into());
+        }
+    }
+}
+
 /// Useful utility to throw v8 exceptions.
-pub fn throw_exception(scope: &mut v8::HandleScope, message: &str) {
-    let message = v8::String::new(scope, message).unwrap();
+pub fn throw_exception(scope: &mut v8::HandleScope, err: &Error) {
+    let message = err.to_string().to_owned();
+    let message = v8::String::new(scope, &message).unwrap();
     let exception = v8::Exception::error(scope, message);
+    set_exception_code(scope, exception, err);
     scope.throw_exception(exception);
 }
 
