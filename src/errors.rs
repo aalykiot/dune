@@ -3,6 +3,8 @@ use colored::*;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fmt::Display;
+pub use std::io::Error as IoError;
+use std::io::ErrorKind;
 
 /// A simple error type that lets the creator specify both the error message and
 /// the error class name.
@@ -175,5 +177,28 @@ pub fn unwrap_or_exit<T>(result: Result<T, Error>) -> T {
             eprintln!("{e:?}");
             std::process::exit(1);
         }
+    }
+}
+
+/// Returns a string representation of the IO error's code.
+pub fn extract_error_code(err: &IoError) -> Option<&'static str> {
+    match err.kind() {
+        ErrorKind::AddrInUse => Some("ADDR_IN_USE"),
+        ErrorKind::AddrNotAvailable => Some("ADDR_NOT_AVAILABLE"),
+        ErrorKind::AlreadyExists => Some("ALREADY_EXISTS"),
+        ErrorKind::BrokenPipe => Some("BROKEN_PIPE"),
+        ErrorKind::ConnectionAborted => Some("CONNECTION_ABORTED"),
+        ErrorKind::ConnectionRefused => Some("CONNECTION_REFUSED"),
+        ErrorKind::ConnectionReset => Some("CONNECTION_RESET"),
+        ErrorKind::Interrupted => Some("INTERRUPTED"),
+        ErrorKind::InvalidData => Some("INVALID_DATA"),
+        ErrorKind::NotConnected => Some("NOT_CONNECTED"),
+        ErrorKind::NotFound => Some("NOT_FOUND"),
+        ErrorKind::PermissionDenied => Some("PERMISSION_DENIED"),
+        ErrorKind::TimedOut => Some("TIMED_OUT"),
+        ErrorKind::UnexpectedEof => Some("UNEXPECTED_EOF"),
+        ErrorKind::WouldBlock => Some("WOULD_BLOCK"),
+        ErrorKind::WriteZero => Some("WRITE_ZERO"),
+        _ => None,
     }
 }
