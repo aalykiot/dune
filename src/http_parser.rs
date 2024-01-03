@@ -1,4 +1,5 @@
 use crate::bindings::set_constant_to;
+use crate::bindings::set_exception_code;
 use crate::bindings::set_function_to;
 use anyhow::bail;
 use anyhow::Result;
@@ -36,6 +37,7 @@ fn parse_incoming_request(
         Err(e) => {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
+            set_exception_code(scope, exception, &e.into());
             scope.throw_exception(exception);
             return;
         }
@@ -107,6 +109,7 @@ fn parse_incoming_response(
         Err(e) => {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
+            set_exception_code(scope, exception, &e.into());
             scope.throw_exception(exception);
             return;
         }
@@ -167,6 +170,7 @@ fn parse_body_chunks(
         Err(e) => {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
+            set_exception_code(scope, exception, &e);
             scope.throw_exception(exception);
             return;
         }

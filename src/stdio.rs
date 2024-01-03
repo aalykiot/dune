@@ -56,7 +56,7 @@ fn read(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, mut ret: 
 /// Clears the terminal if the environment allows it.
 fn clear(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     if let Err(e) = clearscreen::clear() {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e.into());
     }
 }
 

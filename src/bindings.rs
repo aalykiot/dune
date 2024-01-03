@@ -1,4 +1,6 @@
 use crate::dns;
+use crate::errors::extract_error_code;
+use crate::errors::IoError;
 use crate::file;
 use crate::http_parser;
 use crate::net;
@@ -7,6 +9,7 @@ use crate::process;
 use crate::promise;
 use crate::stdio;
 use crate::timers;
+use anyhow::Error;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::ffi::c_void;
@@ -56,7 +59,6 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
 
     // Expose low-level functions to JavaScript.
     process::initialize(scope, global);
-
     scope.escape(context)
 }
 
@@ -107,7 +109,6 @@ pub fn create_object_under<'s>(
     let value = template.new_instance(scope).unwrap();
 
     target.set(scope, key.into(), value.into());
-
     value
 }
 
@@ -138,10 +139,28 @@ pub fn get_internal_ref<'s, T>(
     unsafe { &mut *stored_item }
 }
 
+/// Sets error code to exception if possible.
+pub fn set_exception_code(
+    scope: &mut v8::HandleScope<'_>,
+    exception: v8::Local<v8::Value>,
+    error: &Error,
+) {
+    let exception = exception.to_object(scope).unwrap();
+    if let Some(error) = error.downcast_ref::<IoError>() {
+        if let Some(code) = extract_error_code(error) {
+            let key = v8::String::new(scope, "code").unwrap();
+            let value = v8::String::new(scope, &format!("ERR_{code}")).unwrap();
+            exception.set(scope, key.into(), value.into());
+        }
+    }
+}
+
 /// Useful utility to throw v8 exceptions.
-pub fn throw_exception(scope: &mut v8::HandleScope, message: &str) {
-    let message = v8::String::new(scope, message).unwrap();
+pub fn throw_exception(scope: &mut v8::HandleScope, error: &Error) {
+    let message = error.to_string().to_owned();
+    let message = v8::String::new(scope, &message).unwrap();
     let exception = v8::Exception::error(scope, message);
+    set_exception_code(scope, exception, error);
     scope.throw_exception(exception);
 }
 

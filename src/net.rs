@@ -1,3 +1,4 @@
+use crate::bindings::set_exception_code;
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
 use crate::errors::JsError;
@@ -83,7 +84,7 @@ impl JsFuture for TcpConnectFuture {
                 // Reject the promise.
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-
+                set_exception_code(scope, exception, e);
                 self.promise.open(scope).reject(scope, exception).unwrap();
             }
         }
@@ -128,10 +129,12 @@ fn connect(
 
     // Check if the tcp_connect failed early.
     if let Err(e) = connect {
+        // Drop state to avoid panics.
+        drop(state);
         // Create the JavaScript error.
         let message = v8::String::new(scope, &e.to_string()).unwrap();
         let exception = v8::Exception::error(scope, message);
-
+        set_exception_code(scope, exception, &e);
         promise_resolver.reject(scope, exception).unwrap();
         return;
     }
@@ -151,8 +154,8 @@ impl JsFuture for ReadStartFuture {
             Ok(data) => {
                 // Create ArrayBuffer's backing store from Vec<u8>.
                 let store = data.clone().into_boxed_slice();
-                let store =
-                    v8::ArrayBuffer::new_backing_store_from_boxed_slice(store).make_shared();
+                let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store);
+                let store = store.make_shared();
 
                 // Initialize ArrayBuffer.
                 let bytes = v8::ArrayBuffer::with_backing_store(scope, &store);
@@ -163,11 +166,13 @@ impl JsFuture for ReadStartFuture {
 
         // Create the v8 value for the error parameter.
         let error_value: v8::Local<v8::Value> = match self.data.as_mut() {
+            Ok(_) => v8::null(scope).into(),
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
-                v8::Exception::error(scope, message)
+                let exception = v8::Exception::error(scope, message);
+                set_exception_code(scope, exception, e);
+                exception
             }
-            Ok(_) => v8::null(scope).into(),
         };
 
         // Get access to the on_read callback.
@@ -230,7 +235,7 @@ impl JsFuture for TcpWriteFuture {
                 // Reject the promise.
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-
+                set_exception_code(scope, exception, e);
                 self.promise.open(scope).reject(scope, exception).unwrap();
             }
         }
@@ -361,6 +366,7 @@ fn listen(
     if let Err(e) = server_id {
         let message = v8::String::new(scope, &e.to_string()).unwrap();
         let exception = v8::Exception::error(scope, message);
+        set_exception_code(scope, exception, &e);
         scope.throw_exception(exception);
         return;
     }

@@ -1,5 +1,6 @@
 use crate::bindings::get_internal_ref;
 use crate::bindings::set_constant_to;
+use crate::bindings::set_exception_code;
 use crate::bindings::set_function_to;
 use crate::bindings::set_internal_ref;
 use crate::bindings::set_property_to;
@@ -101,7 +102,7 @@ impl JsFuture for FsOpenFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -202,7 +203,7 @@ fn open_sync(
             rv.set(file_wrapper.into());
         }
         Err(e) => {
-            throw_exception(scope, &e.to_string());
+            throw_exception(scope, &e);
         }
     }
 }
@@ -222,7 +223,7 @@ impl JsFuture for FsReadFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -269,7 +270,6 @@ fn read(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
         None => {
             let message = v8::String::new(scope, "File is closed.").unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise.
             promise_resolver.reject(scope, exception);
             rv.set(promise.into());
             return;
@@ -327,7 +327,7 @@ fn read_sync(
     let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
         Some(file) => file.try_clone().unwrap(),
         None => {
-            throw_exception(scope, "File is closed.");
+            throw_exception(scope, &anyhow!("File is closed."));
             return;
         }
     };
@@ -343,7 +343,7 @@ fn read_sync(
             rv.set(bytes_read.into());
         }
         Err(e) => {
-            throw_exception(scope, &e.to_string());
+            throw_exception(scope, &e);
         }
     }
 }
@@ -373,7 +373,7 @@ impl JsFuture for FsWriteFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -411,7 +411,6 @@ fn write(
         None => {
             let message = v8::String::new(scope, "File is closed.").unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise.
             promise_resolver.reject(scope, exception);
             rv.set(promise.into());
             return;
@@ -462,7 +461,7 @@ fn write_sync(
     let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
         Some(file) => file.try_clone().unwrap(),
         None => {
-            throw_exception(scope, "File is closed.");
+            throw_exception(scope, &anyhow!("File is closed."));
             return;
         }
     };
@@ -474,7 +473,7 @@ fn write_sync(
     data.copy_contents(&mut buffer);
 
     if let Err(e) = write_file_op(&mut file, &buffer) {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e);
     }
 }
 
@@ -493,7 +492,7 @@ impl JsFuture for FsStatFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -560,7 +559,7 @@ fn stat_sync(
 
     match stats_op(path) {
         Ok(stats) => rv.set(create_v8_stats_object(scope, stats).into()),
-        Err(e) => throw_exception(scope, &e.to_string()),
+        Err(e) => throw_exception(scope, &e),
     };
 }
 
@@ -590,7 +589,7 @@ impl JsFuture for FsMkdirFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -652,7 +651,7 @@ fn mkdir_sync(
     let recursive = args.get(1).to_rust_string_lossy(scope) == "true";
 
     if let Err(e) = mkdir_op(path, recursive) {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e);
     }
 }
 
@@ -682,7 +681,7 @@ impl JsFuture for FsRmdirFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -742,7 +741,7 @@ fn rmdir_sync(
     let path = args.get(0).to_rust_string_lossy(scope);
 
     if let Err(e) = rmdir_op(path) {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e);
     }
 }
 
@@ -761,7 +760,7 @@ impl JsFuture for ReadDirFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -850,7 +849,7 @@ fn readdir_sync(
 
             rv.set(directory_value.into());
         }
-        Err(e) => throw_exception(scope, &e.to_string()),
+        Err(e) => throw_exception(scope, &e),
     }
 }
 
@@ -880,7 +879,7 @@ impl JsFuture for FsRmFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -932,7 +931,7 @@ fn rm_sync(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: 
     let path = args.get(0).to_rust_string_lossy(scope);
 
     if let Err(e) = rm_op(path) {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e);
     }
 }
 
@@ -983,7 +982,7 @@ fn close_sync(
         return drop(file);
     }
 
-    throw_exception(scope, "File is closed.");
+    throw_exception(scope, &anyhow!("File is closed."));
 }
 
 /// Describes what will run after the async rename_op completes.
@@ -1012,7 +1011,7 @@ impl JsFuture for FsRenameFuture {
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
-            // Reject the promise on failure.
+            set_exception_code(scope, exception, &e);
             self.promise.open(scope).reject(scope, exception);
             return;
         }
@@ -1076,7 +1075,7 @@ fn rename_sync(
     let to = args.get(1).to_rust_string_lossy(scope);
 
     if let Err(e) = rename_op(from, to) {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e);
     }
 }
 
@@ -1155,7 +1154,7 @@ fn watch(
     let index = match state.handle.fs_event_start(path, recursive, on_event) {
         Ok(index) => v8::Integer::new(scope, index as i32),
         Err(e) => {
-            throw_exception(scope, &e.to_string());
+            throw_exception(scope, &e);
             return;
         }
     };

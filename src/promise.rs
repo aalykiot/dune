@@ -1,6 +1,7 @@
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
 use crate::bindings::throw_exception;
+use anyhow::anyhow;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
@@ -18,7 +19,8 @@ fn peek(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     let promise: v8::Local<v8::Promise> = match args.get(0).try_into() {
         Ok(value) => value,
         Err(_) => {
-            throw_exception(scope, "The provided object is not a Promise.");
+            let err = anyhow!("The provided object is not a Promise.");
+            throw_exception(scope, &err);
             return;
         }
     };

@@ -208,12 +208,14 @@ fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8:
     let pid = args.get(0).to_rust_string_lossy(scope);
     let signal = args.get(1).to_rust_string_lossy(scope);
 
+    use anyhow::anyhow;
+
     // Check if the value is a valid NIX signal.
     if !nix::sys::signal::Signal::iterator()
         .map(|s| s.as_str())
         .any(|v| *v == signal)
     {
-        throw_exception(scope, &format!("Invalid signal: {signal}"));
+        throw_exception(scope, &anyhow!("Invalid signal: {signal}"));
         return;
     }
 
@@ -222,7 +224,7 @@ fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8:
         .args([&format!("-{signal}"), &pid])
         .output()
     {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e.into());
     }
 }
 
@@ -232,7 +234,7 @@ fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8:
     let pid = args.get(0).to_rust_string_lossy(scope);
     // Try to kill the process.
     if let Err(e) = Command::new("Taskkill").args(["/F", "/PID", &pid]).output() {
-        throw_exception(scope, &e.to_string());
+        throw_exception(scope, &e.into());
     }
 }
 
