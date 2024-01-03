@@ -233,7 +233,7 @@ fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8:
     let pid = args.get(0).to_rust_string_lossy(scope);
     // Try to kill the process.
     if let Err(e) = Command::new("Taskkill").args(["/F", "/PID", &pid]).output() {
-        throw_exception(scope, &e);
+        throw_exception(scope, &e.into());
     }
 }
 

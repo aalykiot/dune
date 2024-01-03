@@ -156,11 +156,11 @@ pub fn set_exception_code(
 }
 
 /// Useful utility to throw v8 exceptions.
-pub fn throw_exception(scope: &mut v8::HandleScope, err: &Error) {
-    let message = err.to_string().to_owned();
+pub fn throw_exception(scope: &mut v8::HandleScope, error: &Error) {
+    let message = error.to_string().to_owned();
     let message = v8::String::new(scope, &message).unwrap();
     let exception = v8::Exception::error(scope, message);
-    set_exception_code(scope, exception, err);
+    set_exception_code(scope, exception, error);
     scope.throw_exception(exception);
 }
 
