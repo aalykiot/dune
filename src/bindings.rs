@@ -59,7 +59,6 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
 
     // Expose low-level functions to JavaScript.
     process::initialize(scope, global);
-
     scope.escape(context)
 }
 
@@ -110,7 +109,6 @@ pub fn create_object_under<'s>(
     let value = template.new_instance(scope).unwrap();
 
     target.set(scope, key.into(), value.into());
-
     value
 }
 
