@@ -10,7 +10,6 @@ use crate::bindings::set_property_to;
 use crate::bindings::throw_exception;
 use crate::bindings::BINDINGS;
 use crate::JsRuntime;
-use anyhow::anyhow;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::env;
@@ -208,6 +207,8 @@ fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8:
     // Get PID and SIGNAL arguments
     let pid = args.get(0).to_rust_string_lossy(scope);
     let signal = args.get(1).to_rust_string_lossy(scope);
+
+    use anyhow::anyhow;
 
     // Check if the value is a valid NIX signal.
     if !nix::sys::signal::Signal::iterator()
