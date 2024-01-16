@@ -4,6 +4,7 @@
   "description": "A hobby runtime for JavaScript and TypeScript 🚀",
   "main": "src/js/main.js",
   "scripts": {
+    "build:docs": "jsdoc -c .jsdoc.json",
     "build:aarch64": "./scripts/build-aarch64.sh",
     "lint": "eslint ./src/js/**/*.js"
   },
@@ -19,6 +20,8 @@
   },
   "homepage": "https://github.com/aalykiot/dune#readme",
   "devDependencies": {
-    "eslint": "^8.19.0"
+    "docolatte": "^4.4.0",
+    "eslint": "^8.19.0",
+    "jsdoc": "^4.0.2"
   }
 }

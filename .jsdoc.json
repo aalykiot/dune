@@ -1,0 +1,32 @@
+{
+  "plugins": ["plugins/markdown"],
+  "recurseDepth": 10,
+  "source": {
+    "include": ["src/js/dns.js"]
+  },
+  "tags": {
+    "allowUnknownTags": true,
+    "dictionaries": ["jsdoc", "closure"]
+  },
+  "opts": {
+    "destination": "./docs/static/",
+    "readme": "./README.md",
+    "encoding": "utf8",
+    "template": "./node_modules/docolatte",
+    "recurse": true
+  },
+  "templates": {
+    "docolatte": {
+      "branding": {
+        "title": "Dune Runtime",
+        "link": "https://github.com/aalykiot/dune",
+        "icon": "github"
+      },
+      "meta": {
+        "title": "Dune - API Reference",
+        "description": "A hobby runtime for JavaScript and TypeScript 🚀",
+        "keywords": "JavaScript, TypeScript, V8"
+      }
+    }
+  }
+}
