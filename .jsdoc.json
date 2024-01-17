@@ -8,7 +8,8 @@
       "src/js/stream.js",
       "src/js/events.js",
       "src/js/assert.js",
-      "src/js/timers.js"
+      "src/js/timers.js",
+      "src/js/fs.js"
     ]
   },
   "tags": {
@@ -19,21 +20,13 @@
     "destination": "./docs/static/",
     "readme": "./README.md",
     "encoding": "utf8",
-    "template": "./node_modules/docolatte",
+    "template": "./node_modules/minami",
     "recurse": true
   },
   "templates": {
-    "docolatte": {
-      "branding": {
-        "title": "Dune Runtime",
-        "link": "https://github.com/aalykiot/dune",
-        "icon": "github"
-      },
-      "meta": {
-        "title": "Dune - API Reference",
-        "description": "A hobby runtime for JavaScript and TypeScript 🚀",
-        "keywords": "JavaScript, TypeScript, V8"
-      }
-    }
+    "cleverLinks": false,
+    "monospaceLinks": true,
+    "useLongnameInNav": false,
+    "showInheritedInNav": true
   }
 }

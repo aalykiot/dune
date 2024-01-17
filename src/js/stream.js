@@ -55,7 +55,7 @@ const wrap = (iterable, signal) => {
  *
  * @param {(AsyncGeneratorFunction|AsyncIterator)} source - The source stream from which data is read.
  * @param  {...AsyncGeneratorFunction} targets - One or more target streams where data from the source is written to.
- * @returns {Promise<void>}
+ * @returns {Promise}
  */
 export function pipeline(source, ...targets) {
   // The signal EE is used to signal the pipeline that an uncaught

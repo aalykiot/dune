@@ -20,8 +20,9 @@
   },
   "homepage": "https://github.com/aalykiot/dune#readme",
   "devDependencies": {
-    "docolatte": "^4.4.0",
     "eslint": "^8.19.0",
-    "jsdoc": "^4.0.2"
+    "jsdoc": "^4.0.2",
+    "minami": "^1.2.3",
+    "taffydb": "^2.7.3"
   }
 }
