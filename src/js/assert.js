@@ -1,7 +1,11 @@
-// Assert API
-//
-// Javascript, battle tested, simple assertion library with no dependencies.
-// https://assert-js.norbert.tech/
+/**
+ * Assert API
+ *
+ * Javascript, battle tested, simple assertion library with no dependencies.
+ * https://assert-js.norbert.tech/
+ *
+ * @module Assert
+ */
 
 const VALUE_NAME_REGEXP = /\${(.*?)}/g;
 
@@ -149,11 +153,16 @@ class InvalidValueException {
   }
 }
 
+/**
+ * A class that exposes static methods for assertions.
+ */
 class Assert {
   /**
-   * @param {object} objectValue
-   * @param {function} expectedInstance
-   * @param {string} [message]
+   * Asserts that a given object is an instance of a specified class.
+   *
+   * @param {object} objectValue - The object to be tested against the expected instance.
+   * @param {function} expectedInstance - The constructor function that the value is expected to be an instance of.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static instanceOf(objectValue, expectedInstance, message = '') {
     this.string(
@@ -177,8 +186,10 @@ class Assert {
   }
 
   /**
-   * @param {int} integerValue
-   * @param {string} [message]
+   * Validates that a given value is an integer.
+   *
+   * @param {int} integerValue - The value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static integer(integerValue, message = '') {
     this.string(
@@ -192,8 +203,10 @@ class Assert {
   }
 
   /**
-   * @param {number} numberValue
-   * @param {string} [message]
+   * Validates that a given value is a number.
+   *
+   * @param {number} numberValue - The value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static number(numberValue, message = '') {
     this.string(
@@ -207,8 +220,10 @@ class Assert {
   }
 
   /**
-   * @param {string} stringValue
-   * @param {string} [message]
+   * Validates that a given value is a string.
+   *
+   * @param {string} stringValue - The value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static string(stringValue, message = '') {
     if (typeof message !== 'string') {
@@ -223,8 +238,10 @@ class Assert {
   }
 
   /**
-   * @param {boolean} booleanValue
-   * @param {string} [message]
+   * Validates that a given value is a boolean.
+   *
+   * @param {boolean} booleanValue - The value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static boolean(booleanValue, message = '') {
     this.string(
@@ -238,8 +255,10 @@ class Assert {
   }
 
   /**
-   * @param {boolean} value
-   * @param {string} [message]
+   * Validates that a given value is true.
+   *
+   * @param {boolean} value - The value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static true(value, message = '') {
     this.boolean(value);
@@ -254,8 +273,10 @@ class Assert {
   }
 
   /**
-   * @param {boolean} value
-   * @param {string} [message]
+   * Validates that a given value is false.
+   *
+   * @param {boolean} value - The value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static false(value, message = '') {
     this.boolean(value);
@@ -270,9 +291,11 @@ class Assert {
   }
 
   /**
-   * @param value
-   * @param expectedValue
-   * @param {string} [message]
+   * Asserts that a given value is equal to an expected value.
+   *
+   * @param {*} value - The value to be compared. This can be of any type.
+   * @param {*} expectedValue - The value against which the first parameter is compared.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static equal(value, expectedValue, message = '') {
     if (typeof value !== 'object') {
@@ -302,9 +325,11 @@ class Assert {
   }
 
   /**
-   * @param {object} object
-   * @param {object} expectedObject
-   * @param {string} [message]
+   * Asserts that two objects are equal by comparing their properties.
+   *
+   * @param {object} object - The object to be compared.
+   * @param {object} expectedObject - The object expected to be equal to the first object.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static objectEqual(object, expectedObject, message = '') {
     this.object(object, message);
@@ -340,8 +365,10 @@ class Assert {
   }
 
   /**
-   * @param {object} objectValue
-   * @param {string} [message]
+   * Asserts that a given value is of type 'object'.
+   *
+   * @param {object} objectValue - The value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static object(objectValue, message = '') {
     this.string(
@@ -355,9 +382,11 @@ class Assert {
   }
 
   /**
-   * @param {string} expectedFunctionName
-   * @param {object} objectValue
-   * @param {string} [message]
+   * Asserts that a given object has a function of a specified name.
+   *
+   * @param {string} expectedFunctionName - The name of the function expected to be present in the object.
+   * @param {object} objectValue - The object to be checked for the presence of the specified function.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static hasFunction(expectedFunctionName, objectValue, message = '') {
     this.string(expectedFunctionName);
@@ -377,9 +406,11 @@ class Assert {
   }
 
   /**
-   * @param {string} expectedPropertyName
-   * @param {object} objectValue
-   * @param {string} [message]
+   * Asserts that a given object has a specific property.
+   *
+   * @param {string} expectedPropertyName - The name of the property expected to be present in the object.
+   * @param {object} objectValue - The object to be checked for the presence of the specified property.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static hasProperty(expectedPropertyName, objectValue, message = '') {
     this.string(expectedPropertyName);
@@ -399,8 +430,10 @@ class Assert {
   }
 
   /**
-   * @param {array} arrayValue
-   * @param {string} [message]
+   * Asserts that a given value is an array.
+   *
+   * @param {array} arrayValue - The value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static array(arrayValue, message = '') {
     this.string(
@@ -414,8 +447,10 @@ class Assert {
   }
 
   /**
-   * @param {function} functionValue
-   * @param {string} [message]
+   * Asserts that a given value is a function.
+   *
+   * @param {function} functionValue - The value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static isFunction(functionValue, message = '') {
     this.string(
@@ -429,9 +464,11 @@ class Assert {
   }
 
   /**
-   * @param {int} expected
-   * @param {int} integerValue
-   * @param {string} [message]
+   * Asserts that a given integer value is greater than an expected integer value.
+   *
+   * @param {int} expected - The integer value that the integerValue is expected to be greater than.
+   * @param {int} integerValue - The integer value to be tested against the expected value.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static greaterThan(expected, integerValue, message = '') {
     this.number(expected);
@@ -451,9 +488,11 @@ class Assert {
   }
 
   /**
-   * @param {int} expected
-   * @param {int} integerValue
-   * @param {string} [message]
+   * Asserts that a given integer value is greater or equal than an expected integer value.
+   *
+   * @param {int} expected - The integer value that the integerValue is expected to be greater or equal than.
+   * @param {int} integerValue - The integer value to be tested against the expected value.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static greaterThanOrEqual(expected, integerValue, message = '') {
     this.number(expected);
@@ -473,9 +512,11 @@ class Assert {
   }
 
   /**
-   * @param {int} expected
-   * @param {int} integerValue
-   * @param {string} [message]
+   * Asserts that a given integer value is less than an expected integer value.
+   *
+   * @param {int} expected - The integer value that the integerValue is expected to be less than.
+   * @param {int} integerValue - The integer value to be tested to ensure it is less than the expected value.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static lessThan(expected, integerValue, message = '') {
     this.number(expected);
@@ -495,9 +536,11 @@ class Assert {
   }
 
   /**
-   * @param {int} expected
-   * @param {int} integerValue
-   * @param {string} [message]
+   * Asserts that a given integer value is less or equal than an expected integer value.
+   *
+   * @param {int} expected - The integer value that the integerValue is expected to be less or equal than.
+   * @param {int} integerValue - The integer value to be tested against the expected value.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static lessThanOrEqual(expected, integerValue, message = '') {
     this.number(expected);
@@ -517,9 +560,11 @@ class Assert {
   }
 
   /**
-   * @param {int} expectedCount
-   * @param {array} arrayValue
-   * @param {string} [message]
+   * Asserts that the length of a given array matches an expected count.
+   *
+   * @param {int} expectedCount - The number that the length of the array is expected to match.
+   * @param {array} arrayValue - The array whose length is being checked against the expected count.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static count(expectedCount, arrayValue, message = '') {
     this.integer(expectedCount);
@@ -539,8 +584,10 @@ class Assert {
   }
 
   /**
-   * @param {*} value
-   * @param {string} [message]
+   * Asserts that a given value is not empty.
+   *
+   * @param {*} value - The value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static notEmpty(value, message = '') {
     this.string(
@@ -554,8 +601,10 @@ class Assert {
   }
 
   /**
-   * @param {int} integerValue
-   * @param {string} [message]
+   * Asserts that a given integer value is an odd number.
+   *
+   * @param {int} integerValue - The integer value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static oddNumber(integerValue, message = '') {
     this.integer(integerValue);
@@ -570,8 +619,10 @@ class Assert {
   }
 
   /**
-   * @param {int} integerValue
-   * @param {string} [message]
+   * Asserts that a given integer value is an even number.
+   *
+   * @param {int} integerValue - The integer value to be checked.
+   * @param {string} [message] - A custom error message to be used if the assertion fails.
    */
   static evenNumber(integerValue, message = '') {
     this.integer(integerValue);
@@ -590,8 +641,10 @@ class Assert {
   }
 
   /**
-   * @param {function} callback
-   * @param {object} [expectedError]
+   * Asserts that a function throws an error.
+   *
+   * @param {function} callback - The function expected to throw an error when invoked.
+   * @param {object} [expectedError] - An Error object representing the expected error.
    */
   static throws(callback, expectedError = new Error()) {
     this.isFunction(callback);

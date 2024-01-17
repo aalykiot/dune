@@ -96,8 +96,8 @@ export function compose(...targets) {
 }
 
 /**
- * @ignore
  * An alias of `pipeline()`.
+ * @ignore
  */
 export const pipe = pipeline;
 
