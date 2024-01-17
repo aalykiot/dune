@@ -1,10 +1,14 @@
-// Events API
-//
-// EventEmitter3 is a high performance EventEmitter. It has been micro-optimized for various
-// of code paths making this, one of, if not the fastest EventEmitter available for Node.js and browsers.
-// The module is API compatible with the EventEmitter that ships by default with Node.js.
-//
-// https://github.com/primus/EventEmitter3
+/**
+ * Events API
+ *
+ * EventEmitter3 is a high performance EventEmitter. It has been micro-optimized for various
+ * of code paths making this, one of, if not the fastest EventEmitter available for Node.js
+ * and browsers. The module is API compatible with the EventEmitter that ships by default with Node.js.
+ *
+ * https://github.com/primus/EventEmitter3
+ *
+ * @module Events
+ */
 
 'use strict';
 

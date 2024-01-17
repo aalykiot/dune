@@ -53,7 +53,7 @@ const wrap = (iterable, signal) => {
 /**
  * A module method to pipe between streams forwarding errors and properly cleaning up.
  *
- * @param {AsyncGeneratorFunction|AsyncIterator} source - The source stream from which data is read.
+ * @param {(AsyncGeneratorFunction|AsyncIterator)} source - The source stream from which data is read.
  * @param  {...AsyncGeneratorFunction} targets - One or more target streams where data from the source is written to.
  * @returns {Promise<void>}
  */

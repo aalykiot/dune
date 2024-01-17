@@ -2,7 +2,12 @@
   "plugins": ["plugins/markdown"],
   "recurseDepth": 10,
   "source": {
-    "include": ["src/js/dns.js", "src/js/console.js", "src/js/stream.js"]
+    "include": [
+      "src/js/dns.js",
+      "src/js/console.js",
+      "src/js/stream.js",
+      "src/js/events.js"
+    ]
   },
   "tags": {
     "allowUnknownTags": true,
