@@ -2,7 +2,7 @@
   "plugins": ["plugins/markdown"],
   "recurseDepth": 10,
   "source": {
-    "include": ["src/js/dns.js"]
+    "include": ["src/js/dns.js", "src/js/console.js"]
   },
   "tags": {
     "allowUnknownTags": true,

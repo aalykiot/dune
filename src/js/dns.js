@@ -13,16 +13,14 @@
 const binding = process.binding('dns');
 
 /**
- * @constant
- * @type {RegExp} A regular expression that matches IPv4 addresses.
+ * @constant {RegExp} - A regular expression that matches IPv4 addresses.
  */
 export const IP_ADDRESS_V4 = new RegExp(
   '(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])'
 );
 
 /**
- * @constant
- * @type {RegExp} A regular expression that matches IPv6 addresses.
+ * @constant {RegExp} - A regular expression that matches IPv6 addresses.
  */
 export const IP_ADDRESS_V6 = new RegExp(
   '((([0-9a-fA-F]){1,4})\\:){7}([0-9a-fA-F]){1,4}'
