@@ -1,7 +1,11 @@
-// DOM Style Timers
-//
-// The Timers API provides functionality to allow developers to create DOM style timers.
-// https://www.w3schools.com/js/js_timing.asp
+/**
+ * DOM Style Timers
+ *
+ * The Timers API provides functionality to allow developers to create DOM style timers.
+ * https://www.w3schools.com/js/js_timing.asp
+ *
+ * @module Timers
+ */
 
 import assert from 'assert';
 
@@ -15,6 +19,7 @@ let nextId = 1;
  * This map keeps at sync the JavaScript timer IDs and their equivalent Rust
  * timer indexes (resource IDs) for all currently active timers.
  *
+ * @ignore
  * @type {Map<number, number>}
  */
 
@@ -24,12 +29,11 @@ const activeTimers = new Map();
  * Sets a timer which executes a function or specified piece of code once the
  * timer expires.
  *
- * @param {Function} callback
- * @param {Number} delay
- * @param {...any} [args]
- * @returns {Number}
+ * @param {Function} callback - A function to be executed after the timer expires.
+ * @param {Number} delay - The milliseconds that the timer should wait before the function is executed.
+ * @param {...any} [args] - Additional arguments which are passed through to the function.
+ * @returns {Number} The ID which identifies the timer created.
  */
-
 export function setTimeout(callback, delay, ...args) {
   // Coalesce to number or NaN.
   delay *= 1;
@@ -64,9 +68,8 @@ export function setTimeout(callback, delay, ...args) {
  * The global clearTimeout() method cancels a timeout previously established
  * by calling setTimeout().
  *
- * @param {Number} id
+ * @param {Number} id - The ID which identifies the timer.
  */
-
 export function clearTimeout(id) {
   // Check parameter's type.
   assert.integer(id);
@@ -81,12 +84,11 @@ export function clearTimeout(id) {
  * Repeatedly calls a function or executes a code snippet, with a fixed time
  * delay between each call.
  *
- * @param {Function} callback
- * @param {Number} delay
- * @param {...any} [args]
- * @returns {Number}
+ * @param {Function} callback - A function to be executed every `delay` milliseconds.
+ * @param {Number} delay - The milliseconds the timer should delay in between executions.
+ * @param {...any} [args] - Additional arguments which are passed through to the function.
+ * @returns {Number} The ID which identifies the timer created.
  */
-
 export function setInterval(callback, delay, ...args) {
   // Coalesce to number or NaN.
   delay *= 1;
@@ -113,9 +115,8 @@ export function setInterval(callback, delay, ...args) {
  * The global clearInterval() method cancels an interval previously established
  * by calling setInterval().
  *
- * @param {Number} id
+ * @param {Number} id - The ID which identifies the timer.
  */
-
 export function clearInterval(id) {
   clearTimeout(id);
 }
@@ -123,9 +124,9 @@ export function clearInterval(id) {
 /**
  * Schedules the "immediate" execution of the callback after the I/O phase.
  *
- * @param {Function} callback
- * @param  {...any} [args]
- * @returns {Number}
+ * @param {Function} callback - A function to be executed after the I/O (`poll`) phase.
+ * @param  {...any} [args] - Additional arguments which are passed through to the function.
+ * @returns {Number} The ID which identifies the timer created.
  */
 export function setImmediate(callback, ...args) {
   // Check arg type.
@@ -147,7 +148,7 @@ export function setImmediate(callback, ...args) {
 /**
  * Cancels an Immediate timer created by setImmediate().
  *
- * @param {Number} id
+ * @param {Number} id - The ID which identifies the timer.
  */
 export function clearImmediate(id) {
   // Check parameter's type.

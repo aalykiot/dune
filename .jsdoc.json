@@ -7,7 +7,8 @@
       "src/js/console.js",
       "src/js/stream.js",
       "src/js/events.js",
-      "src/js/assert.js"
+      "src/js/assert.js",
+      "src/js/timers.js"
     ]
   },
   "tags": {
