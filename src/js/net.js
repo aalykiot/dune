@@ -125,7 +125,7 @@ function callbackTimeout(callback, time = 0, onTimeout) {
  * @param {Object} options - Configuration options for the connection.
  * @param {string} options.host - The hostname or IP address of the remote server to connect to.
  * @param {(string|number)} options.port - The port number on the remote host to connect to.
- * @returns Socket - An instance of the `Socket` class
+ * @returns {Socket} An instance of the `Socket` class
  */
 export function createConnection(...args) {
   const socket = new Socket();
@@ -137,7 +137,7 @@ export function createConnection(...args) {
  * Creates a new TCP server.
  *
  * @param {Function} [onConnection] - A function that is called whenever a connection is made to the server.
- * @returns Server - An instance of the `Server` class.
+ * @returns {Server} An instance of the `Server` class.
  */
 export function createServer(onConnection) {
   // Instantiate a new TCP server.
@@ -179,6 +179,13 @@ const kAsyncGenerator = Symbol('kAsyncGenerator');
 
 /**
  * A Socket object is a JS wrapper around a low-level TCP socket.
+ *
+ * @fires connect - Emitted when a socket connection is successfully established.
+ * @fires data - Emitted when data is received.
+ * @fires end - Emitted when the other end of the socket sends a FIN packet.
+ * @fires error - Emitted when an error occurs.
+ * @fires close - Emitted once the socket is fully closed.
+ * @fires timeout - Emitted if the socket times out from (read) inactivity.
  */
 export class Socket extends EventEmitter {
   #id;
@@ -281,7 +288,7 @@ export class Socket extends EventEmitter {
   /**
    * Sets the encoding for the current socket.
    *
-   * @param {String} [encoding='utf-8'] - The character encoding to use.
+   * @param {String} [encoding] - The character encoding to use.
    */
   setEncoding(encoding = 'utf-8') {
     // Check the parameter type.
@@ -523,6 +530,11 @@ export class Socket extends EventEmitter {
 
 /**
  * A Server object is a wrapper around a TCP listener.
+ *
+ * @fires listening - Emitted when the server has been bound.
+ * @fires connection - Emitted when a new connection is made.
+ * @fires close - Emitted when the server stops accepting new connections.
+ * @fires error - Emitted when an error occurs.
  */
 export class Server extends EventEmitter {
   #id;
@@ -533,7 +545,7 @@ export class Server extends EventEmitter {
   /**
    * Creates a new Server instance.
    *
-   * @returns {Server} - An instance of the TCP `Server` class.
+   * @returns {Server} An instance of the TCP `Server` class.
    */
   constructor() {
     super();
@@ -546,7 +558,7 @@ export class Server extends EventEmitter {
    *
    * @param {(string|number)} port - The port number or string on which the server should listen.
    * @param {string} host - The hostname or IP address on which the server will listen.
-   * @returns Promise<SocketHost> - The host information where the server is listening.
+   * @returns {Promise<SocketHost>} The host information where the server is listening.
    */
   async listen(...args) {
     // Parse arguments.

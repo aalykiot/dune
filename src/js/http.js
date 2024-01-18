@@ -1,10 +1,14 @@
-// HTTP Networking APIs
-//
-// The HTTP interfaces are built to make it easier to use traditionally difficult protocol
-// features. By never buffering complete requests or responses, users can stream data
-// instead, making data transmission more efficient and flexible.
-//
-// https://undici.nodejs.org/#/
+/**
+ * HTTP Networking APIs
+ *
+ * The HTTP interfaces are built to make it easier to use traditionally difficult protocol
+ * features. By never buffering complete requests or responses, users can stream data
+ * instead, making data transmission more efficient and flexible.
+ *
+ * https://undici.nodejs.org/#/
+ *
+ * @module HTTP
+ */
 
 import net from 'net';
 import assert from 'assert';
@@ -12,6 +16,10 @@ import { EventEmitter } from 'events';
 
 const binding = process.binding('http_parser');
 
+/**
+ * A list of the HTTP methods that are supported by the parser.
+ * @constant {string[]}
+ */
 export const METHODS = [
   'ACL',
   'BIND',
@@ -49,6 +57,10 @@ export const METHODS = [
   'UNSUBSCRIBE',
 ];
 
+/**
+ * A collection of all the standard HTTP response status codes.
+ * @constant {string[]}
+ */
 export const STATUS_CODES = {
   100: 'Continue',
   101: 'Switching Protocols',
@@ -193,6 +205,7 @@ const urlRegex = new RegExp('^(.*:)//([A-Za-z0-9-.]+)(:[0-9]+)?(.*)$');
 
 /**
  * An outgoing HTTP request to a remote host.
+ * @ignore
  */
 class Request {
   #hostname;
@@ -344,14 +357,29 @@ class IncomingResponse {
     this.#body = new Body(metadata, buffer, socket, false);
   }
 
+  /**
+   * Retrieves the status code of the HTTP response.
+   *
+   * @returns {number} - The HTTP status code.
+   */
   get statusCode() {
     return this.#statusCode;
   }
 
+  /**
+   * Retrieves the headers of the HTTP response.
+   *
+   * @returns {Object} - An object containing the HTTP response headers.
+   */
   get headers() {
     return this.#headers;
   }
 
+  /**
+   * Retrieves the body of the HTTP response.
+   *
+   * @returns {Body} - An instance of the HTTP `Body` class.
+   */
   get body() {
     return this.#body;
   }
@@ -385,7 +413,7 @@ class Body {
   /**
    * Formats the body to a UTF-8 string.
    *
-   * @returns Promise<String>
+   * @returns {Promise<string>} The complete body as a UTF-8 string.
    */
   async text() {
     const string = [];
@@ -400,7 +428,7 @@ class Body {
   /**
    * Formats the body to an actual JSON object.
    *
-   * @returns Promise<Object>
+   * @returns {Promise<Object>} The complete body as a JavaScript object.
    */
   async json() {
     const data = await this.text();
@@ -409,6 +437,7 @@ class Body {
 
   /**
    * The HTTP body should be async iterable.
+   * @ignore
    */
   async *[Symbol.asyncIterator](signal) {
     // Close socket on stream pipeline errors.
@@ -459,6 +488,10 @@ const kAsyncGenerator = Symbol('kAsyncGenerator');
 
 /**
  * An object capable of serving HTTP requests.
+ *
+ * @fires request - Emitted each time there is a request.
+ * @fires close - Emitted when the server closes.
+ * @fires clientError - Emitted when a client connection emits an 'error' event.
  */
 export class Server extends EventEmitter {
   #tcp;
@@ -468,7 +501,7 @@ export class Server extends EventEmitter {
   /**
    * Creates a new Server instance.
    *
-   * @returns {Server}
+   * @returns {Server} An instance of the HTTP `Server` class.
    */
   constructor() {
     super();
@@ -481,9 +514,17 @@ export class Server extends EventEmitter {
   }
 
   /**
+   * An object representing an HTTP connection.
+   *
+   * @typedef Connection
+   * @property {ServerRequest} request - The incoming HTTP request.
+   * @property {ServerResponse} response - The HTTP response that will be sent by the server.
+   */
+
+  /**
    * Waits for a client to connect and accepts the HTTP request.
    *
-   * @returns {Promise<(ServerRequest, ServerResponse)>}
+   * @returns {Promise<Connection>} An object representing an HTTP connection.
    */
   accept() {
     // No available requests yet.
@@ -493,10 +534,10 @@ export class Server extends EventEmitter {
       return promise;
     }
 
-    const socket = this.#pushQueue.shift();
-    const action = socket instanceof Error ? Promise.reject : Promise.resolve;
+    const conn = this.#pushQueue.shift();
+    const action = conn instanceof Error ? Promise.reject : Promise.resolve;
 
-    return action.call(Promise, socket);
+    return action.call(Promise, conn);
   }
 
   async #handleConnectionSafely(socket) {
@@ -568,10 +609,20 @@ export class Server extends EventEmitter {
   }
 
   /**
-   * Starts listening for incoming connections.
+   * Information about the host TCP socket.
    *
-   * @param  {...any} args
-   * @returns Promise<Object>
+   * @typedef SocketHost
+   * @property {number} port - The port number on the local machine.
+   * @property {string} family - The IP family of the local address (`IPv4` or `IPv6`).
+   * @property {string} address - The local IP address.
+   */
+
+  /**
+   * Starts listening for incoming HTTP connections.
+   *
+   * @param {(string|number)} port - The port number or string on which the server should listen.
+   * @param {string} host - The hostname or IP address on which the server will listen.
+   * @returns {Promise<SocketHost>} The host information where the server is listening.
    */
   async listen(...args) {
     return this.#tcp.listen(...args);
@@ -593,6 +644,7 @@ export class Server extends EventEmitter {
 
   /**
    * The server should be async iterable.
+   * @ignore
    */
   [Symbol.asyncIterator]() {
     const iterator = { return: () => this.close() };
@@ -617,7 +669,7 @@ export class ServerRequest {
   /**
    * Formats the body to a UTF-8 string.
    *
-   * @returns Promise<String>
+   * @returns {Promise<string>} The body content as a UTF-8 string.
    */
   async text() {
     return this.#body.text();
@@ -626,7 +678,7 @@ export class ServerRequest {
   /**
    * Formats the body to an actual JSON object.
    *
-   * @returns Promise<Object>
+   * @returns {Promise<Object>} The body content as JavaScript object.
    */
   async json() {
     return this.#body.json();
@@ -634,6 +686,7 @@ export class ServerRequest {
 
   /**
    * The HTTP request should be async iterable.
+   * @ignore
    */
   async *[Symbol.asyncIterator](signal) {
     yield* this.#body[Symbol.asyncIterator](signal);
@@ -673,8 +726,8 @@ class ServerResponse extends EventEmitter {
   /**
    * Writes a chunk of the response body.
    *
-   * @param {String|Uint8Array} data
-   * @param {String} encoding
+   * @param {(String|Uint8Array)} data - The data to be written to the response body.
+   * @param {String} [encoding] - The character encoding to use.
    */
   async write(data, encoding = 'utf-8') {
     // Check the data argument type.
@@ -710,8 +763,8 @@ class ServerResponse extends EventEmitter {
   /**
    * Signals that all of the response headers and body have been sent.
    *
-   * @param {String|Uint8Array} data
-   * @param {String} encoding
+   * @param {string|Uint8Array} [data] - The final data chunk to be sent with the response.
+   * @param {string} [encoding] - The character encoding to use.
    */
   async end(data, encoding = 'utf-8') {
     // If data is given, write to stream.
@@ -737,7 +790,9 @@ class ServerResponse extends EventEmitter {
   /**
    * Sends a response header to the request.
    *
-   * @param  {...any} args
+   * @param {number} code - The HTTP status code for the response.
+   * @param {string} [message] - A human-readable status message corresponding to the status code.
+   * @param {Object} [headers] - Additional header fields to include in the response.
    */
   async writeHead(...args) {
     // Do not send headers multiple times.
@@ -779,6 +834,7 @@ class ServerResponse extends EventEmitter {
 
   /**
    * Checks for HTTP header violations, mutual exclusions, etc.
+   * @ignore
    */
   #checkHeaders() {
     // HTTP 1.0 doesn't support other encoding.
@@ -810,6 +866,7 @@ class ServerResponse extends EventEmitter {
 
   /**
    * Writes raw headers to the TCP stream.
+   * @ignore
    */
   async #sendHeaders() {
     // Start building the HTTP message.
@@ -838,8 +895,8 @@ class ServerResponse extends EventEmitter {
   /**
    * Sets a single header value for implicit headers.
    *
-   * @param {String} name
-   * @param {String} value
+   * @param {String} name - The name of the header.
+   * @param {String} value - The value to be set for the header.
    */
   setHeader(name, value = '') {
     // Check for correct types on provided params.
@@ -857,8 +914,8 @@ class ServerResponse extends EventEmitter {
   /**
    * Reads out a header value from raw headers.
    *
-   * @param {String} name
-   * @returns String
+   * @param {string} name - The name of the header to retrieve.
+   * @returns {string} The value of the requested header.
    */
   getHeader(name) {
     // Check for correct types on provided params.
@@ -872,7 +929,7 @@ class ServerResponse extends EventEmitter {
   /**
    * Returns an array containing the unique names of the current outgoing headers.
    *
-   * @returns Array<String>
+   * @returns {Array<string>} An array of strings, each representing the name of headers.
    */
   getHeaderNames() {
     return Array.from(this.#headers.keys());
@@ -881,8 +938,8 @@ class ServerResponse extends EventEmitter {
   /**
    * Returns true if the header identified is currently set.
    *
-   * @param {String} name
-   * @returns Boolean
+   * @param {string} name - The name of the header to check.
+   * @returns {boolean} Indicating whether the specified header is set.
    */
   hasHeader(name) {
     // Check for correct types on provided params.
@@ -896,7 +953,7 @@ class ServerResponse extends EventEmitter {
   /**
    * Removes a header that's queued for implicit sending.
    *
-   * @param {String} name
+   * @param {String} name - The name of the header to remove.
    */
   removeHeader(name) {
     // Check for correct types on provided params.
@@ -914,7 +971,7 @@ class ServerResponse extends EventEmitter {
   /**
    * Returns a copy of the current outgoing headers.
    *
-   * @returns Object
+   * @returns {Object} Key-value pair corresponds to a header name and its value.
    */
   getHeaders() {
     return Object.fromEntries(this.#headers);
@@ -922,6 +979,8 @@ class ServerResponse extends EventEmitter {
 
   /**
    * True if headers were sent, false otherwise (read-only).
+   *
+   * @returns {boolean} Indicates if the headers have been sent.
    */
   get headersSent() {
     return this.#headersSent;
@@ -929,6 +988,8 @@ class ServerResponse extends EventEmitter {
 
   /**
    * Reference to the underlying TCP socket.
+   *
+   * @returns {Socket} An instance of the underline TPC connection.
    */
   get socket() {
     return this.#socket;
@@ -940,6 +1001,7 @@ class ServerResponse extends EventEmitter {
  *
  * @param {AbortSignal} signal
  * @returns Promise<void>
+ * @ignore
  */
 function cancelation(signal) {
   return new Promise((_, reject) => {
@@ -960,9 +1022,15 @@ const defaultOptions = {
 /**
  * Performs an HTTP request.
  *
- * @param {String} url
- * @param {Object} options
- * @returns Promise<HttpResponse>
+ * @param {string} url - The URL to which the HTTP request is sent.
+ * @param {Object} [options] - Configuration options for the HTTP request.
+ * @param {string} [options.method] - The HTTP method to be used (e.g., `GET`, `POST`).
+ * @param {Object} [options.headers] - An object containing request headers.
+ * @param {(string|Uint8Array|Readable)} [options.body] - The body of the request.
+ * @param {Number} [options.timeout] - A timeout in milliseconds for the request.
+ * @param {boolean} [options.throwOnError] - Will throw an error for non-2xx response codes.
+ * @param {AbortSignal} [options.signal] - An AbortSignal to cancel the request.
+ * @returns {Promise<IncomingResponse>} Containing the HTTP response.
  */
 export function request(url, options = {}) {
   // Check URL param type.
@@ -987,8 +1055,8 @@ export function request(url, options = {}) {
 /**
  * Creates a new HTTP server.
  *
- * @param {Function} [onRequest]
- * @returns Server
+ * @param {Function} [onRequest] - A function that is called whenever the server receives a HTTP request.
+ * @returns {Server} Representing the newly created HTTP server.
  */
 export function createServer(onRequest) {
   // Instantiate a new HTTP server.

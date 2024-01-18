@@ -10,7 +10,8 @@
       "src/js/assert.js",
       "src/js/timers.js",
       "src/js/fs.js",
-      "src/js/net.js"
+      "src/js/net.js",
+      "src/js/http.js"
     ]
   },
   "tags": {
