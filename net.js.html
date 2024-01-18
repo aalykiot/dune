@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>net.js - Documentation</title>
+
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav>
+    <li class="nav-link nav-home-link"><a href="index.html">Home</a></li><li class="nav-heading">Classes</li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Assert-Assert.html">Assert</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.array">array</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.boolean">boolean</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.count">count</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.equal">equal</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.evenNumber">evenNumber</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.false">false</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.greaterThan">greaterThan</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.greaterThanOrEqual">greaterThanOrEqual</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.hasFunction">hasFunction</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.hasProperty">hasProperty</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.instanceOf">instanceOf</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.integer">integer</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.isFunction">isFunction</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.lessThan">lessThan</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.lessThanOrEqual">lessThanOrEqual</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.notEmpty">notEmpty</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.number">number</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.object">object</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.objectEqual">objectEqual</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.oddNumber">oddNumber</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.string">string</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.throws">throws</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.true">true</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Console.Console.html">Console</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#clear">clear</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#debug">debug</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#error">error</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#info">info</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#log">log</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#time">time</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#timeEnd">timeEnd</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#timeLog">timeLog</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#warn">warn</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html">EventEmitter</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#emit">emit</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#eventNames">eventNames</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#listenerCount">listenerCount</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#listeners">listeners</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#on">on</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#once">once</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#removeAllListeners">removeAllListeners</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#removeListener">removeListener</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-File-System.File.html">File</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#closeSync">closeSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#open">open</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#openSync">openSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#read">read</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#readSync">readSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#stat">stat</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#statSync">statSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#write">write</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#writeSync">writeSync</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-File-System-FsWatcher.html">FsWatcher</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System-FsWatcher.html#close">close</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP.Server.html">Server</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.Server.html#accept">accept</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.Server.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.Server.html#listen">listen</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP.ServerRequest.html">ServerRequest</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.ServerRequest.html#json">json</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.ServerRequest.html#text">text</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP-Body.html">Body</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-Body.html#json">json</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-Body.html#text">text</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP-IncomingResponse.html">IncomingResponse</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html">ServerResponse</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#end">end</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#getHeader">getHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#getHeaderNames">getHeaderNames</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#getHeaders">getHeaders</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#hasHeader">hasHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#removeHeader">removeHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#setHeader">setHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#write">write</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#writeHead">writeHead</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Net.Server.html">Server</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#accept">accept</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#address">address</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#listen">listen</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Net.Socket.html">Socket</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#address">address</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#connect">connect</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#destroy">destroy</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#end">end</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#read">read</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#setEncoding">setEncoding</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#setTimeout">setTimeout</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#write">write</a></span></li><li class="nav-heading">Modules</li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Assert.html">Assert</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Console.html">Console</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.html#.prompt">prompt</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-DNS.html">DNS</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-DNS.html#.lookup">lookup</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Events.html">Events</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-File-System.html">File-System</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.copyFile">copyFile</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.copyFileSync">copyFileSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.createReadStream">createReadStream</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.createWriteStream">createWriteStream</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.mkdir">mkdir</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.mkdirSync">mkdirSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.open">open</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.openSync">openSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readFile">readFile</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readFileSync">readFileSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readdir">readdir</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readdirSync">readdirSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rename">rename</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.renameSync">renameSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rm">rm</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rmSync">rmSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rmdir">rmdir</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rmdirSync">rmdirSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.stat">stat</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.statSync">statSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.watch">watch</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.writeFile">writeFile</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.writeFileSync">writeFileSync</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-HTTP.html">HTTP</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.html#.createServer">createServer</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.html#.request">request</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Net.html">Net</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.html#.createConnection">createConnection</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.html#.createServer">createServer</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Stream.html">Stream</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Stream.html#.compose">compose</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Stream.html#.pipeline">pipeline</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Timers.html">Timers</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.clearImmediate">clearImmediate</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.clearInterval">clearInterval</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.clearTimeout">clearTimeout</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.setImmediate">setImmediate</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.setInterval">setInterval</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.setTimeout">setTimeout</a></span></li>
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">net.js</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * TCP Networking APIs
+ *
+ * The TCP Networking APIs provide an asynchronous network API for creating
+ * stream-based TCP servers and clients.
+ *
+ * https://nodejs.org/dist/latest-v18.x/docs/api/net.html
+ *
+ * @module Net
+ */
+
+import dns from 'dns';
+import assert from 'assert';
+import { EventEmitter } from 'events';
+
+const binding = process.binding('net');
+
+function parseOptionsArgs(args) {
+  // Use options overloading.
+  if (typeof args[0] === 'object') {
+    return [args[0]?.port, args[0]?.host];
+  }
+  return args;
+}
+
+function toUint8Array(data, encoding) {
+  if (!(data instanceof Uint8Array)) {
+    return new TextEncoder(encoding).encode(data);
+  }
+  return data;
+}
+
+function makeDeferredPromise() {
+  // Extract the resolve method from the promise.
+  const promiseExt = {};
+  const promise = new Promise((resolve, reject) => {
+    promiseExt.resolve = resolve;
+    promiseExt.reject = reject;
+  });
+
+  return { promise, promiseExt };
+}
+
+const TIMEOUT_MAX = Math.pow(2, 31) - 1;
+
+// Error type referring to socket connection timeout.
+export class TimeoutError extends Error {
+  constructor(message) {
+    super();
+    this.name = 'TimeoutError';
+    this.message = message;
+  }
+}
+
+// Utility function that wraps a promise with a timeout.
+function timeout(promise, time = 0) {
+  // When the time is 0ms it means that we don't want to
+  // have a timeout for the provided promise.
+  if (time === 0) return promise;
+
+  const timer = {};
+  return Promise.race([
+    promise,
+    new Promise(
+      (_, reject) => (timer.id = setTimeout(reject, time, new TimeoutError()))
+    ),
+  ]).finally(() => clearTimeout(timer.id));
+}
+
+/**
+ *  Utility function that wraps a `repeatable` callback with a timeout.
+ *
+ *  The following implementation does not create a new timer every time an
+ *  I/O activity happens on the socket. The logic is a bit more complex
+ *  but it is more performant on high I/O scenarios.
+ *
+ *  http://pod.tst.eu/http://cvs.schmorp.de/libev/ev.pod#Be_smart_about_timeouts
+ * @ignore
+ */
+function callbackTimeout(callback, time = 0, onTimeout) {
+  // The reason of the event-emitter is to allow the "outside" world
+  // to signal us for changes in the timeout value.
+  const timer = { time, lastActivity: Date.now() };
+  const timerSignal = new EventEmitter();
+
+  const timeout = () => {
+    // Calculate when the timeout would happen.
+    const after = timer.lastActivity - Date.now() + timer.time;
+
+    if (timer.time === 0) return;
+
+    // Timeout occurred, take action.
+    if (after &lt; 0) {
+      onTimeout();
+      return (timer.id = setTimeout(timeout, timer.time));
+    }
+
+    // There was some recent activity, simply restart the timer.
+    timer.id = setTimeout(timeout, after);
+  };
+
+  timerSignal.on('timeoutUpdate', (timeMs) => {
+    if (timer.id) clearTimeout(timer.id);
+    timer.time = timeMs;
+    timeout();
+  });
+
+  if (time > 0) timer.id = setTimeout(timeout, time);
+
+  return [
+    (...args) => {
+      callback(...args);
+      timer.lastActivity = Date.now();
+    },
+    timerSignal,
+  ];
+}
+
+/**
+ * Initiates a connection to a given remote host.
+ *
+ * Additional signatures:
+ * - createConnection(port: number | string, host?: string)
+ *
+ * @param {Object} options - Configuration options for the connection.
+ * @param {string} options.host - The hostname or IP address of the remote server to connect to.
+ * @param {(string|number)} options.port - The port number on the remote host to connect to.
+ * @returns {Socket} An instance of the `Socket` class
+ */
+export function createConnection(...args) {
+  const socket = new Socket();
+  socket.connect(...args);
+  return socket;
+}
+
+/**
+ * Creates a new TCP server.
+ *
+ * @param {Function} [onConnection] - A function that is called whenever a connection is made to the server.
+ * @returns {Server} An instance of the `Server` class.
+ */
+export function createServer(onConnection) {
+  // Instantiate a new TCP server.
+  const server = new Server();
+  if (onConnection) {
+    assert.isFunction(onConnection);
+    server.on('connection', onConnection);
+  }
+  return server;
+}
+
+/**
+ * Information about the connected TCP socket.
+ *
+ * @typedef socketInfo
+ * @property {SocketHost} host - Information about the local endpoint of the socket.
+ * @property {SocketRemote} remote -  Information about the remote endpoint of the socket.
+ */
+
+/**
+ * Information about the host TCP socket.
+ *
+ * @typedef SocketHost
+ * @property {number} port - The port number on the local machine.
+ * @property {string} family - The IP family of the local address (`IPv4` or `IPv6`).
+ * @property {string} address - The local IP address.
+ */
+
+/**
+ * Information about the remote TCP socket.
+ *
+ * @typedef SocketRemote
+ * @property {number} port - The port number on the remote machine.
+ * @property {string} address - The remote IP address.
+ */
+
+const kSetSocketIdUnchecked = Symbol('kSetSocketIdUnchecked');
+const kAsyncGenerator = Symbol('kAsyncGenerator');
+
+/**
+ * A Socket object is a JS wrapper around a low-level TCP socket.
+ *
+ * @fires connect - Emitted when a socket connection is successfully established.
+ * @fires data - Emitted when data is received.
+ * @fires end - Emitted when the other end of the socket sends a FIN packet.
+ * @fires error - Emitted when an error occurs.
+ * @fires close - Emitted once the socket is fully closed.
+ * @fires timeout - Emitted if the socket times out from (read) inactivity.
+ */
+export class Socket extends EventEmitter {
+  #id;
+  #host;
+  #connecting;
+  #encoding;
+  #writable;
+  #pushQueue;
+  #pullQueue;
+  #timeoutHandle;
+
+  /**
+   * Creates a new Socket instance.
+   *
+   * @returns {Socket}
+   */
+  constructor() {
+    super();
+    this.#pushQueue = [];
+    this.#pullQueue = [];
+    this.#connecting = false;
+    this.#timeoutHandle = undefined;
+    this.bytesRead = 0;
+    this.bytesWritten = 0;
+    this.remotePort = undefined;
+    this.remoteAddress = undefined;
+    this.timeout = 0;
+  }
+
+  /**
+   * Initiates a connection on a given remote host.
+   *
+   * Additional signatures:
+   * - connect(port: number | string, host?: string)
+   *
+   * @param {Object} options - Configuration options for the connection.
+   * @param {string} options.host - The hostname or IP address of the remote server to connect to.
+   * @param {(string|number)} options.port - The port number on the remote host to connect to.
+   * @returns {Promise&lt;socketInfo>} Information about the connected TCP socket.
+   */
+  async connect(...args) {
+    // Parse arguments.
+    const [port, hostUnchecked] = parseOptionsArgs(args);
+    const hostname = hostUnchecked || '0.0.0.0';
+
+    if (this.#connecting) {
+      throw new Error('Socket is trying to connect.');
+    }
+
+    if (Number.isNaN(Number.parseInt(port))) {
+      throw new TypeError(`The "port" option must be castable to number.`);
+    }
+
+    if (hostname &amp;&amp; typeof hostname !== 'string') {
+      throw new TypeError(`The "host" option must be of type string.`);
+    }
+
+    if (this.#id) {
+      throw new Error(
+        `Socket is already connected to &lt;${this.remoteAddress}:${this.remotePort}>.`
+      );
+    }
+
+    this.#connecting = true;
+
+    // Use DNS lookup to resolve the hostname.
+    const addresses = await dns.lookup(hostname);
+
+    // Prefer IPv4 address.
+    const remoteHost = addresses.some((addr) => addr.family === 'IPv4')
+      ? addresses.filter((addr) => addr.family === 'IPv4')[0].address
+      : addresses[0].address;
+
+    const { id, host, remote } = await binding.connect(
+      remoteHost,
+      Number.parseInt(port)
+    );
+
+    this.#id = id;
+    this.#connecting = false;
+    this.#writable = true;
+    this.#host = host;
+    this.remoteAddress = remote.address;
+    this.remotePort = remote.port;
+
+    const [onAvailableSocketData, signal] = callbackTimeout(
+      this.#onAvailableSocketData.bind(this),
+      this.timeout,
+      () => this.emit('timeout')
+    );
+
+    this.#timeoutHandle = signal;
+    this.emit('connect', { host, remote });
+
+    binding.readStart(this.#id, onAvailableSocketData);
+
+    return { host, remote };
+  }
+
+  /**
+   * Sets the encoding for the current socket.
+   *
+   * @param {String} [encoding] - The character encoding to use.
+   */
+  setEncoding(encoding = 'utf-8') {
+    // Check the parameter type.
+    if (typeof encoding !== 'string') {
+      throw new TypeError('The "encoding" argument must be of type string.');
+    }
+    this.#encoding = encoding;
+  }
+
+  /**
+   * Sets the socket to timeout after timeout milliseconds of (read) inactivity on the socket.
+   *
+   * @param {Number} timeout - The duration after which the socket should timeout due to inactivity.
+   */
+  setTimeout(timeout = 0) {
+    // Coalesce to number or NaN.
+    timeout *= 1;
+
+    // Check timeout's boundaries.
+    if (!(timeout >= 0 &amp;&amp; timeout &lt;= TIMEOUT_MAX)) {
+      timeout = 0;
+    }
+
+    if (this.#id) {
+      // Timeout value changed after the socket began waiting.
+      this.#timeoutHandle.emit('timeoutUpdate', timeout);
+    }
+
+    this.timeout = timeout;
+  }
+
+  /**
+   * Returns a promise which is fulfilled when the TCP stream can return a chunk.
+   *
+   * @returns {Promise&lt;(Uint8Array|string)>} The chunk read from the socket.
+   */
+  read() {
+    // Check if the socket is connected to a host.
+    if (!this.#id) return null;
+
+    // HACK: The following is used to handle uncaught errors thrown
+    // from the event-emitter when no one is subscribed to the `error` event.
+    if (this.listenerCount('error') === 0) this.on('error', () => {});
+
+    // No available value to read yet.
+    if (this.#pushQueue.length === 0) {
+      const { promise, promiseExt } = makeDeferredPromise();
+      this.#pullQueue.push(promiseExt);
+      return timeout(promise, this.timeout);
+    }
+
+    const value = this.#pushQueue.shift();
+    const action = value instanceof Error ? Promise.reject : Promise.resolve;
+
+    return action.call(Promise, value);
+  }
+
+  /**
+   * Writes contents to a TCP socket stream.
+   *
+   * @param {String|Uint8Array} data - The data to be written to the socket.
+   * @param {String} [encoding] - The character encoding to use.
+   * @returns {Promise&lt;Number>} The number of bytes written.
+   */
+  async write(data, encoding = 'utf-8') {
+    // Check the data argument type.
+    if (!(data instanceof Uint8Array) &amp;&amp; typeof data !== 'string') {
+      throw new TypeError(
+        `The "data" argument must be of type string or Uint8Array.`
+      );
+    }
+
+    if (!this.#id) {
+      throw new Error(`Socket is not connected to a remote host.`);
+    }
+
+    if (!this.#writable) {
+      throw new Error(`The socket stream is not writable.`);
+    }
+
+    // Default to UTF-8 encoding.
+    encoding = encoding || this.#encoding || 'utf-8';
+
+    const bytes = toUint8Array(data, encoding);
+    const bytesWritten = await binding.write(this.#id, bytes);
+
+    this.bytesWritten += bytesWritten;
+
+    return bytesWritten;
+  }
+
+  /**
+   * Half-closes the TCP stream.
+   *
+   * @param {String|Uint8Array} data - The (last) data to be written to the socket.
+   * @param {String} [encoding] - The character encoding to use.
+   * @returns {Promise&lt;void>}
+   */
+  async end(data, encoding = 'utf-8') {
+    // Check socket connection.
+    if (!this.#id) return;
+
+    // If data is given, write to stream.
+    if (data) {
+      await this.write(data, encoding);
+    }
+    this.#writable = false;
+    await binding.shutdown(this.#id);
+  }
+
+  /**
+   * Closes both sides of the TCP sockets.
+   */
+  async destroy() {
+    // Check if the socket is indeed connected.
+    if (!this.#id) return;
+
+    this.#timeoutHandle?.emit('timeoutUpdate', 0);
+    await binding.close(this.#id);
+
+    // Ignore pending reads.
+    for (const promise of this.#pullQueue) {
+      promise.resolve(null);
+    }
+
+    this.#reset();
+    this.emit('close');
+  }
+
+  /**
+   * Returns the bound address, the address family name and port of the socket.
+   *
+   * @returns {SocketHost} - Information about the local endpoint of the socket.
+   */
+  address() {
+    return this.#host;
+  }
+
+  /**
+   * Resets socket's internal state (not to be called manually).
+   * @ignore
+   */
+  #reset() {
+    this.#id = undefined;
+    this.#pushQueue = [];
+    this.#pullQueue = [];
+    this.#connecting = false;
+    this.#timeoutHandle = undefined;
+    this.bytesRead = 0;
+    this.bytesWritten = 0;
+    this.remotePort = undefined;
+    this.remoteAddress = undefined;
+    this.timeout = 0;
+  }
+
+  #asyncDispatch(value) {
+    if (this.#pullQueue.length === 0) {
+      this.#pushQueue.push(value);
+      return;
+    }
+    const promise = this.#pullQueue.shift();
+    const action = value instanceof Error ? promise.reject : promise.resolve;
+    action(value);
+  }
+
+  #onAvailableSocketData(err, arrayBufferView) {
+    // Check for errors during socket read.
+    if (err) {
+      this.#asyncDispatch(err);
+      this.emit('error', err);
+      return;
+    }
+
+    // Check if the remote host closed the connection.
+    if (arrayBufferView.byteLength === 0) {
+      this.#asyncDispatch(null);
+      this.emit('end');
+      this.destroy();
+      return;
+    }
+
+    this.bytesRead += arrayBufferView.byteLength;
+
+    // Transform ArrayBuffer into a Uint8Array we can use.
+    const data = new Uint8Array(arrayBufferView);
+    const data_transform = this.#encoding
+      ? new TextDecoder(this.#encoding).decode(new Uint8Array(data))
+      : data;
+
+    // Use the EE mode instead of the async-iterator.
+    if (this.listenerCount('data') > 0) {
+      this.emit('data', data_transform);
+      return;
+    }
+
+    this.#asyncDispatch(data_transform);
+  }
+
+  /**
+   * Hard-sets the ID of the socket (ONLY for internal use).
+   *
+   * @param {Number} id - The resource ID existing in the event-loop.
+   * @ignore
+   */
+  [kSetSocketIdUnchecked](id) {
+    this.#id = id;
+    this.#writable = true;
+
+    const [onAvailableSocketData, signal] = callbackTimeout(
+      this.#onAvailableSocketData.bind(this),
+      this.timeout,
+      () => this.emit('timeout')
+    );
+
+    this.#timeoutHandle = signal;
+    binding.readStart(this.#id, onAvailableSocketData);
+  }
+
+  async *[kAsyncGenerator](signal) {
+    // Close socket on stream pipeline errors.
+    if (signal) signal.on('uncaughtStreamException', () => this.destroy());
+
+    let data;
+    while ((data = await this.read())) {
+      if (!data) break;
+      yield data;
+    }
+  }
+
+  /**
+   * The socket should be async iterable.
+   * @ignore
+   */
+  [Symbol.asyncIterator](signal) {
+    const iterator = { return: () => this.end() };
+    return Object.assign(this[kAsyncGenerator](signal), iterator);
+  }
+}
+
+/**
+ * A Server object is a wrapper around a TCP listener.
+ *
+ * @fires listening - Emitted when the server has been bound.
+ * @fires connection - Emitted when a new connection is made.
+ * @fires close - Emitted when the server stops accepting new connections.
+ * @fires error - Emitted when an error occurs.
+ */
+export class Server extends EventEmitter {
+  #id;
+  #host;
+  #pushQueue;
+  #pullQueue;
+
+  /**
+   * Creates a new Server instance.
+   *
+   * @returns {Server} An instance of the TCP `Server` class.
+   */
+  constructor() {
+    super();
+    this.#pushQueue = [];
+    this.#pullQueue = [];
+  }
+
+  /**
+   * Starts listening for incoming connections.
+   *
+   * @param {(string|number)} port - The port number or string on which the server should listen.
+   * @param {string} host - The hostname or IP address on which the server will listen.
+   * @returns {Promise&lt;SocketHost>} The host information where the server is listening.
+   */
+  async listen(...args) {
+    // Parse arguments.
+    const [port, hostUnchecked] = parseOptionsArgs(args);
+    const hostname = hostUnchecked || '127.0.0.1';
+
+    if (Number.isNaN(Number.parseInt(port))) {
+      throw new TypeError(`The "port" option must be castable to number.`);
+    }
+
+    if (hostname &amp;&amp; typeof hostname !== 'string') {
+      throw new TypeError(`The "host" option must be of type string.`);
+    }
+
+    if (this.#id) {
+      throw new Error(`Server is already listening for connections.`);
+    }
+
+    // Use DNS lookup to resolve the local listening interface.
+    const addresses = await dns.lookup(hostname);
+
+    // Prefer IPv4 address.
+    const host = addresses.some((addr) => addr.family === 'IPv4')
+      ? addresses.filter((addr) => addr.family === 'IPv4')[0].address
+      : addresses[0].address;
+
+    // Bind server to address, and start listening for connections.
+    const socketInfo = binding.listen(
+      host,
+      port,
+      this.#onAvailableConnection.bind(this)
+    );
+
+    this.#id = socketInfo.id;
+    this.#host = socketInfo.host;
+
+    this.emit('listening', this.#host);
+
+    return this.#host;
+  }
+
+  /**
+   * Waits for a TCP client to connect and accepts the connection.
+   *
+   * @returns {Promise&lt;Socket>} - A `Socket` object representing the connected client.
+   */
+  accept() {
+    // Check if the server is listening.
+    if (!this.#id) {
+      throw new Error(`Server is not bound to a port.`);
+    }
+
+    // HACK: The following is used to handle uncaught errors thrown
+    // from the event-emitter when no one is subscribed to the `error` event.
+    if (this.listenerCount('error') === 0) this.on('error', () => {});
+
+    // No available connection yet.
+    if (this.#pushQueue.length === 0) {
+      const { promise, promiseExt } = makeDeferredPromise();
+      this.#pullQueue.push(promiseExt);
+      return promise;
+    }
+
+    const socket = this.#pushQueue.shift();
+    const action = socket instanceof Error ? Promise.reject : Promise.resolve;
+
+    return action.call(Promise, socket);
+  }
+
+  /**
+   * Stops the server from accepting new connections.
+   */
+  async close() {
+    // Check if the server is already closed.
+    if (!this.#id) {
+      throw new Error('Server is already closed.');
+    }
+    await binding.close(this.#id);
+    this.emit('close');
+  }
+
+  /**
+   * Returns the bound address, the address family name and port of the socket.
+   *
+   * @returns {SocketHost} The host information where the server is listening.
+   */
+  address() {
+    return this.#host;
+  }
+
+  #asyncDispatch(socket) {
+    if (this.#pullQueue.length === 0) {
+      this.#pushQueue.push(socket);
+      return;
+    }
+    const promise = this.#pullQueue.shift();
+    const action = socket instanceof Error ? promise.reject : promise.resolve;
+    action(socket);
+  }
+
+  #onAvailableConnection(err, sockInfo) {
+    // Check for socket connection errors.
+    if (err) {
+      this.#asyncDispatch(err);
+      this.emit('error', err);
+      return;
+    }
+
+    // Create a new socket instance.
+    const socket = new Socket();
+    const { id, remoteAddress, remotePort } = sockInfo;
+
+    socket[kSetSocketIdUnchecked](id);
+    socket.remoteAddress = remoteAddress;
+    socket.remotePort = remotePort;
+
+    // Check if a connection handler is specified.
+    if (this.listenerCount('connection') > 0) {
+      this.emit('connection', socket);
+      return;
+    }
+
+    this.#asyncDispatch(socket);
+  }
+
+  async *[kAsyncGenerator]() {
+    let socket;
+    while ((socket = await this.accept())) {
+      yield socket;
+    }
+  }
+
+  /**
+   * The server should be async iterable.
+   * @ignore
+   */
+  [Symbol.asyncIterator]() {
+    const iterator = { return: () => this.close() };
+    return Object.assign(this[kAsyncGenerator](), iterator);
+  }
+}
+
+export default {
+  TimeoutError,
+  Socket,
+  createConnection,
+  Server,
+  createServer,
+};
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<br class="clear">
+
+<footer>
+    Generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Thu Jan 18 2024 23:00:57 GMT+0000 (Coordinated Universal Time) using the Minami theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/linenumber.js"></script>
+</body>
+</html>

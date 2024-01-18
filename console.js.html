@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>console.js - Documentation</title>
+
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav>
+    <li class="nav-link nav-home-link"><a href="index.html">Home</a></li><li class="nav-heading">Classes</li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Assert-Assert.html">Assert</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.array">array</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.boolean">boolean</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.count">count</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.equal">equal</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.evenNumber">evenNumber</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.false">false</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.greaterThan">greaterThan</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.greaterThanOrEqual">greaterThanOrEqual</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.hasFunction">hasFunction</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.hasProperty">hasProperty</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.instanceOf">instanceOf</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.integer">integer</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.isFunction">isFunction</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.lessThan">lessThan</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.lessThanOrEqual">lessThanOrEqual</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.notEmpty">notEmpty</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.number">number</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.object">object</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.objectEqual">objectEqual</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.oddNumber">oddNumber</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.string">string</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.throws">throws</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.true">true</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Console.Console.html">Console</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#clear">clear</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#debug">debug</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#error">error</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#info">info</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#log">log</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#time">time</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#timeEnd">timeEnd</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#timeLog">timeLog</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#warn">warn</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html">EventEmitter</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#emit">emit</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#eventNames">eventNames</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#listenerCount">listenerCount</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#listeners">listeners</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#on">on</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#once">once</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#removeAllListeners">removeAllListeners</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#removeListener">removeListener</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-File-System.File.html">File</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#closeSync">closeSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#open">open</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#openSync">openSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#read">read</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#readSync">readSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#stat">stat</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#statSync">statSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#write">write</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#writeSync">writeSync</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-File-System-FsWatcher.html">FsWatcher</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System-FsWatcher.html#close">close</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP.Server.html">Server</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.Server.html#accept">accept</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.Server.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.Server.html#listen">listen</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP.ServerRequest.html">ServerRequest</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.ServerRequest.html#json">json</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.ServerRequest.html#text">text</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP-Body.html">Body</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-Body.html#json">json</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-Body.html#text">text</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP-IncomingResponse.html">IncomingResponse</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html">ServerResponse</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#end">end</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#getHeader">getHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#getHeaderNames">getHeaderNames</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#getHeaders">getHeaders</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#hasHeader">hasHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#removeHeader">removeHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#setHeader">setHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#write">write</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#writeHead">writeHead</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Net.Server.html">Server</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#accept">accept</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#address">address</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#listen">listen</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Net.Socket.html">Socket</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#address">address</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#connect">connect</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#destroy">destroy</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#end">end</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#read">read</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#setEncoding">setEncoding</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#setTimeout">setTimeout</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#write">write</a></span></li><li class="nav-heading">Modules</li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Assert.html">Assert</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Console.html">Console</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.html#.prompt">prompt</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-DNS.html">DNS</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-DNS.html#.lookup">lookup</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Events.html">Events</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-File-System.html">File-System</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.copyFile">copyFile</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.copyFileSync">copyFileSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.createReadStream">createReadStream</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.createWriteStream">createWriteStream</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.mkdir">mkdir</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.mkdirSync">mkdirSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.open">open</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.openSync">openSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readFile">readFile</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readFileSync">readFileSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readdir">readdir</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readdirSync">readdirSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rename">rename</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.renameSync">renameSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rm">rm</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rmSync">rmSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rmdir">rmdir</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rmdirSync">rmdirSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.stat">stat</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.statSync">statSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.watch">watch</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.writeFile">writeFile</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.writeFileSync">writeFileSync</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-HTTP.html">HTTP</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.html#.createServer">createServer</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.html#.request">request</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Net.html">Net</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.html#.createConnection">createConnection</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.html#.createServer">createServer</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Stream.html">Stream</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Stream.html#.compose">compose</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Stream.html#.pipeline">pipeline</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Timers.html">Timers</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.clearImmediate">clearImmediate</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.clearInterval">clearInterval</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.clearTimeout">clearTimeout</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.setImmediate">setImmediate</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.setInterval">setInterval</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.setTimeout">setTimeout</a></span></li>
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">console.js</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * Console APIs
+ *
+ * The Console APIs provide functionality to allow developers to perform debugging tasks,
+ * such as logging messages or the values of variables at set points in your code.
+ *
+ * https://developer.mozilla.org/en-US/docs/Web/API/console
+ *
+ * @module Console
+ */
+
+/* eslint-disable no-control-regex */
+
+import { performance } from 'perf_hooks';
+import { green, yellow, cyan, red, bright_black } from 'colors';
+
+const { callConsole } = process.binding('stdio');
+
+// Returns a string with as many spaces as the parameter specified.
+function pre(amount) {
+  return ' '.repeat(amount);
+}
+
+// Small util for objects that might not have a `.toString` method.
+function objectToString(value) {
+  return Object.prototype.toString.call(value);
+}
+
+/**
+ * Stringifies almost all JavaScript built-in types.
+ *
+ * @ignore
+ * @param {*} value
+ * @param {WeakSet} seen
+ * @param {number} depth
+ * @returns {string}
+ */
+
+function stringify(value, seen, depth = 0) {
+  switch (typeof value) {
+    case 'string':
+      return depth > 0 ? stringifyText(value) : value;
+    case 'number':
+    case 'boolean':
+      return yellow(String(value));
+    case 'undefined':
+      return bright_black(String(value));
+    case 'symbol':
+      return green(String(value));
+    case 'bigint':
+      return yellow(String(value) + 'n');
+    case 'object':
+      return !value ? 'null' : stringifyObject(value, seen, ++depth);
+    case 'function':
+      return !value.name
+        ? cyan('[Function (anonymous)]')
+        : cyan(`[Function: ${value.name}]`);
+    default:
+      return '[Unknown]';
+  }
+}
+
+function stringifyText(value) {
+  const text = value.length > 100 ? `${value.slice(0, 100)}...` : value;
+  const textEscaped = JSON.stringify(text);
+  return green(textEscaped);
+}
+
+function isArray(value) {
+  return Array.isArray(value);
+}
+
+function stringifyArray(arr, seen, depth) {
+  // Special formatting required if array has only numbers.
+  const hasOnlyNumbers = arr.every((elem) => typeof elem === 'number');
+
+  const entries = [];
+  for (const elem of arr) {
+    entries.push(stringify(elem, seen, depth));
+  }
+
+  // Remove the color characters to get the proper length.
+  const uncoloredEntries = entries.join('').replace(/\u001b\[[0-9;]*m/g, '');
+
+  // Multiline formatting.
+  if (uncoloredEntries.length > 60) {
+    const start = '[\n';
+    const end = `\n${pre((depth - 1) * 2)}]`;
+    const entriesPretty = prettifyArray(entries, depth, hasOnlyNumbers);
+    return `${start}${entriesPretty}${end}`;
+  }
+
+  // Inline formatting.
+  return entries.length > 0 ? `[ ${entries.join(', ')} ]` : `[]`;
+}
+
+function isTypedArray(value) {
+  switch (Object.prototype.toString.call(value)) {
+    case '[object Int8Array]':
+    case '[object Uint8Array]':
+    case '[object Uint8ClampedArray]':
+    case '[object Uint16Array]':
+    case '[object Int32Array]':
+    case '[object Uint32Array]':
+    case '[object Float32Array]':
+    case '[object Float64Array]':
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Calculate the grid size (trying to make perfect squares and minimizing empty space).
+// 1. Max out at 12xN.
+// 2. Max out at 01xN (if the lengthier element is too big).
+function getMaxElementsPerRow(arr, avgElementLength, maxElementLength) {
+  if (maxElementLength > 30) return 1;
+  return Math.min(
+    Math.max(
+      Math.floor((Math.sqrt(arr.length) * avgElementLength) / maxElementLength),
+      1
+    ),
+    12
+  );
+}
+
+function prettifyArray(arr, depth = 0, hasOnlyNumbers) {
+  // Remove the color characters so we can calculate the AVG and MAX correctly.
+  const uncolored = arr.map(
+    (elem) => elem.replace(/\u001b\[[0-9;]*m/g, '').length
+  );
+
+  const maxElementLength = Math.max(...uncolored);
+  const avgElementLength = uncolored.reduce((a, b) => a + b) / uncolored.length;
+
+  // Calculate the grid size.
+  const maxElementsPerRow = getMaxElementsPerRow(
+    arr,
+    avgElementLength,
+    maxElementLength
+  );
+
+  // Tries to align the columns.
+  const alignColumn = (elem, i) => {
+    const length = elem.replace(/\u001b\[[0-9;]*m/g, '').length;
+    const shift = maxElementsPerRow === 1 ? 0 : maxElementLength - length;
+    if (hasOnlyNumbers) {
+      return i === arr.length - 1
+        ? pre(shift) + elem
+        : pre(shift) + elem + ', ';
+    } else {
+      return i === arr.length - 1
+        ? elem + pre(shift)
+        : elem + ', ' + pre(shift);
+    }
+  };
+
+  // Creates rows of length `maxElementsPerRow`.
+  const groupRows = (acc, elem, i) => {
+    if (acc.atRow === maxElementsPerRow || i === 0) {
+      acc.list.push([elem]);
+      acc.atRow = 1;
+    } else {
+      acc.list[acc.list.length - 1].push(elem);
+      acc.atRow++;
+    }
+    return acc;
+  };
+
+  // Indents row based on the depth we're currently in.
+  const indentRow = (row) => pre(depth * 2) + row.join('');
+
+  let output = arr.map(alignColumn);
+
+  output = output.reduce(groupRows, { atRow: 0, list: [] });
+  output = output.list.map(indentRow).join('\n');
+
+  return output;
+}
+
+function stringifyTypedArray(arr, depth = 0) {
+  // Colorize internal values.
+  let pretty = arr
+    .toString()
+    .split(',')
+    .map((elem) => yellow(elem));
+
+  // Get typed-array's specific type.
+  const type = Object.prototype.toString
+    .call(arr)
+    .replace('[object ', '')
+    .replace(']', '');
+
+  if (pretty.length > 50) {
+    pretty = prettifyArray(pretty, depth, true);
+    return `${type}(${arr.length}) [\n${pretty}\n${pre((depth - 1) * 2)}]`;
+  }
+
+  return `${type}(${arr.length}) [ ${pretty.join(', ')} ]`;
+}
+
+function isDate(value) {
+  return Object.prototype.toString.call(value) === '[object Date]';
+}
+
+function stringifyDate(date) {
+  return date.toISOString();
+}
+
+function isRexExp(value) {
+  return Object.prototype.toString.call(value) === '[object RegExp]';
+}
+
+function stringifyRexExp(exp) {
+  return exp.toString();
+}
+
+function isError(value) {
+  return Object.prototype.toString.call(value) === '[object Error]';
+}
+
+function stringifyError(error) {
+  return error.stack;
+}
+
+function isArrayBuffer(value) {
+  return value instanceof ArrayBuffer;
+}
+
+function stringifyArrayBuffer(value) {
+  return `ArrayBuffer { byteLength: ${stringify(value.byteLength)} }`;
+}
+
+function isPromise(value) {
+  return value instanceof Promise;
+}
+
+function stringifyPromise(value) {
+  // We have to use a Rust binding to inspect the contents of a promise
+  // object because JS doesn't expose that kind of functionality.
+  const binding = process.binding('promise');
+  const { state, value: promiseValue } = binding.peek(value);
+
+  if (state === 'PENDING') {
+    return `Promise { ${cyan('&lt;pending>')} }`;
+  }
+
+  const output = stringify(promiseValue, undefined, 1);
+  const end = `${output.length > 50 ? '\n' : ' '}}`;
+
+  const prefix =
+    state === 'FULFILLED'
+      ? `${output.length > 50 ? '\n  ' : ''}`
+      : `${output.length > 50 ? '\n  ' : ''}${red('&lt;rejected>')} `;
+
+  return 'Promise { ' + prefix + output + end;
+}
+
+const specialCharsRegex = new RegExp('[^A-Za-z0-9|_]+');
+
+/**
+ * Specifically stringifies JavaScript objects.
+ *
+ * @ignore
+ * @param {*} value
+ * @param {WeakSet} seen
+ * @param {number} depth
+ * @returns {string}
+ */
+
+function stringifyObject(value, seen = new WeakSet(), depth) {
+  // We have to check the type of the value parameter to decide which stringify
+  // transformer we should use.
+  if (isArray(value)) {
+    return stringifyArray(value, seen, depth);
+  }
+
+  if (isArrayBuffer(value)) {
+    return stringifyArrayBuffer(value);
+  }
+
+  if (isTypedArray(value)) {
+    return stringifyTypedArray(value, depth);
+  }
+
+  if (isDate(value)) {
+    return stringifyDate(value);
+  }
+
+  if (isRexExp(value)) {
+    return stringifyRexExp(value);
+  }
+
+  if (isError(value)) {
+    return stringifyError(value);
+  }
+
+  if (isPromise(value)) {
+    return stringifyPromise(value);
+  }
+
+  // It's an object type that console does not support.
+  if (objectToString(value) !== '[object Object]') {
+    const type = objectToString(value).replace('[object ', '').replace(']', '');
+    return `${type} {}`;
+  }
+
+  // Looks like it's a regular object.
+  const entries = [];
+  for (const key of Object.keys(value)) {
+    if (seen.has(value[key])) {
+      entries.push(`${pre(depth * 2)}${key}: [Circular]`);
+      continue;
+    }
+    // The following wraps in quotes object keys that contain special
+    // characters like { "Foo-Bar": 123 }.
+    const keyValue = specialCharsRegex.test(key) ? `"${key}"` : key;
+
+    seen.add(value);
+    entries.push(
+      `${pre(depth * 2)}${keyValue}: ${stringify(value[key], seen, depth)}`
+    );
+  }
+
+  // Output the class name if the object is a class instance.
+  const className = value?.constructor?.name;
+  const prefix = !className || className === 'Object' ? '' : className + ' ';
+
+  // Apply multi-line formatting on long properties.
+  if (entries.map((v) => v.trim()).join('').length > 50) {
+    const start = `${prefix}{\n`;
+    const end = `\n${pre((depth - 1) * 2)}}`;
+    return `${start}${entries.join(',\n')}${end}`;
+  }
+
+  // Inline formatting.
+  const entriesPretty = entries.map((v) => v.trim());
+  const content = entries.length > 0 ? `{ ${entriesPretty.join(', ')} }` : `{}`;
+
+  return `${prefix}${content}`;
+}
+
+/**
+ * Shows the given message and waits for the user's input.
+ *
+ * @param {String} [message] - A string of text to display to the user.
+ * @param {String} [defaultValue] - A string containing the default value displayed in the text input field.
+ */
+export function prompt(message = 'Prompt', defaultValue = null) {
+  // Write prompt message to stdout.
+  process.stdout.write(
+    `${message} ${defaultValue ? `[${defaultValue}] ` : ''}`
+  );
+  // Read and return user's input.
+  return process.stdin.read() || defaultValue;
+}
+
+/**
+ * Console is a subset implementation of MDN's Console API.
+ */
+export class Console {
+  // Holds timers initialized by console.
+  // https://developer.mozilla.org/en-US/docs/Web/API/Console/time
+  #timers = new Map();
+
+  /**
+   * Outputs data to the `stdout` stream.
+   *
+   * @param  {...*} args - Prints to stdout with newline.
+   */
+  log(...args) {
+    const output = args.map((arg) => stringify(arg)).join(' ');
+    process.stdout.write(`${output}\n`);
+  }
+
+  /**
+   * An alias to `console.log()`.
+   *
+   * @param  {...*} args - Prints to stdout with newline.
+   */
+  info(...args) {
+    const output = args.map((arg) => stringify(arg)).join(' ');
+    process.stdout.write(`${output}\n`);
+  }
+
+  /**
+   * An alias to `console.log()`.
+   *
+   * @param  {...*} args - Prints to stdout with newline.
+   */
+  debug(...args) {
+    const output = args.map((arg) => stringify(arg)).join(' ');
+    process.stdout.write(`${output}\n`);
+  }
+
+  /**
+   * Same as `console.log` but prepends the output with "WARNING".
+   *
+   * @param  {...*} args - Prints to stdout with newline.
+   */
+  warn(...args) {
+    const output = args.map((arg) => stringify(arg)).join(' ');
+    process.stderr.write(`WARNING: ${output}\n`);
+  }
+
+  /**
+   * Same as `console.log` but prepends the output with "WARNING".
+   *
+   * @param  {...*} args - Prints to stdout with newline.
+   */
+  error(...args) {
+    const output = args.map((arg) => stringify(arg)).join(' ');
+    process.stderr.write(`WARNING: ${output}\n`);
+  }
+
+  /**
+   * Clears the console if the environment allows it.
+   */
+  clear() {
+    try {
+      process.binding('stdio').clear();
+    } catch (e) {
+      this.warn('This environment does not support console clearing');
+    }
+  }
+
+  /**
+   * Starts a timer you can use to track how long an operation takes.
+   *
+   * @param {String} [label] - A string representing the name to give the new timer.
+   */
+  time(label = 'default') {
+    if (this.#timers.has(label)) {
+      this.warn(`Timer '${label}' already exists`);
+      return;
+    }
+
+    this.#timers.set(label, performance.now());
+  }
+
+  /**
+   * Logs the current value of a timer that was previously started by calling
+   * console.time() to the console.
+   *
+   * @param {String} [label] - The name of the timer to log to the console.
+   */
+  timeLog(label = 'default') {
+    if (!this.#timers.has(label)) {
+      this.warn(`Timer '${label}' does not exist`);
+      return;
+    }
+
+    const difference = performance.now() - this.#timers.get(label);
+    this.log(`${label}: ${difference} ms`);
+  }
+
+  /**
+   * Stops a timer that was previously started by calling console.time().
+   *
+   * @param {String} [label] - A string representing the name of the timer to stop.
+   */
+  timeEnd(label = 'default') {
+    if (!this.#timers.has(label)) {
+      this.warn(`Timer '${label}' does not exist`);
+      return;
+    }
+
+    this.timeLog(label);
+    this.#timers.delete(label);
+  }
+}
+
+// This wrapper forwards console messages to V8's internal console implementation,
+// triggering the `Runtime.consoleAPICalled` event. This ensures that the
+// attached debugger (if exists) is notified about the console call.
+//
+// https://github.com/v8/v8/blob/master/src/inspector/v8-console.cc
+// https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#event-consoleAPICalled
+//
+export function wrapConsole(console, consoleFromV8) {
+  // Get the property names of the console prototype.
+  const prototype = Object.getPrototypeOf(console);
+  const propertyNames = Object.getOwnPropertyNames(prototype);
+
+  for (const key of Object.keys(consoleFromV8)) {
+    // If global console has the same method as inspector console,
+    // then wrap these two methods into one.
+    if (propertyNames.includes(key)) {
+      console[key] = callConsole.bind(
+        console,
+        consoleFromV8[key],
+        console[key]
+      );
+    } else {
+      // Add additional console APIs from the inspector.
+      console[key] = consoleFromV8[key];
+    }
+  }
+}
+
+export default { Console, prompt, wrapConsole };
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<br class="clear">
+
+<footer>
+    Generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Thu Jan 18 2024 23:00:57 GMT+0000 (Coordinated Universal Time) using the Minami theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/linenumber.js"></script>
+</body>
+</html>
