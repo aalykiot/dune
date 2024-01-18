@@ -1,9 +1,13 @@
-// Console APIs
-//
-// The Console APIs provide functionality to allow developers to perform debugging tasks,
-// such as logging messages or the values of variables at set points in your code.
-//
-// https://developer.mozilla.org/en-US/docs/Web/API/console
+/**
+ * Console APIs
+ *
+ * The Console APIs provide functionality to allow developers to perform debugging tasks,
+ * such as logging messages or the values of variables at set points in your code.
+ *
+ * https://developer.mozilla.org/en-US/docs/Web/API/console
+ *
+ * @module Console
+ */
 
 /* eslint-disable no-control-regex */
 
@@ -25,6 +29,7 @@ function objectToString(value) {
 /**
  * Stringifies almost all JavaScript built-in types.
  *
+ * @ignore
  * @param {*} value
  * @param {WeakSet} seen
  * @param {number} depth
@@ -256,6 +261,7 @@ const specialCharsRegex = new RegExp('[^A-Za-z0-9|_]+');
 /**
  * Specifically stringifies JavaScript objects.
  *
+ * @ignore
  * @param {*} value
  * @param {WeakSet} seen
  * @param {number} depth
@@ -337,9 +343,8 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
 /**
  * Shows the given message and waits for the user's input.
  *
- * @param {String} [message]
- * @param {String} [defaultValue]
- * @returns
+ * @param {String} [message] - A string of text to display to the user.
+ * @param {String} [defaultValue] - A string containing the default value displayed in the text input field.
  */
 export function prompt(message = 'Prompt', defaultValue = null) {
   // Write prompt message to stdout.
@@ -359,35 +364,50 @@ export class Console {
   #timers = new Map();
 
   /**
-   * Outputs data to the stdout stream.
+   * Outputs data to the `stdout` stream.
    *
-   * @param  {...any} args
+   * @param  {...*} args - Prints to stdout with newline.
    */
   log(...args) {
     const output = args.map((arg) => stringify(arg)).join(' ');
     process.stdout.write(`${output}\n`);
   }
 
+  /**
+   * An alias to `console.log()`.
+   *
+   * @param  {...*} args - Prints to stdout with newline.
+   */
   info(...args) {
     const output = args.map((arg) => stringify(arg)).join(' ');
     process.stdout.write(`${output}\n`);
   }
 
+  /**
+   * An alias to `console.log()`.
+   *
+   * @param  {...*} args - Prints to stdout with newline.
+   */
   debug(...args) {
     const output = args.map((arg) => stringify(arg)).join(' ');
     process.stdout.write(`${output}\n`);
   }
 
   /**
-   * Same as console.log but prepends the output with "WARNING".
+   * Same as `console.log` but prepends the output with "WARNING".
    *
-   * @param  {...any} args
+   * @param  {...*} args - Prints to stdout with newline.
    */
   warn(...args) {
     const output = args.map((arg) => stringify(arg)).join(' ');
     process.stderr.write(`WARNING: ${output}\n`);
   }
 
+  /**
+   * Same as `console.log` but prepends the output with "WARNING".
+   *
+   * @param  {...*} args - Prints to stdout with newline.
+   */
   error(...args) {
     const output = args.map((arg) => stringify(arg)).join(' ');
     process.stderr.write(`WARNING: ${output}\n`);
@@ -407,9 +427,8 @@ export class Console {
   /**
    * Starts a timer you can use to track how long an operation takes.
    *
-   * @param String label
+   * @param {String} [label] - A string representing the name to give the new timer.
    */
-
   time(label = 'default') {
     if (this.#timers.has(label)) {
       this.warn(`Timer '${label}' already exists`);
@@ -423,9 +442,8 @@ export class Console {
    * Logs the current value of a timer that was previously started by calling
    * console.time() to the console.
    *
-   * @param String label
+   * @param {String} [label] - The name of the timer to log to the console.
    */
-
   timeLog(label = 'default') {
     if (!this.#timers.has(label)) {
       this.warn(`Timer '${label}' does not exist`);
@@ -439,9 +457,8 @@ export class Console {
   /**
    * Stops a timer that was previously started by calling console.time().
    *
-   * @param String label
+   * @param {String} [label] - A string representing the name of the timer to stop.
    */
-
   timeEnd(label = 'default') {
     if (!this.#timers.has(label)) {
       this.warn(`Timer '${label}' does not exist`);

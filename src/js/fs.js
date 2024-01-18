@@ -1,9 +1,13 @@
-// File System APIs
-//
-// The File System APIs enable interacting with the file system in a way modeled
-// on standard POSIX functions.
-//
-// https://nodejs.org/api/fs.html
+/**
+ * File System APIs
+ *
+ * The File System APIs enable interacting with the file system in a way modeled
+ * on standard POSIX functions.
+ *
+ * https://nodejs.org/api/fs.html
+ *
+ * @module File-System
+ */
 
 const binding = process.binding('fs');
 
@@ -16,9 +20,9 @@ export class File {
   /**
    * Creates a new File instance given a file path.
    *
-   * @param {String} path
-   * @param {String} [mode]
-   * @returns {File}
+   * @param {String} path - The file path for the File instance.
+   * @param {String} [mode] - The mode in which the file is to be opened.
+   * @returns {File} An instance of the File class.
    */
   constructor(path, mode) {
     // Check if the path argument is a valid type.
@@ -35,7 +39,7 @@ export class File {
   /**
    * Asynchronously opens the file.
    *
-   * @param {string} mode
+   * @param {string} mode - The mode in which the file is to be opened.
    */
   async open(mode = 'r') {
     // Check if the file is already open.
@@ -50,7 +54,7 @@ export class File {
   /**
    * Synchronously opens the file.
    *
-   * @param {string} mode
+   * @param {string} mode - The mode in which the file is to be opened.
    */
   openSync(mode = 'r') {
     // Check if the file is already open.
@@ -65,9 +69,9 @@ export class File {
   /**
    * Reads asynchronously some bytes from the file.
    *
-   * @param {Uint8Array} buffer
-   * @param {Number} offset
-   * @returns {Promise<Number>}
+   * @param {Uint8Array} buffer - The buffer into which the data will be read.
+   * @param {Number} offset - The starting position in the file from which to begin reading data.
+   * @returns {Promise<Number>} - The amount of bytes read.
    */
   async read(buffer, offset = 0) {
     // Check if the file is open.
@@ -87,9 +91,9 @@ export class File {
   /**
    * Reads synchronously some bytes from the file.
    *
-   * @param {Uint8Array} buffer
-   * @param {Number} offset
-   * @returns {Number}
+   * @param {Uint8Array} buffer - The buffer into which the data will be read.
+   * @param {Number} offset - The starting position in the file from which to begin reading data.
+   * @returns {Number} - The amount of bytes read.
    */
   readSync(buffer, offset = 0) {
     // Check if the file is open.
@@ -109,7 +113,7 @@ export class File {
   /**
    * Writes asynchronously a binary buffer to the file.
    *
-   * @param {Uint8Array} data
+   * @param {Uint8Array} data - The binary data to be written to the file.
    */
   async write(data) {
     // Check the data argument type.
@@ -128,7 +132,7 @@ export class File {
   /**
    * Writes synchronously a binary buffer to the file.
    *
-   * @param {Uint8Array} data
+   * @param {Uint8Array} data - The binary data to be written to the file.
    */
   writeSync(data) {
     // Check the data argument type.
@@ -145,7 +149,34 @@ export class File {
   }
 
   /**
+   * Information about a specific `File` object.
+   *
+   * @typedef {Object} FileStats
+   * @property {number} size - The size of the file in bytes.
+   * @property {number} [atimeMs] - The timestamp indicating the last time this file was accessed (POSIX Epoch).
+   * @property {number} [mtimeMs] - The timestamp indicating the last time this file was modified (POSIX Epoch).
+   * @property {number} [birthtimeMs] - The timestamp indicating the creation time of this file (POSIX Epoch).
+   * @property {boolean} isFile - Returns `true` if the object describes a regular file.
+   * @property {boolean} isDirectory - Returns `true` if the object describes a file system directory.
+   * @property {boolean} isSymbolicLink - Returns `true` if the object describes a symbolic link.
+   * @property {boolean} [isSocket] - Returns `true` if the object describes a socket.
+   * @property {boolean} [isFIFO] - Returns `true` if object describes a regular file.
+   * @property {boolean} [isBlockDevice] - Returns `true` if the object describes a block device.
+   * @property {boolean} [isCharacterDevice] - Returns `true` if the object describes a character device.
+   * @property {number} [blocks] - The number of blocks allocated for this file.
+   * @property {number} [blksize] - The file system block size for i/o operations.
+   * @property {number} [mode] - A bit-field describing the file type and mode.
+   * @property {number} [dev] - The numeric identifier of the device containing the file.
+   * @property {number} [gid] - The numeric group identifier of the group that owns the file (POSIX).
+   * @property {number} [inode] - The file system specific "Inode" number for the file.
+   * @property {number} [nlink] - The number of hard-links that exist for the file.
+   * @property {number} [rdev] - A numeric device identifier if the file represents a device.
+   */
+
+  /**
    * Retrieves asynchronously statistics for the file.
+   *
+   * @returns {Promise<FileStats>} Useful information about the file.
    */
   async stat() {
     // Check if the file is already closed.
@@ -158,6 +189,8 @@ export class File {
 
   /**
    * Retrieves synchronously statistics for the file.
+   *
+   * @returns {FileStats} Useful information about the file.
    */
   statSync() {
     // Check if the file is already closed.
@@ -202,6 +235,7 @@ export class File {
 
   /**
    * The `File` instances are asynchronously iterable objects.
+   * @ignore
    */
   async *[Symbol.asyncIterator](signal) {
     // Close the file on stream pipeline errors.
@@ -219,6 +253,7 @@ export class File {
 
   /**
    * The `File` instances are iterable objects.
+   * @ignore
    */
   *[Symbol.iterator]() {
     let buffer = new Uint8Array(BUFFER_SIZE);
@@ -254,9 +289,9 @@ class FsWatcher {
   /**
    * Creates a new FsWatcher instance.
    *
-   * @param {String} path
-   * @param {Boolean} recursive
-   * @returns {FsWatcher}
+   * @param {String} path - The path to be monitored for changes.
+   * @param {Boolean} recursive - The watcher will monitor changes in the directory and its subdirectories.
+   * @returns {FsWatcher} An instance to monitor file or directory changes.
    */
   constructor(path, recursive = false) {
     this.#pushQueue = [];
@@ -293,6 +328,7 @@ class FsWatcher {
   /**
    * Returns a promise which is fulfilled when a new FS event is available.
    *
+   * @ignore
    * @returns {Promise<object>}
    */
   _next() {
@@ -316,6 +352,7 @@ class FsWatcher {
 
   /**
    * The FsWatcher should be async iterable.
+   * @ignore
    */
   async *[Symbol.asyncIterator](signal) {
     // Close watcher on stream pipeline errors.
@@ -332,9 +369,9 @@ class FsWatcher {
 /**
  * Asynchronously opens a file.
  *
- * @param {String} path
- * @param {String} mode
- * @returns {Promise<File>}
+ * @param {String} path - The file path of the file to be opened.
+ * @param {String} mode - The mode in which the file is to be opened.
+ * @returns {Promise<File>} An instance of the File class.
  */
 export async function open(path, mode = 'r') {
   // Check the data argument type.
@@ -352,9 +389,9 @@ export async function open(path, mode = 'r') {
 /**
  * Synchronously opens a file.
  *
- * @param {String} path
- * @param {String} mode
- * @returns {File}
+ * @param {String} path - The file path of the file to be opened.
+ * @param {String} mode - The mode in which the file is to be opened.
+ * @returns {File} An instance of the File class.
  */
 export function openSync(path, mode = 'r') {
   // Check the data argument type.
@@ -372,11 +409,11 @@ export function openSync(path, mode = 'r') {
 /**
  * Reads asynchronously the entire contents of a file.
  *
- * @param {String} path
- * @param {(String|Object)} options
- * @returns {Promise<(String|Uint8Array)>}
+ * @param {String} path - The path of the file to be read.
+ * @param {(String|Object)} [options] - The options to control the file read operation.
+ * @param {String} [options.encoding] - The encoding to be used for reading the file.
+ * @returns {Promise<(String|Uint8Array)>} - The contents of the file.
  */
-
 export async function readFile(path, options = {}) {
   // Create a new file instance.
   const file = new File(path, 'r');
@@ -410,11 +447,11 @@ export async function readFile(path, options = {}) {
 /**
  * Reads synchronously the entire contents of a file.
  *
- * @param {String} path
- * @param {(String|Object)} options
- * @returns {(String|Uint8Array)}
+ * @param {String} path - The path of the file to be read.
+ * @param {(String|Object)} [options] - The options to control the file read operation.
+ * @param {String} [options.encoding] - The encoding to be used for reading the file.
+ * @returns {(String|Uint8Array)} - The contents of the file.
  */
-
 export function readFileSync(path, options = {}) {
   // Create a new file instance.
   const file = new File(path, 'r');
@@ -455,12 +492,12 @@ function toUint8Array(data, encoding) {
 /**
  * Writes asynchronously contents to a file.
  *
- * @param {String} path
- * @param {String|Uint8Array} data
- * @param {String|Object} options
+ * @param {String} path - The path of the file where the data is to be written.
+ * @param {(String|Uint8Array)} data - The data to write to the file.
+ * @param {(String|Object)} [options] - The options to control the file write operation.
+ * @param {String} [options.encoding] - The encoding to be used for writing the file.
  * @returns {Promise}
  */
-
 export async function writeFile(path, data, options = {}) {
   // Check the data argument type.
   if (!(data instanceof Uint8Array) && typeof data !== 'string') {
@@ -488,9 +525,10 @@ export async function writeFile(path, data, options = {}) {
 /**
  * Writes synchronously contents to a file.
  *
- * @param {String} path
- * @param {String|Uint8Array} data
- * @param {String|Object} options
+ * @param {String} path - The path of the file where the data is to be written.
+ * @param {String|Uint8Array} data - The data to write to the file.
+ * @param {String|Object} [options] - The options to control the file write operation.
+ * @param {String} [options.encoding] - The encoding to be used for writing the file.
  */
 
 export function writeFileSync(path, data, options = {}) {
@@ -520,12 +558,10 @@ export function writeFileSync(path, data, options = {}) {
 /**
  * Copies asynchronously a file from the source path to destination path.
  *
- * @param {String} path
- * @param {String|Uint8Array} data
- * @param {String} encoding
+ * @param {String} source - The path of the source file to be copied.
+ * @param {String} destination - The path where the source file will be copied to.
  * @returns {Promise}
  */
-
 export async function copyFile(source, destination) {
   // Check the source argument type.
   if (typeof source !== 'string') {
@@ -543,11 +579,9 @@ export async function copyFile(source, destination) {
 /**
  * Copies synchronously a file from the source path to destination path.
  *
- * @param {String} path
- * @param {String|Uint8Array} data
- * @param {String} encoding
+ * @param {String} source - The path of the source file to be copied.
+ * @param {String} destination - The path where the source file will be copied to.
  */
-
 export function copyFileSync(source, destination) {
   // Check the source argument type.
   if (typeof source !== 'string') {
@@ -565,8 +599,8 @@ export function copyFileSync(source, destination) {
 /**
  * Retrieves asynchronously statistics for the file.
  *
- * @param {String} path
- * @returns {Promise<Object>}
+ * @param {String} path - The path of the file for which statistics are to be retrieved.
+ * @returns {Promise<FileStats>} An object containing the statistics of the file.
  */
 export async function stat(path) {
   // Check the path argument type.
@@ -583,8 +617,8 @@ export async function stat(path) {
 /**
  * Retrieves synchronously statistics for the file.
  *
- * @param {String} path
- * @returns {Object}
+ * @param {String} path - The path of the file for which statistics are to be retrieved.
+ * @returns {Object} An object containing the statistics of the file.
  */
 export function statSync(path) {
   // Check the path argument type.
@@ -601,8 +635,9 @@ export function statSync(path) {
 /**
  * Creates directories asynchronously.
  *
- * @param {String} path
- * @param {Object} options
+ * @param {String} path - The path where the new directory will be created.
+ * @param {Object} [options] - Configuration options for directory creation.
+ * @param {boolean}  [options.recursive] - Will create all directories necessary to reach the specified path.
  * @returns {Promise}
  */
 export async function mkdir(path, options = {}) {
@@ -617,8 +652,9 @@ export async function mkdir(path, options = {}) {
 /**
  * Creates directories synchronously.
  *
- * @param {String} path
- * @param {Object} options
+ * @param {String} path - The path where the new directory will be created.
+ * @param {Object} [options] - Configuration options for directory creation.
+ * @param {boolean}  [options.recursive] - Will create all directories necessary to reach the specified path.
  */
 export function mkdirSync(path, options = {}) {
   // Check the path argument type.
@@ -632,8 +668,10 @@ export function mkdirSync(path, options = {}) {
 /**
  * Removes empty directories asynchronously.
  *
- * @param {String} path
- * @param {Object} options
+ * @param {String} path - The path of the directory to be removed.
+ * @param {Object} [options] - Configuration options for directory removal.
+ * @param {number} [options.maxRetries=0] - The maximum number of times to retry the removal in case of failure.
+ * @param {number} [options.retryDelay=100] - The delay in milliseconds between retries.
  * @returns {Promise}
  */
 export async function rmdir(path, options = {}, __retries = 0) {
@@ -670,8 +708,10 @@ export async function rmdir(path, options = {}, __retries = 0) {
 /**
  * Removes empty directories synchronously.
  *
- * @param {String} path
- * @param {Object} options
+ * @param {String} path - The path of the directory to be removed.
+ * @param {Object} [options] - Configuration options for directory removal.
+ * @param {number} [options.maxRetries=0] - The maximum number of times to retry the removal in case of failure.
+ * @param {number} [options.retryDelay=100] - The delay in milliseconds between retries.
  */
 export function rmdirSync(path, options = {}, __retries = 0) {
   // Check the path argument type.
@@ -699,8 +739,8 @@ export function rmdirSync(path, options = {}, __retries = 0) {
 /**
  * Reads asynchronously the contents of a directory.
  *
- * @param {String} path
- * @returns {Promise<String[]>}
+ * @param {String} path - The path of the directory whose contents are to be read.
+ * @returns {Promise<String[]>} An array of strings, where each string is the name of a file or directory.
  */
 export async function readdir(path) {
   // Check the path argument type.
@@ -714,8 +754,8 @@ export async function readdir(path) {
 /**
  * Reads the contents of a directory.
  *
- * @param {String} path
- * @returns {String[]}
+ * @param {String} path - The path of the directory whose contents are to be read.
+ * @returns {String[]} An array of strings, where each string is the name of a file or directory.
  */
 export function readdirSync(path) {
   // Check the path argument type.
@@ -729,8 +769,11 @@ export function readdirSync(path) {
 /**
  * Removes files and directories asynchronously.
  *
- * @param {String} path
- * @param {Object} options
+ * @param {String} path - The path of the file or directory to be removed.
+ * @param {Object} [options] - Configuration options for the removal operation.
+ * @param {boolean} [options.recursive=false] - The method will remove the directory and all its contents recursively.
+ * @param {number} [options.maxRetries=0] - The maximum number of times to retry the removal in case of failure.
+ * @param {number} [options.retryDelay=100] - The delay in milliseconds between retries.
  * @returns {Promise}
  */
 export async function rm(path, options = {}, __retries = 0) {
@@ -777,8 +820,11 @@ export async function rm(path, options = {}, __retries = 0) {
 /**
  * Removes files and directories synchronously.
  *
- * @param {String} path
- * @param {Object} options
+ * @param {String} path - The path of the file or directory to be removed.
+ * @param {Object} [options] - Configuration options for the removal operation.
+ * @param {boolean} [options.recursive=false] - The method will remove the directory and all its contents recursively.
+ * @param {number} [options.maxRetries=0] - The maximum number of times to retry the removal in case of failure.
+ * @param {number} [options.retryDelay=100] - The delay in milliseconds between retries.
  */
 export function rmSync(path, options = {}, __retries = 0) {
   // Check the path argument type.
@@ -816,9 +862,9 @@ export function rmSync(path, options = {}, __retries = 0) {
 /**
  * Renames oldPath to newPath asynchronously.
  *
- * @param {String} from
- * @param {String} to
- * @returns {Promise<undefined>}
+ * @param {String} from - The current path of the file or directory to be renamed.
+ * @param {String} to - The new path for the file or directory.
+ * @returns {Promise}
  */
 export async function rename(from, to) {
   // Check the `from` argument type.
@@ -837,8 +883,8 @@ export async function rename(from, to) {
 /**
  * Renames oldPath to newPath synchronously.
  *
- * @param {String} from
- * @param {String} to
+ * @param {String} from - The current path of the file or directory to be renamed.
+ * @param {String} to - The new path for the file or directory.
  */
 export function renameSync(from, to) {
   // Check the `from` argument type.
@@ -857,9 +903,10 @@ export function renameSync(from, to) {
 /**
  * Returns an async iterator that watches for changes over a path.
  *
- * @param {String} path
- * @param {Object} options
- * @returns {FsWatcher}
+ * @param {String} path - The path to be monitored for changes.
+ * @param {Object} [options] - Configuration options for the file watcher.
+ *  @param {boolean} [options.recursive] - Will monitor the specified directory and its subdirectories for changes.
+ * @returns {FsWatcher} An instance of the `FsWatcher` class.
  */
 export function watch(path, options = {}) {
   // Check the `path` argument type.
@@ -873,9 +920,10 @@ export function watch(path, options = {}) {
 /**
  * Returns a new readable IO stream.
  *
- * @param {String} path
- * @param {(String|Object)} options
- * @returns {AsyncGeneratorFunction}
+ * @param {String} path - The path of the file to be read.
+ * @param {(String|Object)} [options] - Configuration options for the stream.
+ * @param {String} [options.encoding] - The encoding to be used for reading the file.
+ * @returns {AsyncGeneratorFunction} - An instance of a `Readable` stream.
  */
 export function createReadStream(path, options = {}) {
   // Use passed encoding or default to UTF-8.
@@ -898,9 +946,10 @@ export function createReadStream(path, options = {}) {
 /**
  * Returns a new writable IO stream.
  *
- * @param {String} path
- * @param {(String|Object)} options
- * @returns {Object}
+ * @param {String} path - The path of the file where data will be written.
+ * @param {(String|Object)} [options] - Configuration options for the stream.
+ * @param {String} [options.encoding] - The encoding to be used for writing data to the file.
+ * @returns {Object} An instance of a `Writable` stream.
  */
 export function createWriteStream(path, options = {}) {
   // We want to open the file the moment the stream becomes active.

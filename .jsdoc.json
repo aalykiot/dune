@@ -1,0 +1,34 @@
+{
+  "plugins": ["plugins/markdown"],
+  "recurseDepth": 10,
+  "source": {
+    "include": [
+      "src/js/dns.js",
+      "src/js/console.js",
+      "src/js/stream.js",
+      "src/js/events.js",
+      "src/js/assert.js",
+      "src/js/timers.js",
+      "src/js/fs.js",
+      "src/js/net.js",
+      "src/js/http.js"
+    ]
+  },
+  "tags": {
+    "allowUnknownTags": true,
+    "dictionaries": ["jsdoc", "closure"]
+  },
+  "opts": {
+    "destination": "./dist/api/",
+    "readme": "./README.md",
+    "encoding": "utf8",
+    "template": "./node_modules/minami",
+    "recurse": true
+  },
+  "templates": {
+    "cleverLinks": false,
+    "monospaceLinks": true,
+    "useLongnameInNav": false,
+    "showInheritedInNav": true
+  }
+}

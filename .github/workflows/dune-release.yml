@@ -1,4 +1,4 @@
-name: release
+name: Build and Release
 
 permissions:
   contents: write
@@ -38,3 +38,5 @@ jobs:
           target: ${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  build-api:
+    uses: ./.github/workflows/dune-api.yml

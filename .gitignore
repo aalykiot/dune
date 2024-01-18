@@ -25,3 +25,4 @@ temp/
 
 # NPM
 package-lock.json
+dist/

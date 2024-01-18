@@ -1,9 +1,13 @@
-// Stream API
-//
-// A stream is an abstract interface for working with streaming data, and
-// is based on generators and async-iterators.
-//
-// https://youtu.be/YVdw1MDHVZs
+/**
+ * Stream API
+ *
+ * A stream is an abstract interface for working with streaming data, and
+ * is based on generators and async-iterators.
+ *
+ * https://youtu.be/YVdw1MDHVZs
+ *
+ * @module Stream
+ */
 
 import assert from 'assert';
 import { EventEmitter } from 'events';
@@ -49,9 +53,9 @@ const wrap = (iterable, signal) => {
 /**
  * A module method to pipe between streams forwarding errors and properly cleaning up.
  *
- * @param {AsyncGeneratorFunction|AsyncIterator} source
- * @param  {...AsyncGeneratorFunction} targets
- * @returns Promise<undefined>
+ * @param {(AsyncGeneratorFunction|AsyncIterator)} source - The source stream from which data is read.
+ * @param  {...AsyncGeneratorFunction} targets - One or more target streams where data from the source is written to.
+ * @returns {Promise}
  */
 export function pipeline(source, ...targets) {
   // The signal EE is used to signal the pipeline that an uncaught
@@ -75,8 +79,8 @@ export function pipeline(source, ...targets) {
 /**
  * Combines two or more streams into a Duplex stream.
  *
- * @param  {...AsyncGeneratorFunction} targets
- * @returns AsyncGeneratorFunction
+ * @param  {...AsyncGeneratorFunction} targets - A series of streams to be combined into the Duplex stream.
+ * @returns AsyncGeneratorFunction - The combined Duplex stream.
  */
 export function compose(...targets) {
   // Ensure that the compose stream is an open circuit.
@@ -93,6 +97,7 @@ export function compose(...targets) {
 
 /**
  * An alias of `pipeline()`.
+ * @ignore
  */
 export const pipe = pipeline;
 
