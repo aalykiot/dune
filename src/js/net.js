@@ -1,9 +1,13 @@
-// TCP Networking APIs
-//
-// The TCP Networking APIs provide an asynchronous network API for creating
-// stream-based TCP servers and clients.
-//
-// https://nodejs.org/dist/latest-v18.x/docs/api/net.html
+/**
+ * TCP Networking APIs
+ *
+ * The TCP Networking APIs provide an asynchronous network API for creating
+ * stream-based TCP servers and clients.
+ *
+ * https://nodejs.org/dist/latest-v18.x/docs/api/net.html
+ *
+ * @module Net
+ */
 
 import dns from 'dns';
 import assert from 'assert';
@@ -71,6 +75,7 @@ function timeout(promise, time = 0) {
  *  but it is more performant on high I/O scenarios.
  *
  *  http://pod.tst.eu/http://cvs.schmorp.de/libev/ev.pod#Be_smart_about_timeouts
+ * @ignore
  */
 function callbackTimeout(callback, time = 0, onTimeout) {
   // The reason of the event-emitter is to allow the "outside" world
@@ -114,8 +119,13 @@ function callbackTimeout(callback, time = 0, onTimeout) {
 /**
  * Initiates a connection to a given remote host.
  *
- * @param {Object} options
- * @returns Socket
+ * Additional signatures:
+ * - createConnection(port: number | string, host?: string)
+ *
+ * @param {Object} options - Configuration options for the connection.
+ * @param {string} options.host - The hostname or IP address of the remote server to connect to.
+ * @param {(string|number)} options.port - The port number on the remote host to connect to.
+ * @returns Socket - An instance of the `Socket` class
  */
 export function createConnection(...args) {
   const socket = new Socket();
@@ -126,8 +136,8 @@ export function createConnection(...args) {
 /**
  * Creates a new TCP server.
  *
- * @param {Function} [onConnection]
- * @returns Server
+ * @param {Function} [onConnection] - A function that is called whenever a connection is made to the server.
+ * @returns Server - An instance of the `Server` class.
  */
 export function createServer(onConnection) {
   // Instantiate a new TCP server.
@@ -138,6 +148,31 @@ export function createServer(onConnection) {
   }
   return server;
 }
+
+/**
+ * Information about the connected TCP socket.
+ *
+ * @typedef socketInfo
+ * @property {SocketHost} host - Information about the local endpoint of the socket.
+ * @property {SocketRemote} remote -  Information about the remote endpoint of the socket.
+ */
+
+/**
+ * Information about the host TCP socket.
+ *
+ * @typedef SocketHost
+ * @property {number} port - The port number on the local machine.
+ * @property {string} family - The IP family of the local address (`IPv4` or `IPv6`).
+ * @property {string} address - The local IP address.
+ */
+
+/**
+ * Information about the remote TCP socket.
+ *
+ * @typedef SocketRemote
+ * @property {number} port - The port number on the remote machine.
+ * @property {string} address - The remote IP address.
+ */
 
 const kSetSocketIdUnchecked = Symbol('kSetSocketIdUnchecked');
 const kAsyncGenerator = Symbol('kAsyncGenerator');
@@ -176,8 +211,13 @@ export class Socket extends EventEmitter {
   /**
    * Initiates a connection on a given remote host.
    *
-   * @param  {...any} args
-   * @returns {Promise<object>}
+   * Additional signatures:
+   * - connect(port: number | string, host?: string)
+   *
+   * @param {Object} options - Configuration options for the connection.
+   * @param {string} options.host - The hostname or IP address of the remote server to connect to.
+   * @param {(string|number)} options.port - The port number on the remote host to connect to.
+   * @returns {Promise<socketInfo>} Information about the connected TCP socket.
    */
   async connect(...args) {
     // Parse arguments.
@@ -241,7 +281,7 @@ export class Socket extends EventEmitter {
   /**
    * Sets the encoding for the current socket.
    *
-   * @param {String} [encoding]
+   * @param {String} [encoding='utf-8'] - The character encoding to use.
    */
   setEncoding(encoding = 'utf-8') {
     // Check the parameter type.
@@ -254,7 +294,7 @@ export class Socket extends EventEmitter {
   /**
    * Sets the socket to timeout after timeout milliseconds of (read) inactivity on the socket.
    *
-   * @param {Number} timeout
+   * @param {Number} timeout - The duration after which the socket should timeout due to inactivity.
    */
   setTimeout(timeout = 0) {
     // Coalesce to number or NaN.
@@ -276,7 +316,7 @@ export class Socket extends EventEmitter {
   /**
    * Returns a promise which is fulfilled when the TCP stream can return a chunk.
    *
-   * @returns {Promise<Uint8Array|string>}
+   * @returns {Promise<(Uint8Array|string)>} The chunk read from the socket.
    */
   read() {
     // Check if the socket is connected to a host.
@@ -302,9 +342,9 @@ export class Socket extends EventEmitter {
   /**
    * Writes contents to a TCP socket stream.
    *
-   * @param {String|Uint8Array} data
-   * @param {String} [encoding]
-   * @returns {Promise<Number>}
+   * @param {String|Uint8Array} data - The data to be written to the socket.
+   * @param {String} [encoding] - The character encoding to use.
+   * @returns {Promise<Number>} The number of bytes written.
    */
   async write(data, encoding = 'utf-8') {
     // Check the data argument type.
@@ -336,8 +376,8 @@ export class Socket extends EventEmitter {
   /**
    * Half-closes the TCP stream.
    *
-   * @param {String|Uint8Array} data
-   * @param {String} [encoding]
+   * @param {String|Uint8Array} data - The (last) data to be written to the socket.
+   * @param {String} [encoding] - The character encoding to use.
    * @returns {Promise<void>}
    */
   async end(data, encoding = 'utf-8') {
@@ -374,7 +414,7 @@ export class Socket extends EventEmitter {
   /**
    * Returns the bound address, the address family name and port of the socket.
    *
-   * @returns {Object}
+   * @returns {SocketHost} - Information about the local endpoint of the socket.
    */
   address() {
     return this.#host;
@@ -382,6 +422,7 @@ export class Socket extends EventEmitter {
 
   /**
    * Resets socket's internal state (not to be called manually).
+   * @ignore
    */
   #reset() {
     this.#id = undefined;
@@ -442,7 +483,8 @@ export class Socket extends EventEmitter {
   /**
    * Hard-sets the ID of the socket (ONLY for internal use).
    *
-   * @param {Number} id
+   * @param {Number} id - The resource ID existing in the event-loop.
+   * @ignore
    */
   [kSetSocketIdUnchecked](id) {
     this.#id = id;
@@ -471,6 +513,7 @@ export class Socket extends EventEmitter {
 
   /**
    * The socket should be async iterable.
+   * @ignore
    */
   [Symbol.asyncIterator](signal) {
     const iterator = { return: () => this.end() };
@@ -490,7 +533,7 @@ export class Server extends EventEmitter {
   /**
    * Creates a new Server instance.
    *
-   * @returns {Server}
+   * @returns {Server} - An instance of the TCP `Server` class.
    */
   constructor() {
     super();
@@ -501,8 +544,9 @@ export class Server extends EventEmitter {
   /**
    * Starts listening for incoming connections.
    *
-   * @param  {...any} args
-   * @returns Promise<Object>
+   * @param {(string|number)} port - The port number or string on which the server should listen.
+   * @param {string} host - The hostname or IP address on which the server will listen.
+   * @returns Promise<SocketHost> - The host information where the server is listening.
    */
   async listen(...args) {
     // Parse arguments.
@@ -547,7 +591,7 @@ export class Server extends EventEmitter {
   /**
    * Waits for a TCP client to connect and accepts the connection.
    *
-   * @returns {Promise<Socket>}
+   * @returns {Promise<Socket>} - A `Socket` object representing the connected client.
    */
   accept() {
     // Check if the server is listening.
@@ -587,7 +631,7 @@ export class Server extends EventEmitter {
   /**
    * Returns the bound address, the address family name and port of the socket.
    *
-   * @returns {Object}
+   * @returns {SocketHost} The host information where the server is listening.
    */
   address() {
     return this.#host;
@@ -637,6 +681,7 @@ export class Server extends EventEmitter {
 
   /**
    * The server should be async iterable.
+   * @ignore
    */
   [Symbol.asyncIterator]() {
     const iterator = { return: () => this.close() };

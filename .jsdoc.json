@@ -9,7 +9,8 @@
       "src/js/events.js",
       "src/js/assert.js",
       "src/js/timers.js",
-      "src/js/fs.js"
+      "src/js/fs.js",
+      "src/js/net.js"
     ]
   },
   "tags": {
