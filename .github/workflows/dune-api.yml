@@ -15,7 +15,7 @@ jobs:
           node-version: 'latest'
       - name: Install NPM packages
         run: |
-          npm ci
+          npm install
           npm run build:api
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
