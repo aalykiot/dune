@@ -1,0 +1,26 @@
+name: Deploy API References
+
+permissions:
+  contents: write
+on: [workflow_dispatch, workflow_call]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Configure Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'latest'
+      - name: Install NPM packages
+        run: |
+          npm ci
+          npm run build:api
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist/api/
+          branch: gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
