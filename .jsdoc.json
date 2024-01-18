@@ -17,7 +17,7 @@
     "dictionaries": ["jsdoc", "closure"]
   },
   "opts": {
-    "destination": "./docs/static/",
+    "destination": "./dist/api/",
     "readme": "./README.md",
     "encoding": "utf8",
     "template": "./node_modules/minami",

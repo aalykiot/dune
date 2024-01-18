@@ -2,27 +2,31 @@
   "name": "dune",
   "version": "0.5.5",
   "description": "A hobby runtime for JavaScript and TypeScript 🚀",
+  "homepage": "https://github.com/aalykiot/dune#readme",
+  "keywords": [],
+  "author": "Alex Alikiotis <alexalikiotis5@gmail.com>",
+  "license": "MIT",
   "main": "src/js/main.js",
-  "scripts": {
-    "build:docs": "jsdoc -c .jsdoc.json",
-    "build:aarch64": "./scripts/build-aarch64.sh",
-    "lint": "eslint ./src/js/**/*.js"
+  "bugs": {
+    "url": "https://github.com/aalykiot/dune/issues"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/aalykiot/dune.git"
   },
-  "keywords": [],
-  "author": "Alex Alikiotis <alexalikiotis5@gmail.com>",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/aalykiot/dune/issues"
+  "scripts": {
+    "lint": "eslint ./src/js/**/*.js",
+    "api": "concurrently \"nodemon --exec 'npm run build:api' --watch src/js/\" 'serve dist/api/'",
+    "build:api": "jsdoc -c .jsdoc.json",
+    "build:aarch64": "./scripts/build-aarch64.sh"
   },
-  "homepage": "https://github.com/aalykiot/dune#readme",
   "devDependencies": {
+    "concurrently": "^8.2.2",
     "eslint": "^8.19.0",
     "jsdoc": "^4.0.2",
     "minami": "^1.2.3",
+    "nodemon": "^3.0.3",
+    "serve": "^14.2.1",
     "taffydb": "^2.7.3"
   }
 }
