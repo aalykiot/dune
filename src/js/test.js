@@ -1,9 +1,13 @@
-// Test Runner APIs
-//
-// The test module enables the creation of JavaScript tests, drawing
-// inspiration from Deno's built-in test runner.
-//
-// https://deno.land/manual/basics/testing
+/**
+ * Test Runner APIs
+ *
+ * The test module enables the creation of JavaScript tests, drawing
+ * inspiration from Deno's built-in test runner.
+ *
+ * @see {@link https://deno.land/manual/basics/testing}
+ *
+ * @module Test-Runner
+ */
 
 import fs from 'fs';
 import { performance } from 'perf_hooks';
@@ -70,8 +74,8 @@ export class TestRunner {
   /**
    * Registers a new test to the runner.
    *
-   * @param {String} description
-   * @param {Function} testFn
+   * @param {String} description - A brief description of the test.
+   * @param {Function} testFn - The test function where the actual test logic is implemented.
    */
   test(description, testFn) {
     // We don't allow tests with similar descriptions.
@@ -106,7 +110,7 @@ export class TestRunner {
   /**
    * Loads tests from files to the runner recursively.
    *
-   * @param {String} [entryPoint]
+   * @param {String} [entryPoint] - The path that serves as the starting point for loading tests.
    */
   async importTests(entryPoint = process.cwd()) {
     // Find if the `entryPoint` is file or directory.
@@ -193,7 +197,10 @@ function parseOptionsArgs(args) {
 /**
  * Specifies a test to be registered with the default test runner.
  *
- * @param  {...any} params
+ * @param {string} description - A brief description of the test.
+ * @param {string} testFn - The test function where the actual test logic is implemented.
+ * @param {Object} [options] - Additional configuration options for the test.
+ * @param {boolean} [options.ignore] - The test will be registered but not executed.
  */
 function test(...params) {
   // Parse variadic parameters.

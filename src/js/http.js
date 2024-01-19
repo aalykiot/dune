@@ -5,7 +5,7 @@
  * features. By never buffering complete requests or responses, users can stream data
  * instead, making data transmission more efficient and flexible.
  *
- * https://undici.nodejs.org/#/
+ * @see {@link https://undici.nodejs.org/#/}
  *
  * @module HTTP
  */
@@ -654,6 +654,11 @@ export class Server extends EventEmitter {
 
 /**
  * A server-side request object for handling HTTP requests.
+ *
+ * @property {string} httpVersion - The HTTP version specified in the request.
+ * @property {string} method - The HTTP method used for the request
+ * @property {string} url - The URL being requested.
+ * @property {Object} headers - An object containing the request headers.
  */
 export class ServerRequest {
   #body;

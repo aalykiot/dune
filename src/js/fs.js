@@ -4,7 +4,7 @@
  * The File System APIs enable interacting with the file system in a way modeled
  * on standard POSIX functions.
  *
- * https://nodejs.org/api/fs.html
+ * @see {@link https://nodejs.org/api/fs.html}
  *
  * @module File-System
  */

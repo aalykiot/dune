@@ -4,7 +4,8 @@
  * A stream is an abstract interface for working with streaming data, and
  * is based on generators and async-iterators.
  *
- * https://youtu.be/YVdw1MDHVZs
+ * @see {@link https://youtu.be/YVdw1MDHVZs}
+ * @see {@link https://github.com/aalykiot/dune/blob/main/docs/the-stream-guide.md}
  *
  * @module Stream
  */
