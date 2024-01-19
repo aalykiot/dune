@@ -5,7 +5,7 @@
  * DNS protocol for lookups. This module uses the operating system facilities
  * to perform name resolution. It may not need to perform any network communication.
  *
- * https://nodejs.org/api/dns.html#dns
+ * @see {@link https://nodejs.org/api/dns.html#dns}
  *
  * @module DNS
  */

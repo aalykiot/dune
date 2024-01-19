@@ -4,7 +4,7 @@
  * The Console APIs provide functionality to allow developers to perform debugging tasks,
  * such as logging messages or the values of variables at set points in your code.
  *
- * https://developer.mozilla.org/en-US/docs/Web/API/console
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/console}
  *
  * @module Console
  */

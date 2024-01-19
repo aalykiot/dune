@@ -2,7 +2,8 @@
  * DOM Style Timers
  *
  * The Timers API provides functionality to allow developers to create DOM style timers.
- * https://www.w3schools.com/js/js_timing.asp
+ *
+ * @see {@link https://www.w3schools.com/js/js_timing.asp}
  *
  * @module Timers
  */

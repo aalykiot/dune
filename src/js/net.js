@@ -4,7 +4,7 @@
  * The TCP Networking APIs provide an asynchronous network API for creating
  * stream-based TCP servers and clients.
  *
- * https://nodejs.org/dist/latest-v18.x/docs/api/net.html
+ * @see {@link https://nodejs.org/dist/latest-v18.x/docs/api/net.html}
  *
  * @module Net
  */

@@ -2,7 +2,8 @@
  * Assert API
  *
  * Javascript, battle tested, simple assertion library with no dependencies.
- * https://assert-js.norbert.tech/
+ *
+ * @see {@link https://assert-js.norbert.tech/}
  *
  * @module Assert
  */
