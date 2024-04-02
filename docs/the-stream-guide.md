@@ -223,7 +223,7 @@ async function* makeStream(signal) {
 
 ### Uncontrollable Sources
 
-Lastly, as mentioned earlier, a pull-based stream works effectively when we can control the source. However, there are cases where we can't control the source, which is not uncommon, especially in networking scenarios. Take a `TCP client``, for example.
+Lastly, as mentioned earlier, a pull-based stream works effectively when we can control the source. However, there are cases where we can't control the source, which is not uncommon, especially in networking scenarios. Take a `TCP client`, for example.
 
 To tackle this issue, every internal Dune object, such as `net.Socket` or `http.Server`, that satisfies the `Readable` interface utilizes a double queue mechanism.
 
