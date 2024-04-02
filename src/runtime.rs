@@ -110,10 +110,9 @@ impl JsRuntime {
         let flags = concat!(
             " --no-validate-asm",
             " --turbo_fast_api_calls",
-            " --harmony-change-array-by-copy",
             " --harmony-import-assertions",
             " --harmony-array-from_async",
-            " --harmony-iterator-helpers"
+            " --harmony-iterator-helpers",
         );
 
         if options.seed.is_some() {
