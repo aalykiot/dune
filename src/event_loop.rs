@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use anyhow::bail;
 use anyhow::Result;
 use downcast_rs::impl_downcast;
 use downcast_rs::Downcast;
@@ -16,6 +17,8 @@ use notify::RecursiveMode;
 use notify::Watcher;
 use rayon::ThreadPool;
 use rayon::ThreadPoolBuilder;
+pub use signal_hook::consts::signal as Signal;
+use signal_hook::low_level::emulate_default_handler;
 use std::any::type_name;
 use std::borrow::Cow;
 use std::cell::Cell;
@@ -38,11 +41,14 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
+#[cfg(target_family = "unix")]
+use signal_hook_mio::v0_8::Signals;
+
 /// Wrapper type for resource identification.
 pub type Index = u32;
 
 /// All objects that are tracked by the event-loop should implement the `Resource` trait.
-pub trait Resource: Downcast + 'static {
+trait Resource: Downcast + 'static {
     /// Returns a string representation of the resource.
     fn name(&self) -> Cow<str> {
         type_name::<Self>().into()
@@ -124,21 +130,153 @@ pub struct TcpSocketInfo {
 }
 
 /// Describes a callback that will run once after the Poll phase.
-pub struct CheckWrap {
+struct CheckWrap {
     cb: Option<OnCheck>,
 }
 
 impl Resource for CheckWrap {}
 
 /// Describes a file-system watcher.
-pub struct FsWatcherWrap {
-    pub inner: Option<RecommendedWatcher>,
-    pub on_event: Option<FsWatchOnEvent>,
-    pub path: PathBuf,
-    pub recursive: bool,
+struct FsWatcherWrap {
+    inner: Option<RecommendedWatcher>,
+    on_event: Option<FsWatchOnEvent>,
+    path: PathBuf,
+    recursive: bool,
 }
 
 impl Resource for FsWatcherWrap {}
+
+// Based on linux systems the max allowed signal number is 31.
+// https://www-uxsup.csx.cam.ac.uk/courses/moved.Building/signals.pdf
+const MAX_SIGNAL_VALUE: i32 = 31;
+
+#[derive(Debug)]
+struct SignalNum(i32);
+
+impl SignalNum {
+    // Note: This allows us to have signal validation on the type level
+    // instead in the logic when used.
+    fn parse(signal: i32) -> Result<Self> {
+        // Check if signal is within UNIX range.
+        if signal > MAX_SIGNAL_VALUE {
+            bail!("Signal number out of range.");
+        }
+        // Forbidden signals are not allowed to be registered.
+        if signal_hook::consts::FORBIDDEN.contains(&signal) {
+            bail!("Forbidden signal provided.");
+        }
+
+        Ok(SignalNum(signal))
+    }
+
+    fn to_i32(&self) -> i32 {
+        self.0
+    }
+}
+
+struct SignalWrap {
+    id: Index,
+    on_signal: SignalHandler,
+    oneshot: bool,
+}
+
+type SignalHandler = Box<dyn FnMut(LoopHandle, i32) + 'static>;
+
+/// Abstracts signal handling across platforms.
+struct OsSignals {
+    #[cfg(target_family = "unix")]
+    sources: Signals,
+    handlers: HashMap<i32, Vec<SignalWrap>>,
+}
+
+impl OsSignals {
+    #[cfg(target_family = "unix")]
+    fn new(registry: &Registry) -> Self {
+        let mut sources = Signals::new::<[_; 0], i32>([]).unwrap();
+        let _ = registry.register(&mut sources, Token(1), Interest::READABLE);
+
+        OsSignals {
+            sources,
+            handlers: HashMap::new(),
+        }
+    }
+
+    #[cfg(target_family = "windows")]
+    fn new(notifier: Arc<Mutex<mpsc::Sender<Event>>>, waker: Arc<Waker>) -> Self {
+        // Spawn signal watching thread.
+        let on_signal_handler = move || {
+            notifier.lock().unwrap().send(Event::WinSigInt).unwrap();
+            waker.wake().unwrap();
+        };
+
+        ctrlc::set_handler(on_signal_handler).unwrap();
+
+        OsSignals {
+            handlers: HashMap::new(),
+        }
+    }
+
+    #[cfg(target_family = "unix")]
+    fn run_pending(&mut self, handle: LoopHandle) {
+        // Going through the available signals.
+        for signal in self.sources.pending() {
+            // Get all handlers for the given signal.
+            let handlers = match self.handlers.get_mut(&signal) {
+                Some(handlers) => handlers,
+                None => continue,
+            };
+
+            // No listeners for this signal, running default action.
+            if handlers.is_empty() {
+                emulate_default_handler(signal).unwrap();
+                continue;
+            }
+
+            handlers.retain_mut(|handler| {
+                // Run handler's callback.
+                (handler.on_signal)(handle.clone(), signal);
+                // Keep the listener if it's not a oneshot.
+                !handler.oneshot
+            });
+        }
+    }
+
+    #[cfg(target_family = "windows")]
+    fn run_pending(&mut self, handle: LoopHandle) {
+        // Note: In Windows, a dedicated thread is always on standby to listen for
+        // CTRL+C signals. Consequently, this function may be activated even if a
+        // signal handler was never initiated. Therefore, it's necessary to mimic
+        // the default action when no signals are registered or if the list of
+        // handlers is currently empty.
+        let handlers = match self.handlers.get_mut(&Signal::SIGINT) {
+            Some(handlers) if !handlers.is_empty() => handlers,
+            _ => {
+                emulate_default_handler(Signal::SIGINT).unwrap();
+                return;
+            }
+        };
+
+        handlers.retain_mut(|handler| {
+            // Run handler's callback.
+            (handler.on_signal)(handle.clone(), Signal::SIGINT);
+            // Keep the listener if it's not a oneshot.
+            !handler.oneshot
+        });
+    }
+
+    fn remove_handler(&mut self, index: Index) {
+        // Note: Given the structure of this struct we're following the simplest
+        // approach to remove the element with O(n^2) complexity. Further
+        // improvements can be made in the future if necessary.
+        if let Some((_, list)) = self
+            .handlers
+            .iter_mut()
+            .find(|(_, list)| list.iter().any(|handler| handler.id == index))
+        {
+            list.retain(|handler| handler.id != index);
+        }
+    }
+}
 
 #[allow(clippy::enum_variant_names)]
 enum Action {
@@ -155,8 +293,11 @@ enum Action {
     CheckRemoveReq(Index),
     FsEventStartReq(Index, FsWatcherWrap),
     FsEventStopReq(Index),
+    SignalStartReq(SignalNum, SignalWrap),
+    SignalStopReq(Index),
 }
 
+#[allow(dead_code)]
 enum Event {
     /// A thread-pool task has been completed.
     ThreadPool(Index, TaskResult),
@@ -164,6 +305,8 @@ enum Event {
     Network(TcpEvent),
     /// A file-system change has been detected.
     Watch(Index, FsEvent),
+    /// An interrupt signal detected (Windows platform).
+    WinSigInt,
 }
 
 #[derive(Debug)]
@@ -206,6 +349,7 @@ pub struct EventLoop {
     event_dispatcher: Arc<Mutex<mpsc::Sender<Event>>>,
     event_queue: mpsc::Receiver<Event>,
     network_events: Registry,
+    signals: OsSignals,
     poll: Poll,
     waker: Arc<Waker>,
 }
@@ -232,11 +376,20 @@ impl EventLoop {
 
         // Create network handles.
         let poll = Poll::new().unwrap();
-        let waker = Waker::new(poll.registry(), Token(0)).unwrap();
         let registry = poll.registry().try_clone().unwrap();
+        let waker = Waker::new(poll.registry(), Token(0)).unwrap();
+        let waker = Arc::new(waker);
+
+        // Monitor system signals through dedicated thread.
+        #[cfg(target_family = "windows")]
+        let signals = OsSignals::new(event_dispatcher.clone(), waker.clone());
+
+        // Monitor system signals through MIO.
+        #[cfg(target_family = "unix")]
+        let signals = OsSignals::new(&registry);
 
         EventLoop {
-            index: Rc::new(Cell::new(1)),
+            index: Rc::new(Cell::new(2)),
             resources: HashMap::new(),
             timer_queue: BTreeMap::new(),
             action_queue,
@@ -250,7 +403,8 @@ impl EventLoop {
             event_queue,
             poll,
             network_events: registry,
-            waker: Arc::new(waker),
+            waker,
+            signals,
         }
     }
 
@@ -307,6 +461,8 @@ impl EventLoop {
                 Action::CheckRemoveReq(index) => self.check_remove_req(index),
                 Action::FsEventStartReq(index, w_wrap) => self.fs_event_start_req(index, w_wrap),
                 Action::FsEventStopReq(index) => self.fs_event_stop_req(index),
+                Action::SignalStartReq(signum, s_wrap) => self.signal_start_req(signum, s_wrap),
+                Action::SignalStopReq(index) => self.signal_stop_req(index),
             };
         }
         self.action_queue_empty.set(true);
@@ -354,8 +510,8 @@ impl EventLoop {
 
     /// Polls for new I/O events (async-tasks, networking, etc).
     fn run_poll(&mut self) {
-        // Based on what resources the event-loop is currently running will decide
-        // how long we should wait on the this phase.
+        // Based on what resources the event-loop is currently running will
+        // decide how long we should wait on the this phase.
         let timeout = if self.has_pending_events() {
             let refs = self.check_queue.len() + self.close_queue.len();
             match self.timer_queue.iter().next() {
@@ -383,6 +539,13 @@ impl EventLoop {
                 continue;
             }
 
+            // Note: Token(1) is another special token signaling an OS
+            // signal is available for processing.
+            if event.token() == Token(1) {
+                self.signals.run_pending(self.handle());
+                continue;
+            }
+
             let event_type = match (
                 event.is_readable() || event.is_read_closed(),
                 event.is_writable(),
@@ -407,6 +570,7 @@ impl EventLoop {
                     TcpEvent::Write(index) => self.tcp_socket_write(index),
                     TcpEvent::Read(index) => self.tcp_socket_read(index),
                 },
+                Event::WinSigInt => self.signals.run_pending(self.handle()),
             }
             self.prepare();
         }
@@ -923,6 +1087,27 @@ impl EventLoop {
     fn fs_event_stop_req(&mut self, index: Index) {
         self.resources.remove(&index);
     }
+
+    /// Subscribes a new signal listener to the event-loop.
+    fn signal_start_req(&mut self, signum: SignalNum, signal_wrap: SignalWrap) {
+        // Check if the specific signal is already being tracked.
+        let signum = signum.to_i32();
+        if let Some(handlers) = self.signals.handlers.get_mut(&signum) {
+            handlers.push(signal_wrap);
+            return;
+        }
+
+        #[cfg(target_family = "unix")]
+        {
+            self.signals.sources.add_signal(signum).unwrap();
+        }
+        self.signals.handlers.insert(signum, vec![signal_wrap]);
+    }
+
+    /// Removes the signal listener from the event-loop.
+    fn signal_stop_req(&mut self, index: Index) {
+        self.signals.remove_handler(index)
+    }
 }
 
 impl Default for EventLoop {
@@ -1160,6 +1345,54 @@ impl LoopHandle {
     /// Stops watch handle, the callback will no longer be called.
     pub fn fs_event_stop(&self, index: &Index) {
         self.actions.send(Action::FsEventStopReq(*index)).unwrap();
+        self.actions_queue_empty.set(false);
+    }
+
+    /// Generic function to subscribe interest in an OS signal.
+    fn signal_init<F>(&self, signum: i32, oneshot: bool, on_signal: F) -> Result<Index>
+    where
+        F: FnMut(LoopHandle, i32) + 'static,
+    {
+        // Parse signal number provided.
+        let signum = SignalNum::parse(signum)?;
+
+        let index = self.index();
+        let on_signal = Box::new(on_signal);
+
+        let signal_wrap = SignalWrap {
+            id: index,
+            oneshot,
+            on_signal,
+        };
+
+        self.actions
+            .send(Action::SignalStartReq(signum, signal_wrap))
+            .unwrap();
+
+        self.actions_queue_empty.set(false);
+
+        Ok(index)
+    }
+
+    /// Start the handle with the given callback, watching for the given signal.
+    pub fn signal_start<F>(&self, signum: i32, on_signal: F) -> Result<Index>
+    where
+        F: FnMut(LoopHandle, i32) + 'static,
+    {
+        self.signal_init(signum, false, on_signal)
+    }
+
+    /// Same functionality but the signal handler is reset the moment the signal is received.
+    pub fn signal_start_oneshot<F>(&self, signum: i32, on_signal: F) -> Result<Index>
+    where
+        F: FnMut(LoopHandle, i32) + 'static,
+    {
+        self.signal_init(signum, true, on_signal)
+    }
+
+    /// Stop the handle, the callback will no longer be called.
+    pub fn signal_stop(&self, index: &Index) {
+        self.actions.send(Action::SignalStopReq(*index)).unwrap();
         self.actions_queue_empty.set(false);
     }
 }

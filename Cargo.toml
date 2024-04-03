@@ -15,9 +15,21 @@ name = "dune"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.28.0", features = ["signal"] }
+signal-hook-mio = { version = "0.2.3", features = ["support-v0_8"] }
 
 [target.'cfg(windows)'.dependencies]
 enable-ansi-support = "0.2.1"
+ctrlc = "3.4.4"
+
+[dependencies.signal-hook]
+version = "0.3.17"
+default-features = false
+features = ["channel"]
+
+[target.'cfg(unix)'.dependencies.signal-hook]
+version = "0.3.17"
+default-features = false
+features = ["channel", "iterator"]
 
 [dependencies]
 v8 = { version = "0.89.0", default-features = false }
