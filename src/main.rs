@@ -16,6 +16,7 @@ mod process;
 mod promise;
 mod repl;
 mod runtime;
+mod signals;
 mod stdio;
 mod timers;
 mod tools;
