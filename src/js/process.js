@@ -94,6 +94,7 @@ function startListeningIfSignal(type) {
 function stopListeningIfNoListener(type) {
   // Retrieve the internal ID of the signal.
   const signal = activeSignals.get(type);
+
   // Remove the signal.
   if (signal && process.listenerCount(type) === 0) {
     os.cancelSignal(signal);
