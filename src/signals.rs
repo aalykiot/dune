@@ -2,11 +2,11 @@ use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
 use crate::bindings::throw_exception;
 use crate::errors::JsError;
-use crate::event_loop::LoopHandle;
-use crate::event_loop::Signal;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::anyhow;
+use dune_event_loop::LoopHandle;
+use dune_event_loop::Signal;
 use std::rc::Rc;
 
 const SIGNALS: [(&'static str, i32); 29] = [

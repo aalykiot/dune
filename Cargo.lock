@@ -660,10 +660,10 @@ dependencies = [
  "clap",
  "clearscreen",
  "colored",
- "ctrlc",
  "dirs 5.0.1",
  "dns-lookup",
  "downcast-rs",
+ "dune_event_loop",
  "enable-ansi-support",
  "futures",
  "httparse",
@@ -684,8 +684,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha",
- "signal-hook",
- "signal-hook-mio",
  "swc_atoms",
  "swc_bundler",
  "swc_common",
@@ -704,6 +702,21 @@ dependencies = [
  "uuid",
  "v8",
  "zstd",
+]
+
+[[package]]
+name = "dune_event_loop"
+version = "0.1.0"
+source = "git+https://github.com/aalykiot/dune-event-loop?branch=main#0ab67d13de3f00858a242ceab8646ec5ae296501"
+dependencies = [
+ "anyhow",
+ "ctrlc",
+ "downcast-rs",
+ "mio",
+ "notify",
+ "rayon",
+ "signal-hook",
+ "signal-hook-mio",
 ]
 
 [[package]]

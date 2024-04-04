@@ -1,14 +1,14 @@
 use crate::bindings::set_exception_code;
 use crate::bindings::throw_type_error;
 use crate::errors::unwrap_or_exit;
-use crate::event_loop::LoopHandle;
-use crate::event_loop::TaskResult;
 use crate::modules::load_import;
 use crate::modules::resolve_import;
 use crate::modules::EsModuleFuture;
 use crate::modules::ModuleGraph;
 use crate::modules::ModuleStatus;
 use crate::runtime::JsRuntime;
+use dune_event_loop::LoopHandle;
+use dune_event_loop::TaskResult;
 use std::cell::RefCell;
 use std::rc::Rc;
 

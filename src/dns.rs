@@ -1,12 +1,12 @@
 use crate::bindings::set_exception_code;
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
-use crate::event_loop::LoopHandle;
-use crate::event_loop::TaskResult;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
 use dns_lookup::lookup_host;
+use dune_event_loop::LoopHandle;
+use dune_event_loop::TaskResult;
 use std::net::IpAddr;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {

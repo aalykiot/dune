@@ -5,7 +5,6 @@
 
 use crate::errors::generic_error;
 use crate::errors::unwrap_or_exit;
-use crate::event_loop::LoopInterruptHandle;
 use axum::extract::ws::Message;
 use axum::extract::ws::WebSocket;
 use axum::extract::ws::WebSocketUpgrade;
@@ -14,6 +13,7 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Json;
 use axum::Router;
+use dune_event_loop::LoopInterruptHandle;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use serde::Serialize;

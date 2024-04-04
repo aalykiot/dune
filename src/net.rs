@@ -2,12 +2,12 @@ use crate::bindings::set_exception_code;
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
 use crate::errors::JsError;
-use crate::event_loop::Index;
-use crate::event_loop::LoopHandle;
-use crate::event_loop::TcpSocketInfo;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
+use dune_event_loop::Index;
+use dune_event_loop::LoopHandle;
+use dune_event_loop::TcpSocketInfo;
 use std::net::IpAddr;
 use std::rc::Rc;
 

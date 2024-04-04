@@ -1,8 +1,6 @@
 use crate::errors::generic_error;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
-use crate::event_loop::LoopHandle;
-use crate::event_loop::TaskResult;
 use crate::loaders::CoreModuleLoader;
 use crate::loaders::FsModuleLoader;
 use crate::loaders::ModuleLoader;
@@ -12,6 +10,8 @@ use crate::runtime::JsRuntime;
 use anyhow::anyhow;
 use anyhow::Error;
 use anyhow::Result;
+use dune_event_loop::LoopHandle;
+use dune_event_loop::TaskResult;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;
