@@ -46,8 +46,8 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     let target = v8::Object::new(scope);
     let signals = v8::Array::new(scope, SIGNALS.len() as i32);
 
-    set_function_to(scope, target, "createSignal", create_signal);
-    set_function_to(scope, target, "removeSignal", remove_signal);
+    set_function_to(scope, target, "startSignal", start_signal);
+    set_function_to(scope, target, "cancelSignal", cancel_signal);
 
     // Create a JS array containing the available signals.
     SIGNALS.iter().enumerate().for_each(|(i, (signal, _))| {
@@ -82,8 +82,8 @@ impl JsFuture for SignalFuture {
     }
 }
 
-/// Creates a new signal listener to the event-loop.
-fn create_signal(
+/// Registers a signal listener to the event-loop.
+fn start_signal(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
@@ -119,21 +119,21 @@ fn create_signal(
 
     // Schedule a new signal listener to the event-loop.
     let state = state_rc.borrow();
-    let rid = state.handle.signal_start(signal_type, signal_cb).unwrap();
+    let id = state.handle.signal_start(signal_type, signal_cb).unwrap();
 
     // Return timeout's internal id.
-    rv.set(v8::Number::new(scope, rid as f64).into());
+    rv.set(v8::Number::new(scope, id as f64).into());
 }
 
-// Removes a subscribed signal listener from the event-loop.
-fn remove_signal(
+/// Removes a signal listener to the event-loop.
+fn cancel_signal(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
     // Get handlers internal token.
-    let token = args.get(0).int32_value(scope).unwrap() as u32;
+    let id = args.get(0).int32_value(scope).unwrap() as u32;
     let state_rc = JsRuntime::state(scope);
 
-    state_rc.borrow().handle.signal_stop(&token);
+    state_rc.borrow().handle.signal_stop(&id);
 }

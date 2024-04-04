@@ -86,7 +86,7 @@ function startListeningIfSignal(type) {
 
   // Define a handler function for the signal.
   const callback = signalEmitFunction.bind(this, type);
-  const signal = os.createSignal(type, callback);
+  const signal = os.startSignal(type, callback);
 
   activeSignals.set(type, signal);
 }
@@ -96,7 +96,7 @@ function stopListeningIfNoListener(type) {
   const signal = activeSignals.get(type);
   // Remove the signal.
   if (signal && process.listenerCount(type) === 0) {
-    os.removeSignal(signal);
+    os.cancelSignal(signal);
     activeSignals.delete(type);
   }
 }
