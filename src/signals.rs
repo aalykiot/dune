@@ -9,7 +9,7 @@ use dune_event_loop::LoopHandle;
 use dune_event_loop::Signal;
 use std::rc::Rc;
 
-const SIGNALS: [(&'static str, i32); 29] = [
+const SIGNALS: [(&str, i32); 29] = [
     ("SIGABRT", Signal::SIGABRT),
     ("SIGALRM", Signal::SIGALRM),
     ("SIGBUS", Signal::SIGBUS),
