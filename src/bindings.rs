@@ -7,6 +7,7 @@ use crate::net;
 use crate::perf_hooks;
 use crate::process;
 use crate::promise;
+use crate::signals;
 use crate::stdio;
 use crate::timers;
 use anyhow::Error;
@@ -28,6 +29,7 @@ lazy_static! {
             ("net", net::initialize),
             ("promise", promise::initialize),
             ("http_parser", http_parser::initialize),
+            ("signals", signals::initialize),
         ];
         HashMap::from_iter(bindings.into_iter())
     };

@@ -530,6 +530,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctrlc"
+version = "3.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "672465ae37dc1bc6380a6547a8883d5dd397b0f1faaad4f265726cc7042a5345"
+dependencies = [
+ "nix 0.28.0",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "dashmap"
 version = "5.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -653,6 +663,7 @@ dependencies = [
  "dirs 5.0.1",
  "dns-lookup",
  "downcast-rs",
+ "dune_event_loop",
  "enable-ansi-support",
  "futures",
  "httparse",
@@ -691,6 +702,21 @@ dependencies = [
  "uuid",
  "v8",
  "zstd",
+]
+
+[[package]]
+name = "dune_event_loop"
+version = "0.1.0"
+source = "git+https://github.com/aalykiot/dune-event-loop?branch=main#0ab67d13de3f00858a242ceab8646ec5ae296501"
+dependencies = [
+ "anyhow",
+ "ctrlc",
+ "downcast-rs",
+ "mio",
+ "notify",
+ "rayon",
+ "signal-hook",
+ "signal-hook-mio",
 ]
 
 [[package]]
@@ -2241,6 +2267,27 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "signal-hook"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8621587d4798caf8eb44879d42e56b9a93ea5dcd315a6487c357130095b62801"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
+]
+
+[[package]]
+name = "signal-hook-mio"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29ad2e15f37ec9a6cc544097b78a1ec90001e9f71b81338ca39f430adaca99af"
+dependencies = [
+ "libc",
+ "mio",
+ "signal-hook",
 ]
 
 [[package]]

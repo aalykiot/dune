@@ -31,25 +31,12 @@ pub fn initialize<'s>(
     // This represents the global `process` object.
     let process = create_object_under(scope, global, "process");
 
-    // `process.cwd()` - current working directory.
     set_function_to(scope, process, "cwd", cwd);
-
-    // `process.exit([code])` - exits the program with the given code.
     set_function_to(scope, process, "exit", exit);
-
-    // `process.memoryUsage()` - an object describing the memory usage.
     set_function_to(scope, process, "memoryUsage", memory_usage);
-
-    // `process.nextTick()` - adds callback to the "next tick queue".
     set_function_to(scope, process, "nextTick", next_tick);
-
-    // `process.uptime()` - a number describing the amount of time (in seconds) the process is running.
     set_function_to(scope, process, "uptime", uptime);
-
-    // `process.kill()` - sends the signal to the process identified by pid.
     set_function_to(scope, process, "kill", kill);
-
-    // `process.binding()` - exposes native modules to JavaScript.
     set_function_to(scope, process, "binding", bind);
 
     process

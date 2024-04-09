@@ -13,11 +13,9 @@ name = "dune"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[target.'cfg(unix)'.dependencies]
-nix = { version = "0.28.0", features = ["signal"] }
-
-[target.'cfg(windows)'.dependencies]
-enable-ansi-support = "0.2.1"
+[dependencies.dune_event_loop]
+git = "https://github.com/aalykiot/dune-event-loop"
+branch = "main"
 
 [dependencies]
 v8 = { version = "0.89.0", default-features = false }
@@ -65,6 +63,12 @@ futures = "0.3.30"
 tokio = { version = "1.37.0", features = ["full"] }
 axum = { version = "0.7.5", features = ["ws"] }
 uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.28.0", features = ["signal"] }
+
+[target.'cfg(windows)'.dependencies]
+enable-ansi-support = "0.2.1"
 
 [dev-dependencies]
 assert_fs = "1.1.1"
