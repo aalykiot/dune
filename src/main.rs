@@ -3,6 +3,7 @@ mod cli;
 mod dns;
 mod dotenv;
 mod errors;
+mod exceptions;
 mod file;
 mod hooks;
 mod http_parser;

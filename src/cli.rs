@@ -3,6 +3,7 @@ use crate::compile;
 use crate::dotenv;
 use crate::errors::generic_error;
 use crate::errors::unwrap_or_exit;
+use crate::exceptions::Policy;
 use crate::modules::resolve_import;
 use crate::modules::ImportMap;
 use crate::repl;
@@ -426,8 +427,12 @@ fn test_command(args: &TestArgs) {
 }
 
 fn repl_command() {
+    // Make sure we don't exit on uncaught exceptions.
+    let mut runtime = JsRuntime::new();
+    runtime.set_uncaught_exceptions_policy(Policy::KeepAlive);
+
     // Start REPL.
-    repl::start(JsRuntime::new());
+    repl::start(runtime);
 }
 
 fn upgrade_command() {

@@ -1,6 +1,8 @@
 use crate::bindings;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
+use crate::exceptions::ExceptionState;
+use crate::exceptions::Policy;
 use crate::hooks::host_import_module_dynamically_cb;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
@@ -26,7 +28,6 @@ use dune_event_loop::LoopInterruptHandle;
 use dune_event_loop::TaskResult;
 use std::cell::RefCell;
 use std::cmp;
-use std::collections::HashMap;
 use std::net::SocketAddrV4;
 use std::rc::Rc;
 use std::sync::Once;
@@ -61,8 +62,8 @@ pub struct JsRuntimeState {
     pub time_origin: u128,
     /// Holds callbacks scheduled by nextTick.
     pub next_tick_queue: NextTickQueue,
-    /// Holds exceptions from promises with no rejection handler.
-    pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
+    /// Stores and manages uncaught exceptions.
+    pub exceptions: ExceptionState,
     /// Runtime options.
     pub options: JsRuntimeOptions,
     /// Tracks wake event for current loop iteration.
@@ -96,6 +97,8 @@ pub struct JsRuntime {
     isolate: v8::OwnedIsolate,
     /// The event-loop instance that takes care of polling for I/O.
     pub event_loop: EventLoop,
+    /// The state of the runtime.
+    pub state: Rc<RefCell<JsRuntimeState>>,
 }
 
 impl JsRuntime {
@@ -173,9 +176,12 @@ impl JsRuntime {
             )
         });
 
+        // Exit when reporting uncaught exceptions.
+        let exceptions = ExceptionState::new_with_policy(Policy::Exit);
+
         // Store state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
-        isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
+        let state = Rc::new(RefCell::new(JsRuntimeState {
             context,
             module_map: ModuleMap::new(),
             handle: event_loop.handle(),
@@ -184,15 +190,18 @@ impl JsRuntime {
             startup_moment: Instant::now(),
             time_origin,
             next_tick_queue: Vec::new(),
-            promise_exceptions: HashMap::new(),
+            exceptions,
             options,
             inspector,
             wake_event_queued: false,
-        })));
+        }));
+
+        isolate.set_slot(state.clone());
 
         let mut runtime = JsRuntime {
             isolate,
             event_loop,
+            state,
         };
 
         runtime.load_main_environment();
@@ -378,10 +387,9 @@ impl JsRuntime {
             // Tick the event-loop one cycle.
             self.tick_event_loop();
 
-            // Report (and exit) if any unhandled promise rejection has been caught.
+            // Report any unhandled promise rejections.
             if self.has_promise_rejections() {
-                println!("{:?}", self.promise_rejections().remove(0));
-                std::process::exit(1);
+                self.report_exceptions();
             }
         }
 
@@ -408,10 +416,11 @@ impl JsRuntime {
             state_rc.borrow_mut().pending_futures.drain(..).collect();
 
         // NOTE: After every future executes (aka v8's call stack gets empty) we will drain
-        // the MicrotaskQueue and then the NextTickQueue.
+        // the MicroTask and NextTick Queue.
 
         for mut fut in futures {
             fut.run(scope);
+            state_rc.borrow_mut().exceptions.report(scope);
             run_next_tick_callbacks(scope);
         }
 
@@ -522,7 +531,7 @@ impl JsRuntime {
 
     /// Returns if unhandled promise rejections where caught.
     pub fn has_promise_rejections(&mut self) -> bool {
-        !self.get_state().borrow().promise_exceptions.is_empty()
+        self.get_state().borrow().exceptions.has_promise_rejection()
     }
 
     /// Returns if we have imports in pending state.
@@ -535,23 +544,23 @@ impl JsRuntime {
         !self.get_state().borrow().next_tick_queue.is_empty()
     }
 
-    /// Returns all promise unhandled rejections.
-    pub fn promise_rejections(&mut self) -> Vec<JsError> {
+    /// Reports all uncaught exceptions or promise rejections.
+    pub fn report_exceptions(&mut self) {
         // Get a v8 handle-scope.
         let scope = &mut self.handle_scope();
+        let scope = &mut v8::HandleScope::new(scope);
 
         // Get access to the state.
         let state_rc = JsRuntime::state(scope);
         let mut state = state_rc.borrow_mut();
 
-        state
-            .promise_exceptions
-            .drain()
-            .map(|(_, value)| {
-                let exception = v8::Local::new(scope, value);
-                JsError::from_v8_exception(scope, exception, Some("(in promise) "))
-            })
-            .collect()
+        state.exceptions.report(scope);
+    }
+
+    /// Sets the reporting policy for uncaught exceptions.
+    pub fn set_uncaught_exceptions_policy(&mut self, policy: Policy) {
+        let state_rc = self.get_state();
+        state_rc.borrow_mut().exceptions.set_report_policy(policy);
     }
 }
 
@@ -616,9 +625,11 @@ fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
         // On exception, report it and exit.
         if tc_scope.has_caught() {
             let exception = tc_scope.exception().unwrap();
-            let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            println!("{exception:?}");
-            std::process::exit(1);
+            let exception = v8::Global::new(tc_scope, exception);
+            let mut state = state_rc.borrow_mut();
+            // Force exception reporting.
+            state.exceptions.emit_exception(exception);
+            state.exceptions.report(tc_scope);
         }
     }
 

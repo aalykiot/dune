@@ -1,5 +1,4 @@
 use crate::bindings::set_function_to;
-use crate::errors::JsError;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use dune_event_loop::LoopHandle;
@@ -37,12 +36,12 @@ impl JsFuture for TimeoutFuture {
 
         callback.call(tc_scope, undefined, &args);
 
-        // On exception, report it and exit.
+        // Report if callback threw an exception.
         if tc_scope.has_caught() {
             let exception = tc_scope.exception().unwrap();
-            let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            println!("{exception:?}");
-            std::process::exit(1);
+            let exception = v8::Global::new(tc_scope, exception);
+            let state = JsRuntime::state(tc_scope);
+            state.borrow_mut().exceptions.emit_exception(exception);
         }
     }
 }
@@ -141,9 +140,9 @@ impl JsFuture for ImmediateFuture {
         // On exception, report it and exit.
         if tc_scope.has_caught() {
             let exception = tc_scope.exception().unwrap();
-            let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            println!("{exception:?}");
-            std::process::exit(1);
+            let exception = v8::Global::new(tc_scope, exception);
+            let state = JsRuntime::state(tc_scope);
+            state.borrow_mut().exceptions.emit_exception(exception);
         }
     }
 }

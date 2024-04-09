@@ -127,11 +127,11 @@ pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
 
     match event {
         PromiseHandlerAddedAfterReject => {
-            state.promise_exceptions.remove(&promise);
+            state.exceptions.remove_promise_rejection(&promise);
         }
         PromiseRejectWithNoHandler => {
             let reason = v8::Global::new(scope, reason);
-            state.promise_exceptions.insert(promise, reason);
+            state.exceptions.emit_promise_rejection(promise, reason);
         }
         PromiseRejectAfterResolved | PromiseResolveAfterResolved => {}
     }

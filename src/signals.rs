@@ -1,7 +1,6 @@
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
 use crate::bindings::throw_exception;
-use crate::errors::JsError;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::anyhow;
@@ -86,9 +85,9 @@ impl JsFuture for SignalFuture {
         // On exception, report it and exit.
         if tc_scope.has_caught() {
             let exception = tc_scope.exception().unwrap();
-            let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            println!("{exception:?}");
-            std::process::exit(1);
+            let exception = v8::Global::new(tc_scope, exception);
+            let state = JsRuntime::state(tc_scope);
+            state.borrow_mut().exceptions.emit_exception(exception);
         }
     }
 }
