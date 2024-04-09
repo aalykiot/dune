@@ -33,7 +33,7 @@ nanoid = "0.4.0"
 regex = "1.10.4"
 dirs = "5.0.1"
 path-absolutize = "3.1.1"
-ureq = { version = "2.6.9", features = ["charset"] }
+ureq = { version = "2.9.6", features = ["charset"] }
 phf = { version = "0.11.2", features = ["macros"] }
 url = "2.5.0"
 clearscreen = "2.0.1"
