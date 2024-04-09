@@ -9,6 +9,17 @@ use dune_event_loop::LoopHandle;
 use dune_event_loop::Signal;
 use std::rc::Rc;
 
+#[cfg(windows)]
+const SIGNALS: [(&str, i32); 6] = [
+    ("SIGABRT", Signal::SIGABRT),
+    ("SIGFPE", Signal::SIGFPE),
+    ("SIGILL", Signal::SIGILL),
+    ("SIGINT", Signal::SIGINT),
+    ("SIGSEGV", Signal::SIGSEGV),
+    ("SIGTERM", Signal::SIGTERM),
+];
+
+#[cfg(not(windows))]
 const SIGNALS: [(&str, i32); 29] = [
     ("SIGABRT", Signal::SIGABRT),
     ("SIGALRM", Signal::SIGALRM),
