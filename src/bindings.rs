@@ -1,6 +1,7 @@
 use crate::dns;
 use crate::errors::extract_error_code;
 use crate::errors::IoError;
+use crate::exceptions;
 use crate::file;
 use crate::http_parser;
 use crate::net;
@@ -30,6 +31,7 @@ lazy_static! {
             ("promise", promise::initialize),
             ("http_parser", http_parser::initialize),
             ("signals", signals::initialize),
+            ("exceptions", exceptions::initialize),
         ];
         HashMap::from_iter(bindings.into_iter())
     };

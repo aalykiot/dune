@@ -53,6 +53,8 @@ pub extern "C" fn host_initialize_import_meta_object_cb(
 ) {
     // Get `CallbackScope` from context.
     let scope = &mut unsafe { v8::CallbackScope::new(context) };
+    let scope = &mut v8::HandleScope::new(scope);
+
     let state = JsRuntime::state(scope);
     let state = state.borrow();
 

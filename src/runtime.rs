@@ -505,9 +505,12 @@ impl JsRuntime {
             let _ = module.evaluate(tc_scope);
 
             if module.get_status() == v8::ModuleStatus::Errored {
+                let mut state = state_rc.borrow_mut();
                 let exception = module.get_exception();
-                let exception = JsError::from_v8_exception(tc_scope, exception, None);
-                eprintln!("{exception:?}");
+                let exception = v8::Global::new(tc_scope, exception);
+
+                state.exceptions.emit_exception(exception);
+                state.exceptions.report(tc_scope);
                 std::process::exit(1);
             }
 
