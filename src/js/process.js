@@ -104,20 +104,19 @@ function stopListeningIfNoListener(type) {
 
 const exceptions = process.binding('exceptions');
 
-const exceptionEmitFunction = (...args) => {
+const exceptionEmitFunction = (type, ...args) => {
   // Emit the event.
-  const [type, ...emitterArgs] = args;
-  process.emit(type, ...emitterArgs);
+  process.emit(type, ...args);
   // Remove captures if no listeners.
   if (process.listenerCount(type) === 0) {
-    setCapturesIfExceptionEvent(type, 'remove');
+    setCapturesIfExceptionEvent(type, true);
   }
 };
 
-function setCapturesIfExceptionEvent(type, action) {
+function setCapturesIfExceptionEvent(type, unset = false) {
   // Note: We use the same function for both setting and removing the internal
   // capture callbacks. To remove one, simply pass null as the JS callback.
-  const cb = action !== 'remove' ? exceptionEmitFunction.bind(this) : null;
+  const cb = !unset ? exceptionEmitFunction.bind(this, type) : null;
 
   // https://nodejs.org/docs/latest/api/process.html#event-uncaughtexception
   if (type === 'uncaughtException') {
@@ -129,17 +128,12 @@ function setCapturesIfExceptionEvent(type, action) {
     exceptions.setUnhandledRejectionCallback(cb);
     return;
   }
-  // https://nodejs.org/docs/latest/api/process.html#event-uncaughtexceptionmonitor
-  if (type === 'uncaughtExceptionMonitor') {
-    exceptions.setUncaughtExceptionMonitorCallback(cb);
-    return;
-  }
 }
 
 function removeCapturesIfNoListener(type) {
   // Remove the internal capture callback.
   if (process.listenerCount(type) === 0) {
-    setCapturesIfExceptionEvent(type, 'remove');
+    setCapturesIfExceptionEvent(type, true);
   }
 }
 

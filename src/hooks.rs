@@ -133,7 +133,7 @@ pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
         }
         PromiseRejectWithNoHandler => {
             let reason = v8::Global::new(scope, reason);
-            state.exceptions.emit_promise_rejection(promise, reason);
+            state.exceptions.capture_promise_rejection(promise, reason);
         }
         PromiseRejectAfterResolved | PromiseResolveAfterResolved => {}
     }

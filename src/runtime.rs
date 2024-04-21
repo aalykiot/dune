@@ -2,7 +2,6 @@ use crate::bindings;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::exceptions::ExceptionState;
-use crate::exceptions::Policy;
 use crate::hooks::host_import_module_dynamically_cb;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
@@ -176,9 +175,6 @@ impl JsRuntime {
             )
         });
 
-        // Exit when reporting uncaught exceptions.
-        let exceptions = ExceptionState::new_with_policy(Policy::Exit);
-
         // Store state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
         let state = Rc::new(RefCell::new(JsRuntimeState {
@@ -190,7 +186,7 @@ impl JsRuntime {
             startup_moment: Instant::now(),
             time_origin,
             next_tick_queue: Vec::new(),
-            exceptions,
+            exceptions: ExceptionState::new(),
             options,
             inspector,
             wake_event_queued: false,
@@ -388,8 +384,9 @@ impl JsRuntime {
             self.tick_event_loop();
 
             // Report any unhandled promise rejections.
-            if self.has_promise_rejections() {
-                self.report_exceptions();
+            if let Some(error) = check_exceptions(&mut self.handle_scope()) {
+                eprintln!("{error:?}");
+                std::process::exit(1);
             }
         }
 
@@ -420,7 +417,10 @@ impl JsRuntime {
 
         for mut fut in futures {
             fut.run(scope);
-            state_rc.borrow_mut().exceptions.report(scope);
+            if let Some(error) = check_exceptions(scope) {
+                eprintln!("{error:?}");
+                std::process::exit(1);
+            }
             run_next_tick_callbacks(scope);
         }
 
@@ -508,9 +508,15 @@ impl JsRuntime {
                 let mut state = state_rc.borrow_mut();
                 let exception = module.get_exception();
                 let exception = v8::Global::new(tc_scope, exception);
+                state.exceptions.capture_exception(exception);
 
-                state.exceptions.emit_exception(exception);
-                state.exceptions.report(tc_scope);
+                drop(state);
+
+                // Note: The module is in an error state so even if a capture
+                // callback has been called we must exit the process.
+                if let Some(error) = check_exceptions(tc_scope) {
+                    eprintln!("{error:?}");
+                }
                 std::process::exit(1);
             }
 
@@ -545,25 +551,6 @@ impl JsRuntime {
     /// Returns if we have scheduled any next-tick callbacks.
     pub fn has_next_tick_callbacks(&mut self) -> bool {
         !self.get_state().borrow().next_tick_queue.is_empty()
-    }
-
-    /// Reports all uncaught exceptions or promise rejections.
-    pub fn report_exceptions(&mut self) {
-        // Get a v8 handle-scope.
-        let scope = &mut self.handle_scope();
-        let scope = &mut v8::HandleScope::new(scope);
-
-        // Get access to the state.
-        let state_rc = JsRuntime::state(scope);
-        let mut state = state_rc.borrow_mut();
-
-        state.exceptions.report(scope);
-    }
-
-    /// Sets the reporting policy for uncaught exceptions.
-    pub fn set_uncaught_exceptions_policy(&mut self, policy: Policy) {
-        let state_rc = self.get_state();
-        state_rc.borrow_mut().exceptions.set_report_policy(policy);
     }
 }
 
@@ -607,6 +594,42 @@ impl JsRuntime {
     }
 }
 
+// Returns an error if an uncaught exception or unhandled rejection has been captured.
+pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
+    let state_rc = JsRuntime::state(scope);
+    let mut state = state_rc.borrow_mut();
+
+    // Check for uncaught exceptions first.
+    if let Some(exception) = state.exceptions.exception.take() {
+        let exception = v8::Local::new(scope, exception);
+        match state.exceptions.uncaught_exception_cb.as_ref() {
+            Some(callback) => {
+                let callback = v8::Local::new(scope, callback);
+                let undefined = v8::undefined(scope).into();
+                let origin = v8::String::new(scope, "uncaughtException").unwrap();
+                let tc_scope = &mut v8::TryCatch::new(scope);
+
+                callback.call(tc_scope, undefined, &[exception, origin.into()]);
+
+                // Note: To avoid infinite recursion with these hooks, if this
+                // function throws, return it as error.
+                if tc_scope.has_caught() {
+                    let exception = tc_scope.exception().unwrap();
+                    let exception = v8::Local::new(tc_scope, exception);
+                    let error = JsError::from_v8_exception(tc_scope, exception, None);
+                    return Some(error);
+                }
+            }
+            None => {
+                let error = JsError::from_v8_exception(scope, exception, None);
+                return Some(error);
+            }
+        };
+    }
+
+    None
+}
+
 /// Runs callbacks stored in the next-tick queue.
 fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
     let state_rc = JsRuntime::state(scope);
@@ -625,14 +648,20 @@ fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
 
         cb.call(tc_scope, undefined.into(), &args);
 
-        // On exception, report it and exit.
+        // On exception, report it and handle the error.
         if tc_scope.has_caught() {
             let exception = tc_scope.exception().unwrap();
             let exception = v8::Global::new(tc_scope, exception);
             let mut state = state_rc.borrow_mut();
-            // Force exception reporting.
-            state.exceptions.emit_exception(exception);
-            state.exceptions.report(tc_scope);
+            state.exceptions.capture_exception(exception);
+
+            drop(state);
+
+            // Check for uncaught errors (capture callbacks might be in place).
+            if let Some(error) = check_exceptions(tc_scope) {
+                eprintln!("{error:?}");
+                std::process::exit(1);
+            }
         }
     }
 

@@ -1,3 +1,4 @@
+use crate::runtime::check_exceptions;
 use crate::runtime::JsRuntime;
 use colored::*;
 use phf::phf_set;
@@ -267,7 +268,11 @@ pub fn start(mut runtime: JsRuntime) {
         if maybe_message.is_err() {
             // Tick the event loop and report exceptions.
             runtime.tick_event_loop();
-            runtime.report_exceptions();
+            // Check for exceptions.
+            let scope = &mut runtime.handle_scope();
+            if let Some(error) = check_exceptions(scope) {
+                eprintln!("{error}");
+            }
             continue;
         }
 

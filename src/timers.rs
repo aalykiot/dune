@@ -41,7 +41,7 @@ impl JsFuture for TimeoutFuture {
             let exception = tc_scope.exception().unwrap();
             let exception = v8::Global::new(tc_scope, exception);
             let state = JsRuntime::state(tc_scope);
-            state.borrow_mut().exceptions.emit_exception(exception);
+            state.borrow_mut().exceptions.capture_exception(exception);
         }
     }
 }
@@ -142,7 +142,7 @@ impl JsFuture for ImmediateFuture {
             let exception = tc_scope.exception().unwrap();
             let exception = v8::Global::new(tc_scope, exception);
             let state = JsRuntime::state(tc_scope);
-            state.borrow_mut().exceptions.emit_exception(exception);
+            state.borrow_mut().exceptions.capture_exception(exception);
         }
     }
 }
