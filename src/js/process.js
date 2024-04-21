@@ -102,6 +102,47 @@ function stopListeningIfNoListener(type) {
   }
 }
 
+const exceptions = process.binding('exceptions');
+
+const exceptionEmitFunction = (...args) => {
+  // Emit the event.
+  const [type, ...emitterArgs] = args;
+  process.emit(type, ...emitterArgs);
+  // Remove captures if no listeners.
+  if (process.listenerCount(type) === 0) {
+    setCapturesIfExceptionEvent(type, 'remove');
+  }
+};
+
+function setCapturesIfExceptionEvent(type, action) {
+  // Note: We use the same function for both setting and removing the internal
+  // capture callbacks. To remove one, simply pass null as the JS callback.
+  const cb = action !== 'remove' ? exceptionEmitFunction.bind(this) : null;
+
+  // https://nodejs.org/docs/latest/api/process.html#event-uncaughtexception
+  if (type === 'uncaughtException') {
+    exceptions.setUncaughtExceptionCallback(cb);
+    return;
+  }
+  // https://nodejs.org/docs/latest/api/process.html#event-unhandledrejection
+  if (type === 'unhandledRejection') {
+    exceptions.setUnhandledRejectionCallback(cb);
+    return;
+  }
+  // https://nodejs.org/docs/latest/api/process.html#event-uncaughtexceptionmonitor
+  if (type === 'uncaughtExceptionMonitor') {
+    exceptions.setUncaughtExceptionMonitorCallback(cb);
+    return;
+  }
+}
+
+function removeCapturesIfNoListener(type) {
+  // Remove the internal capture callback.
+  if (process.listenerCount(type) === 0) {
+    setCapturesIfExceptionEvent(type, 'remove');
+  }
+}
+
 // Note: To ensure the full functionality, it's essential to 'override'
 // specific methods inherited from the EventEmitter prototype.
 
@@ -109,6 +150,7 @@ for (const method of ['on', 'once']) {
   process[method] = (event, ...args) => {
     EventEmitter.prototype[method].call(process, event, ...args);
     startListeningIfSignal(event);
+    setCapturesIfExceptionEvent(event);
   };
 }
 
@@ -116,6 +158,7 @@ for (const method of ['removeListener', 'removeAllListeners']) {
   process[method] = (event, ...args) => {
     EventEmitter.prototype[method].call(process, event, ...args);
     stopListeningIfNoListener(event);
+    removeCapturesIfNoListener(event);
   };
 }
 

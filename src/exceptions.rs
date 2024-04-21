@@ -98,9 +98,12 @@ impl ExceptionState {
             let undefined = v8::undefined(scope).into();
             let callback = v8::Local::new(scope, callback);
             let origin = v8::String::new(scope, origin).unwrap();
+            let event = v8::String::new(scope, "uncaughtExceptionMonitor").unwrap();
 
             let tc_scope = &mut v8::TryCatch::new(scope);
-            callback.call(tc_scope, undefined, &[exception, origin.into()]);
+            let params = &[event.into(), exception, origin.into()];
+
+            callback.call(tc_scope, undefined, params);
 
             // Note: To avoid infinite recursion with these hooks, if this
             // function throws, exit immediately.
@@ -126,16 +129,19 @@ impl ExceptionState {
         self.policy = policy;
     }
 
-    pub fn set_uncaught_exception_monitor_callback(&mut self, callback: v8::Global<v8::Function>) {
-        self.uncaught_exception_monitor_cb = Some(callback);
+    pub fn set_uncaught_exception_monitor_callback(
+        &mut self,
+        callback: Option<v8::Global<v8::Function>>,
+    ) {
+        self.uncaught_exception_monitor_cb = callback;
     }
 
-    pub fn set_uncaught_exception_callback(&mut self, callback: v8::Global<v8::Function>) {
-        self.uncaught_exception_cb = Some(callback);
+    pub fn set_uncaught_exception_callback(&mut self, callback: Option<v8::Global<v8::Function>>) {
+        self.uncaught_exception_cb = callback;
     }
 
-    pub fn set_unhandled_rejection_callback(&mut self, callback: v8::Global<v8::Function>) {
-        self.unhandled_rejection_cb = Some(callback);
+    pub fn set_unhandled_rejection_callback(&mut self, callback: Option<v8::Global<v8::Function>>) {
+        self.unhandled_rejection_cb = callback;
     }
 }
 
@@ -174,9 +180,11 @@ fn set_uncaught_exception_monitor_callback(
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
-    // Get the callback from JavaScript.
-    let callback = v8::Local::<v8::Function>::try_from(args.get(0)).unwrap();
-    let callback = v8::Global::new(scope, callback);
+    // Note: Passing `null` from JavaScript essentially will unset the defined callback.
+    let callback = match v8::Local::<v8::Function>::try_from(args.get(0)) {
+        Ok(callback) => Some(v8::Global::new(scope, callback)),
+        Err(_) => None,
+    };
 
     let state_rc = JsRuntime::state(scope);
 
@@ -194,9 +202,11 @@ fn set_uncaught_exception_callback(
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
-    // Get the callback from JavaScript.
-    let callback = v8::Local::<v8::Function>::try_from(args.get(0)).unwrap();
-    let callback = v8::Global::new(scope, callback);
+    // Note: Passing `null` from JavaScript essentially will unset the defined callback.
+    let callback = match v8::Local::<v8::Function>::try_from(args.get(0)) {
+        Ok(callback) => Some(v8::Global::new(scope, callback)),
+        Err(_) => None,
+    };
 
     let state_rc = JsRuntime::state(scope);
     let mut state = state_rc.borrow_mut();
@@ -212,9 +222,11 @@ fn set_unhandled_rejection_callback(
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
-    // Get the callback from JavaScript.
-    let callback = v8::Local::<v8::Function>::try_from(args.get(0)).unwrap();
-    let callback = v8::Global::new(scope, callback);
+    // Note: Passing `null` from JavaScript essentially will unset the defined callback.
+    let callback = match v8::Local::<v8::Function>::try_from(args.get(0)) {
+        Ok(callback) => Some(v8::Global::new(scope, callback)),
+        Err(_) => None,
+    };
 
     let state_rc = JsRuntime::state(scope);
     let mut state = state_rc.borrow_mut();
