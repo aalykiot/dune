@@ -259,32 +259,43 @@ impl JsRuntime {
         &mut self,
         filename: &str,
         source: &str,
-    ) -> Result<v8::Global<v8::Value>, Error> {
+    ) -> Result<Option<v8::Global<v8::Value>>, Error> {
         // Get the handle-scope.
         let scope = &mut self.handle_scope();
+        let state_rc = JsRuntime::state(scope);
 
         let origin = create_origin(scope, filename, false);
         let source = v8::String::new(scope, source).unwrap();
 
         // The `TryCatch` scope allows us to catch runtime errors rather than panicking.
         let tc_scope = &mut v8::TryCatch::new(scope);
+        type ExecuteScriptResult = Result<Option<v8::Global<v8::Value>>, Error>;
+
+        let handle_exception =
+            |scope: &mut v8::TryCatch<'_, v8::HandleScope<'_>>| -> ExecuteScriptResult {
+                // Extract the exception during compilation.
+                assert!(scope.has_caught());
+                let exception = scope.exception().unwrap();
+                let exception = v8::Global::new(scope, exception);
+                let mut state = state_rc.borrow_mut();
+                // Capture the exception internally.
+                state.exceptions.capture_exception(exception);
+                drop(state);
+                // Force an exception check.
+                if let Some(error) = check_exceptions(scope) {
+                    bail!(error)
+                }
+                Ok(None)
+            };
 
         let script = match v8::Script::compile(tc_scope, source, Some(&origin)) {
             Some(script) => script,
-            None => {
-                assert!(tc_scope.has_caught());
-                let exception = tc_scope.exception().unwrap();
-                bail!(JsError::from_v8_exception(tc_scope, exception, None));
-            }
+            None => return handle_exception(tc_scope),
         };
 
         match script.run(tc_scope) {
-            Some(value) => Ok(v8::Global::new(tc_scope, value)),
-            None => {
-                assert!(tc_scope.has_caught());
-                let exception = tc_scope.exception().unwrap();
-                bail!(JsError::from_v8_exception(tc_scope, exception, None));
-            }
+            Some(value) => Ok(Some(v8::Global::new(tc_scope, value))),
+            None => handle_exception(tc_scope),
         }
     }
 

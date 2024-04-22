@@ -281,7 +281,7 @@ pub fn start(mut runtime: JsRuntime) {
             ReplMessage::Evaluate(expression) => {
                 match runtime.execute_script("<anonymous>", &expression) {
                     // Format the expression using console.log.
-                    Ok(value) => {
+                    Ok(Some(value)) => {
                         let scope = &mut runtime.handle_scope();
                         let context = v8::Local::new(scope, context.clone());
                         let scope = &mut v8::ContextScope::new(scope, context);
@@ -295,6 +295,7 @@ pub fn start(mut runtime: JsRuntime) {
                         let value = v8::Local::new(scope, value);
                         log.call(scope, global.into(), &[value]);
                     }
+                    Ok(None) => {}
                     Err(e) => eprintln!("{e}"),
                 };
             }
