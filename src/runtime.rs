@@ -1,4 +1,5 @@
 use crate::bindings;
+use crate::errors::report_and_exit;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::exceptions::ExceptionState;
@@ -237,8 +238,7 @@ impl JsRuntime {
             assert!(tc_scope.has_caught());
             let exception = tc_scope.exception().unwrap();
             let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            eprintln!("{exception:?}");
-            std::process::exit(1);
+            report_and_exit(exception);
         }
 
         let _ = module.evaluate(tc_scope);
@@ -246,8 +246,7 @@ impl JsRuntime {
         if module.get_status() == v8::ModuleStatus::Errored {
             let exception = module.get_exception();
             let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            eprintln!("{exception:?}");
-            std::process::exit(1);
+            report_and_exit(exception);
         }
 
         // Initialize process static values.
@@ -396,8 +395,7 @@ impl JsRuntime {
 
             // Report any unhandled promise rejections.
             if let Some(error) = check_exceptions(&mut self.handle_scope()) {
-                eprintln!("{error:?}");
-                std::process::exit(1);
+                report_and_exit(error);
             }
         }
 
@@ -429,8 +427,7 @@ impl JsRuntime {
         for mut fut in futures {
             fut.run(scope);
             if let Some(error) = check_exceptions(scope) {
-                eprintln!("{error:?}");
-                std::process::exit(1);
+                report_and_exit(error);
             }
             run_next_tick_callbacks(scope);
         }
@@ -509,8 +506,7 @@ impl JsRuntime {
                 assert!(tc_scope.has_caught());
                 let exception = tc_scope.exception().unwrap();
                 let exception = JsError::from_v8_exception(tc_scope, exception, None);
-                eprintln!("{exception:?}");
-                std::process::exit(1);
+                report_and_exit(exception);
             }
 
             let _ = module.evaluate(tc_scope);
@@ -524,8 +520,7 @@ impl JsRuntime {
                 drop(state);
 
                 if let Some(error) = check_exceptions(tc_scope) {
-                    eprintln!("{error:?}");
-                    std::process::exit(1);
+                    report_and_exit(error);
                 }
 
                 // Note: Due to the architecture, when a module errors, the `promise_reject_cb`
@@ -638,8 +633,7 @@ fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
 
             // Check for uncaught errors (capture callbacks might be in place).
             if let Some(error) = check_exceptions(tc_scope) {
-                eprintln!("{error:?}");
-                std::process::exit(1);
+                report_and_exit(error);
             }
         }
     }
