@@ -605,42 +605,6 @@ impl JsRuntime {
     }
 }
 
-// Returns an error if an uncaught exception or unhandled rejection has been captured.
-pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
-    let state_rc = JsRuntime::state(scope);
-    let mut state = state_rc.borrow_mut();
-
-    // Check for uncaught exceptions first.
-    if let Some(exception) = state.exceptions.exception.take() {
-        let exception = v8::Local::new(scope, exception);
-        match state.exceptions.uncaught_exception_cb.as_ref() {
-            Some(callback) => {
-                let callback = v8::Local::new(scope, callback);
-                let undefined = v8::undefined(scope).into();
-                let origin = v8::String::new(scope, "uncaughtException").unwrap();
-                let tc_scope = &mut v8::TryCatch::new(scope);
-
-                callback.call(tc_scope, undefined, &[exception, origin.into()]);
-
-                // Note: To avoid infinite recursion with these hooks, if this
-                // function throws, return it as error.
-                if tc_scope.has_caught() {
-                    let exception = tc_scope.exception().unwrap();
-                    let exception = v8::Local::new(tc_scope, exception);
-                    let error = JsError::from_v8_exception(tc_scope, exception, None);
-                    return Some(error);
-                }
-            }
-            None => {
-                let error = JsError::from_v8_exception(scope, exception, None);
-                return Some(error);
-            }
-        };
-    }
-
-    None
-}
-
 /// Runs callbacks stored in the next-tick queue.
 fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
     let state_rc = JsRuntime::state(scope);
@@ -677,4 +641,94 @@ fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
     }
 
     tc_scope.perform_microtask_checkpoint();
+}
+
+// Returns an error if an uncaught exception or unhandled rejection has been captured.
+pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
+    let state_rc = JsRuntime::state(scope);
+    let mut state = state_rc.borrow_mut();
+
+    // Check for uncaught exceptions first.
+    if let Some(exception) = state.exceptions.exception.take() {
+        let exception = v8::Local::new(scope, exception);
+        if let Some(callback) = state.exceptions.uncaught_exception_cb.as_ref() {
+            let callback = v8::Local::new(scope, callback);
+            let undefined = v8::undefined(scope).into();
+            let origin = v8::String::new(scope, "uncaughtException").unwrap();
+            let tc_scope = &mut v8::TryCatch::new(scope);
+
+            callback.call(tc_scope, undefined, &[exception, origin.into()]);
+
+            // Note: To avoid infinite recursion with these hooks, if this
+            // function throws, return it as error.
+            if tc_scope.has_caught() {
+                let exception = tc_scope.exception().unwrap();
+                let exception = v8::Local::new(tc_scope, exception);
+                let error = JsError::from_v8_exception(tc_scope, exception, None);
+                return Some(error);
+            }
+
+            return None;
+        }
+
+        let error = JsError::from_v8_exception(scope, exception, None);
+        return Some(error);
+    }
+
+    let exceptions = state.exceptions.promise_rejections.to_owned();
+    state.exceptions.promise_rejections.clear();
+
+    // Then, check for unhandled rejections.
+    if let Some((promise, exception)) = exceptions.iter().next() {
+        let promise = v8::Local::new(scope, promise);
+        let exception = v8::Local::new(scope, exception);
+
+        // If the `unhandled_rejection_cb` is set, invoke it to handle the promise rejection.
+        if let Some(callback) = state.exceptions.unhandled_rejection_cb.as_ref() {
+            let callback = v8::Local::new(scope, callback);
+            let undefined = v8::undefined(scope).into();
+            let tc_scope = &mut v8::TryCatch::new(scope);
+
+            callback.call(tc_scope, undefined, &[exception, promise.into()]);
+
+            // Note: To avoid infinite recursion with these hooks, if this
+            // function throws, return it as error.
+            if tc_scope.has_caught() {
+                let exception = tc_scope.exception().unwrap();
+                let exception = v8::Local::new(tc_scope, exception);
+                let error = JsError::from_v8_exception(tc_scope, exception, None);
+                return Some(error);
+            }
+
+            return None;
+        }
+
+        // If the `uncaught_exception_cb` is set, invoke it to handle the promise rejection.
+        if let Some(callback) = state.exceptions.uncaught_exception_cb.as_ref() {
+            let callback = v8::Local::new(scope, callback);
+            let undefined = v8::undefined(scope).into();
+            let origin = v8::String::new(scope, "unhandledRejection").unwrap();
+            let tc_scope = &mut v8::TryCatch::new(scope);
+
+            callback.call(tc_scope, undefined, &[exception, origin.into()]);
+
+            // Note: To avoid infinite recursion with these hooks, if this
+            // function throws, return it as error.
+            if tc_scope.has_caught() {
+                let exception = tc_scope.exception().unwrap();
+                let exception = v8::Local::new(tc_scope, exception);
+                let error = JsError::from_v8_exception(tc_scope, exception, None);
+                return Some(error);
+            }
+
+            return None;
+        }
+
+        let prefix = Some("(in promise) ");
+        let error = JsError::from_v8_exception(scope, exception, prefix);
+
+        return Some(error);
+    }
+
+    None
 }
