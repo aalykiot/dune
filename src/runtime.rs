@@ -523,12 +523,10 @@ impl JsRuntime {
 
                 drop(state);
 
-                // Note: The module is in an error state so even if a capture
-                // callback has been called we must exit the process.
                 if let Some(error) = check_exceptions(tc_scope) {
                     eprintln!("{error:?}");
+                    std::process::exit(1);
                 }
-                std::process::exit(1);
             }
 
             if let ImportKind::Dynamic(main_promise) = graph.kind.clone() {
@@ -675,11 +673,9 @@ pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
         return Some(error);
     }
 
-    let exceptions = state.exceptions.promise_rejections.to_owned();
-    state.exceptions.promise_rejections.clear();
-
     // Then, check for unhandled rejections.
-    if let Some((promise, exception)) = exceptions.iter().next() {
+    for (promise, exception) in state.exceptions.promise_rejections.to_owned().iter() {
+        state.exceptions.promise_rejections.remove(promise);
         let promise = v8::Local::new(scope, promise);
         let exception = v8::Local::new(scope, exception);
 
@@ -700,7 +696,7 @@ pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
                 return Some(error);
             }
 
-            return None;
+            continue;
         }
 
         // If the `uncaught_exception_cb` is set, invoke it to handle the promise rejection.
@@ -721,7 +717,7 @@ pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
                 return Some(error);
             }
 
-            return None;
+            continue;
         }
 
         let prefix = Some("(in promise) ");
