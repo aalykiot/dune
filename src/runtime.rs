@@ -527,6 +527,12 @@ impl JsRuntime {
                     eprintln!("{error:?}");
                     std::process::exit(1);
                 }
+
+                // Note: Due to the architecture, when a module errors, the `promise_reject_cb`
+                // v8 hook will also trigger, resulting in the same exception being registered
+                // as an unhandled promise rejection. Therefore, we need to manually clear the
+                // promise_rejections here.
+                state_rc.borrow_mut().exceptions.promise_rejections.clear();
             }
 
             if let ImportKind::Dynamic(main_promise) = graph.kind.clone() {
