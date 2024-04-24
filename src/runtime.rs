@@ -361,9 +361,9 @@ impl JsRuntime {
     /// Runs a single tick of the event-loop.
     pub fn tick_event_loop(&mut self) {
         run_next_tick_callbacks(&mut self.handle_scope());
+        self.fast_forward_imports();
         self.event_loop.tick();
         self.run_pending_futures();
-        self.fast_forward_imports();
     }
 
     /// Polls the inspector for new devtools messages.
@@ -644,16 +644,18 @@ fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
 // Returns an error if an uncaught exception or unhandled rejection has been captured.
 pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
     let state_rc = JsRuntime::state(scope);
-    let mut state = state_rc.borrow_mut();
+    let maybe_exception = state_rc.borrow_mut().exceptions.exception.take();
 
     // Check for uncaught exceptions first.
-    if let Some(exception) = state.exceptions.exception.take() {
+    if let Some(exception) = maybe_exception {
+        let state = state_rc.borrow();
         let exception = v8::Local::new(scope, exception);
         if let Some(callback) = state.exceptions.uncaught_exception_cb.as_ref() {
             let callback = v8::Local::new(scope, callback);
             let undefined = v8::undefined(scope).into();
             let origin = v8::String::new(scope, "uncaughtException").unwrap();
             let tc_scope = &mut v8::TryCatch::new(scope);
+            drop(state);
 
             callback.call(tc_scope, undefined, &[exception, origin.into()]);
 
@@ -673,8 +675,11 @@ pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
         return Some(error);
     }
 
+    let promise_rejections = state_rc.borrow().exceptions.promise_rejections.to_owned();
+
     // Then, check for unhandled rejections.
-    for (promise, exception) in state.exceptions.promise_rejections.to_owned().iter() {
+    for (promise, exception) in promise_rejections.iter() {
+        let mut state = state_rc.borrow_mut();
         state.exceptions.promise_rejections.remove(promise);
         let promise = v8::Local::new(scope, promise);
         let exception = v8::Local::new(scope, exception);
@@ -684,6 +689,7 @@ pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
             let callback = v8::Local::new(scope, callback);
             let undefined = v8::undefined(scope).into();
             let tc_scope = &mut v8::TryCatch::new(scope);
+            drop(state);
 
             callback.call(tc_scope, undefined, &[exception, promise.into()]);
 
@@ -705,6 +711,7 @@ pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
             let undefined = v8::undefined(scope).into();
             let origin = v8::String::new(scope, "unhandledRejection").unwrap();
             let tc_scope = &mut v8::TryCatch::new(scope);
+            drop(state);
 
             callback.call(tc_scope, undefined, &[exception, origin.into()]);
 
