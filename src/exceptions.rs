@@ -48,6 +48,21 @@ impl ExceptionState {
         self.promise_rejections.remove(promise);
     }
 
+    pub fn remove_promise_rejection_entry(&mut self, exception: &v8::Global<v8::Value>) {
+        // Find the correct entry to remove.
+        let mut key_to_remove = None;
+        for (key, value) in self.promise_rejections.iter() {
+            if value == exception {
+                key_to_remove = Some(key.clone());
+                break;
+            }
+        }
+
+        if let Some(promise) = key_to_remove {
+            self.promise_rejections.remove(&promise);
+        }
+    }
+
     pub fn set_uncaught_exception_callback(&mut self, callback: Option<v8::Global<v8::Function>>) {
         self.uncaught_exception_cb = callback;
     }

@@ -510,24 +510,24 @@ impl JsRuntime {
             }
 
             let _ = module.evaluate(tc_scope);
+            let is_root_module = !graph.root_rc.borrow().is_dynamic_import;
 
-            if module.get_status() == v8::ModuleStatus::Errored {
+            // Note: Due to the architecture, when a module errors, the `promise_reject_cb`
+            // v8 hook will also trigger, resulting in the same exception being registered
+            // as an unhandled promise rejection. Therefore, we need to manually remove it.
+            if module.get_status() == v8::ModuleStatus::Errored && is_root_module {
                 let mut state = state_rc.borrow_mut();
                 let exception = module.get_exception();
                 let exception = v8::Global::new(tc_scope, exception);
-                state.exceptions.capture_exception(exception);
+
+                state.exceptions.capture_exception(exception.clone());
+                state.exceptions.remove_promise_rejection_entry(&exception);
 
                 drop(state);
 
                 if let Some(error) = check_exceptions(tc_scope) {
                     report_and_exit(error);
                 }
-
-                // Note: Due to the architecture, when a module errors, the `promise_reject_cb`
-                // v8 hook will also trigger, resulting in the same exception being registered
-                // as an unhandled promise rejection. Therefore, we need to manually clear the
-                // promise_rejections here.
-                state_rc.borrow_mut().exceptions.promise_rejections.clear();
             }
 
             if let ImportKind::Dynamic(main_promise) = graph.kind.clone() {
