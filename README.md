@@ -132,6 +132,13 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `stdin`: Points to system's `stdin` stream.
 - [x] `stderr`: Points to system's `stderr` stream.
 
+##### Events
+
+- [x] `uncaughtException`: Emitted when an uncaught exception bubbles up to Dune.
+- [x] `unhandledRejection`: Emitted when a Promise is rejected with no handler.
+
+> Signal events will be emitted when the Dune process receives a signal. Please refer to [signal(7)](https://man7.org/linux/man-pages/man7/signal.7.html) for a listing of standard POSIX signal names.
+
 ### File System
 
 > This module also includes a `Sync` method for every async operation available.
@@ -174,10 +181,13 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `accept()`: Waits for a TCP client to connect and accepts the connection.
 - [x] `address()`: Returns the bound address.
 - [x] `close()`: Stops the server from accepting new connections and keeps existing connections.
-- [x] `Event: 'listening'`: Emitted when the server has been bound after calling `server.listen`.
-- [x] `Event: 'connection'`: Emitted when a new connection is made.
-- [x] `Event: 'close'`: Emitted when the server stops accepting new connections.
-- [x] `Event: 'error'`: Emitted when an error occurs.
+
+##### Events
+
+- [x] `listening`: Emitted when the server has been bound after calling `server.listen`.
+- [x] `connection`: Emitted when a new connection is made.
+- [x] `close`: Emitted when the server stops accepting new connections.
+- [x] `error`: Emitted when an error occurs.
 
 #### `net.Socket`
 
@@ -195,12 +205,15 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `remotePort`: The numeric representation of the remote port.
 - [x] `bytesRead`: The amount of received bytes.
 - [x] `bytesWritten`: The amount of bytes sent.
-- [x] `Event: 'connect'`: Emitted when a socket connection is successfully established.
-- [x] `Event: 'data'`: Emitted when data is received.
-- [x] `Event: 'end'`: Emitted when the other end of the socket sends a FIN packet.
-- [x] `Event: 'error'`: Emitted when an error occurs.
-- [x] `Event: 'close'`: Emitted once the socket is fully closed.
-- [x] `Event: 'timeout'`: Emitted if the socket times out from (read) inactivity.
+
+##### Events
+
+- [x] `connect`: Emitted when a socket connection is successfully established.
+- [x] `data`: Emitted when data is received.
+- [x] `end`: Emitted when the other end of the socket sends a FIN packet.
+- [x] `error`: Emitted when an error occurs.
+- [x] `close`: Emitted once the socket is fully closed.
+- [x] `timeout`: Emitted if the socket times out from (read) inactivity.
 
 ### HTTP
 
@@ -244,9 +257,12 @@ Body Mixins
 - [x] `listen(port, host?)`: Starts the HTTP server listening for connections.
 - [x] `close()`: Stops the server from accepting new connections.
 - [x] `accept()`: Waits for a client to connect and accepts the HTTP request.
-- [x] `Event: 'request'`: Emitted each time there is a request.
-- [x] `Event: 'close'`: Emitted when the server closes.
-- [x] `Event: 'clientError'`: Emitted when a client connection emits an 'error' event.
+
+##### Events
+
+- [x] `request`: Emitted each time there is a request.
+- [x] `close`: Emitted when the server closes.
+- [x] `clientError`: Emitted when a client connection emits an 'error' event.
 
 #### `http.ServerRequest`
 
@@ -274,7 +290,10 @@ Body Mixins
 - [x] `removeHeader(name)`: Removes a header that's queued for implicit sending.
 - [x] `headersSent`: Boolean (read-only). True if headers were sent, false otherwise.
 - [x] `socket`: Reference to the underlying socket.
-- [x] `Event: 'finish'`: Emitted when the (full) response has been sent.
+
+##### Events
+
+- [x] `finish`: Emitted when the (full) response has been sent.
 
 ### Stream
 
