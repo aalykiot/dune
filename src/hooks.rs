@@ -53,6 +53,8 @@ pub extern "C" fn host_initialize_import_meta_object_cb(
 ) {
     // Get `CallbackScope` from context.
     let scope = &mut unsafe { v8::CallbackScope::new(context) };
+    let scope = &mut v8::HandleScope::new(scope);
+
     let state = JsRuntime::state(scope);
     let state = state.borrow();
 
@@ -127,11 +129,11 @@ pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
 
     match event {
         PromiseHandlerAddedAfterReject => {
-            state.promise_exceptions.remove(&promise);
+            state.exceptions.remove_promise_rejection(&promise);
         }
         PromiseRejectWithNoHandler => {
             let reason = v8::Global::new(scope, reason);
-            state.promise_exceptions.insert(promise, reason);
+            state.exceptions.capture_promise_rejection(promise, reason);
         }
         PromiseRejectAfterResolved | PromiseResolveAfterResolved => {}
     }

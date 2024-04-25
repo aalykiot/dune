@@ -131,24 +131,21 @@ The provided code snippet is part of the **console** module. It takes multiple a
 Let's take a look how the `process.stdout.write` is implemented.
 
 ```js
-// File: /src/js/main.js
+// File: /src/js/process.js
 //
-Object.defineProperty(process, 'stdout', {
-  get() {
-    return {
-      write: process.binding('stdio').write,
-      end() {},
-    };
-  },
-  configurable: true,
-});
+const io = process.binding('stdio');
+
+defineStream('stdout', () => ({
+  write: io.write,
+  end() {},
+}));
 ```
 
 Let's break it down:
 
-1. **`Object.defineProperty(process, 'stdout', {...});`**: This line alters the stdout property of the process object using the `Object.defineProperty` method. It defines how the stdout property can be accessed and manipulated.
+1. **`defineStream('stdout', () => {...});`**: This line alters the stdout property of the process object using the `Object.defineProperty` method under the hood. It defines how the stdout property can be accessed and manipulated.
 
-2. **`write: process.binding('stdio').write`**: This line assigns the write property to the write method from the **stdio** namespace. In simpler terms, it means that when `process.stdout.write` is invoked, it calls the write method from the `stdio` binding, governing the handling of output data.
+2. **`write: io.write`**: This line assigns the write property to the write method from the **stdio** namespace. In simpler terms, it means that when `process.stdout.write` is invoked, it calls the write method from the `stdio` binding, governing the handling of output data.
 
 This approach is widespread throughout the codebase. Whenever we need to use a Rust function, we employ the `process.binding` method and specify the desired namespace.
 
@@ -215,8 +212,8 @@ pub struct JsRuntimeState {
   pub time_origin: u128,
   /// Holds callbacks scheduled by nextTick.
   pub next_tick_queue: NextTickQueue,
-  /// Holds exceptions from promises with no rejection handler.
-  pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
+  /// Stores and manages uncaught exceptions.
+  pub exceptions: ExceptionState,
   /// Runtime options.
   pub options: JsRuntimeOptions,
   /// Tracks wake event for current loop iteration.
@@ -225,6 +222,8 @@ pub struct JsRuntimeState {
   pub inspector: Option<Rc<RefCell<JsRuntimeInspector>>>,
 }
 ```
+
+> The above snippet might not be in sync with the current structure in the main branch. ☝️
 
 To enable access to this state from various V8 structures, we store it within the isolate's `slot`.
 

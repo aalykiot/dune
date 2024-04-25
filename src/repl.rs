@@ -1,3 +1,4 @@
+use crate::runtime::check_exceptions;
 use crate::runtime::JsRuntime;
 use colored::*;
 use phf::phf_set;
@@ -265,11 +266,12 @@ pub fn start(mut runtime: JsRuntime) {
 
         // Poll the event-loop.
         if maybe_message.is_err() {
-            // Tick the event loop.
+            // Tick the event loop and report exceptions.
             runtime.tick_event_loop();
-            // Report if any unhandled promise rejection has been caught.
-            if runtime.has_promise_rejections() {
-                println!("{}", runtime.promise_rejections().remove(0));
+            // Check for exceptions.
+            let scope = &mut runtime.handle_scope();
+            if let Some(error) = check_exceptions(scope) {
+                eprintln!("{error}");
             }
             continue;
         }
@@ -279,7 +281,7 @@ pub fn start(mut runtime: JsRuntime) {
             ReplMessage::Evaluate(expression) => {
                 match runtime.execute_script("<anonymous>", &expression) {
                     // Format the expression using console.log.
-                    Ok(value) => {
+                    Ok(Some(value)) => {
                         let scope = &mut runtime.handle_scope();
                         let context = v8::Local::new(scope, context.clone());
                         let scope = &mut v8::ContextScope::new(scope, context);
@@ -293,6 +295,7 @@ pub fn start(mut runtime: JsRuntime) {
                         let value = v8::Local::new(scope, value);
                         log.call(scope, global.into(), &[value]);
                     }
+                    Ok(None) => {}
                     Err(e) => eprintln!("{e}"),
                 };
             }

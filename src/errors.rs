@@ -180,6 +180,11 @@ pub fn unwrap_or_exit<T>(result: Result<T, Error>) -> T {
     }
 }
 
+pub fn report_and_exit(error: JsError) {
+    eprint!("{error:?}");
+    std::process::exit(1);
+}
+
 /// Returns a string representation of the IO error's code.
 pub fn extract_error_code(err: &IoError) -> Option<&'static str> {
     match err.kind() {

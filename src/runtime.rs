@@ -1,6 +1,8 @@
 use crate::bindings;
+use crate::errors::report_and_exit;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
+use crate::exceptions::ExceptionState;
 use crate::hooks::host_import_module_dynamically_cb;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
@@ -26,7 +28,6 @@ use dune_event_loop::LoopInterruptHandle;
 use dune_event_loop::TaskResult;
 use std::cell::RefCell;
 use std::cmp;
-use std::collections::HashMap;
 use std::net::SocketAddrV4;
 use std::rc::Rc;
 use std::sync::Once;
@@ -61,8 +62,8 @@ pub struct JsRuntimeState {
     pub time_origin: u128,
     /// Holds callbacks scheduled by nextTick.
     pub next_tick_queue: NextTickQueue,
-    /// Holds exceptions from promises with no rejection handler.
-    pub promise_exceptions: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
+    /// Stores and manages uncaught exceptions.
+    pub exceptions: ExceptionState,
     /// Runtime options.
     pub options: JsRuntimeOptions,
     /// Tracks wake event for current loop iteration.
@@ -96,6 +97,8 @@ pub struct JsRuntime {
     isolate: v8::OwnedIsolate,
     /// The event-loop instance that takes care of polling for I/O.
     pub event_loop: EventLoop,
+    /// The state of the runtime.
+    pub state: Rc<RefCell<JsRuntimeState>>,
 }
 
 impl JsRuntime {
@@ -175,7 +178,7 @@ impl JsRuntime {
 
         // Store state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
-        isolate.set_slot(Rc::new(RefCell::new(JsRuntimeState {
+        let state = Rc::new(RefCell::new(JsRuntimeState {
             context,
             module_map: ModuleMap::new(),
             handle: event_loop.handle(),
@@ -184,15 +187,18 @@ impl JsRuntime {
             startup_moment: Instant::now(),
             time_origin,
             next_tick_queue: Vec::new(),
-            promise_exceptions: HashMap::new(),
+            exceptions: ExceptionState::new(),
             options,
             inspector,
             wake_event_queued: false,
-        })));
+        }));
+
+        isolate.set_slot(state.clone());
 
         let mut runtime = JsRuntime {
             isolate,
             event_loop,
+            state,
         };
 
         runtime.load_main_environment();
@@ -232,8 +238,7 @@ impl JsRuntime {
             assert!(tc_scope.has_caught());
             let exception = tc_scope.exception().unwrap();
             let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            eprintln!("{exception:?}");
-            std::process::exit(1);
+            report_and_exit(exception);
         }
 
         let _ = module.evaluate(tc_scope);
@@ -241,8 +246,7 @@ impl JsRuntime {
         if module.get_status() == v8::ModuleStatus::Errored {
             let exception = module.get_exception();
             let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            eprintln!("{exception:?}");
-            std::process::exit(1);
+            report_and_exit(exception);
         }
 
         // Initialize process static values.
@@ -254,32 +258,43 @@ impl JsRuntime {
         &mut self,
         filename: &str,
         source: &str,
-    ) -> Result<v8::Global<v8::Value>, Error> {
+    ) -> Result<Option<v8::Global<v8::Value>>, Error> {
         // Get the handle-scope.
         let scope = &mut self.handle_scope();
+        let state_rc = JsRuntime::state(scope);
 
         let origin = create_origin(scope, filename, false);
         let source = v8::String::new(scope, source).unwrap();
 
         // The `TryCatch` scope allows us to catch runtime errors rather than panicking.
         let tc_scope = &mut v8::TryCatch::new(scope);
+        type ExecuteScriptResult = Result<Option<v8::Global<v8::Value>>, Error>;
+
+        let handle_exception =
+            |scope: &mut v8::TryCatch<'_, v8::HandleScope<'_>>| -> ExecuteScriptResult {
+                // Extract the exception during compilation.
+                assert!(scope.has_caught());
+                let exception = scope.exception().unwrap();
+                let exception = v8::Global::new(scope, exception);
+                let mut state = state_rc.borrow_mut();
+                // Capture the exception internally.
+                state.exceptions.capture_exception(exception);
+                drop(state);
+                // Force an exception check.
+                if let Some(error) = check_exceptions(scope) {
+                    bail!(error)
+                }
+                Ok(None)
+            };
 
         let script = match v8::Script::compile(tc_scope, source, Some(&origin)) {
             Some(script) => script,
-            None => {
-                assert!(tc_scope.has_caught());
-                let exception = tc_scope.exception().unwrap();
-                bail!(JsError::from_v8_exception(tc_scope, exception, None));
-            }
+            None => return handle_exception(tc_scope),
         };
 
         match script.run(tc_scope) {
-            Some(value) => Ok(v8::Global::new(tc_scope, value)),
-            None => {
-                assert!(tc_scope.has_caught());
-                let exception = tc_scope.exception().unwrap();
-                bail!(JsError::from_v8_exception(tc_scope, exception, None));
-            }
+            Some(value) => Ok(Some(v8::Global::new(tc_scope, value))),
+            None => handle_exception(tc_scope),
         }
     }
 
@@ -346,9 +361,9 @@ impl JsRuntime {
     /// Runs a single tick of the event-loop.
     pub fn tick_event_loop(&mut self) {
         run_next_tick_callbacks(&mut self.handle_scope());
+        self.fast_forward_imports();
         self.event_loop.tick();
         self.run_pending_futures();
-        self.fast_forward_imports();
     }
 
     /// Polls the inspector for new devtools messages.
@@ -378,10 +393,9 @@ impl JsRuntime {
             // Tick the event-loop one cycle.
             self.tick_event_loop();
 
-            // Report (and exit) if any unhandled promise rejection has been caught.
-            if self.has_promise_rejections() {
-                println!("{:?}", self.promise_rejections().remove(0));
-                std::process::exit(1);
+            // Report any unhandled promise rejections.
+            if let Some(error) = check_exceptions(&mut self.handle_scope()) {
+                report_and_exit(error);
             }
         }
 
@@ -408,10 +422,13 @@ impl JsRuntime {
             state_rc.borrow_mut().pending_futures.drain(..).collect();
 
         // NOTE: After every future executes (aka v8's call stack gets empty) we will drain
-        // the MicrotaskQueue and then the NextTickQueue.
+        // the MicroTask and NextTick Queue.
 
         for mut fut in futures {
             fut.run(scope);
+            if let Some(error) = check_exceptions(scope) {
+                report_and_exit(error);
+            }
             run_next_tick_callbacks(scope);
         }
 
@@ -489,17 +506,28 @@ impl JsRuntime {
                 assert!(tc_scope.has_caught());
                 let exception = tc_scope.exception().unwrap();
                 let exception = JsError::from_v8_exception(tc_scope, exception, None);
-                eprintln!("{exception:?}");
-                std::process::exit(1);
+                report_and_exit(exception);
             }
 
             let _ = module.evaluate(tc_scope);
+            let is_root_module = !graph.root_rc.borrow().is_dynamic_import;
 
-            if module.get_status() == v8::ModuleStatus::Errored {
+            // Note: Due to the architecture, when a module errors, the `promise_reject_cb`
+            // v8 hook will also trigger, resulting in the same exception being registered
+            // as an unhandled promise rejection. Therefore, we need to manually remove it.
+            if module.get_status() == v8::ModuleStatus::Errored && is_root_module {
+                let mut state = state_rc.borrow_mut();
                 let exception = module.get_exception();
-                let exception = JsError::from_v8_exception(tc_scope, exception, None);
-                eprintln!("{exception:?}");
-                std::process::exit(1);
+                let exception = v8::Global::new(tc_scope, exception);
+
+                state.exceptions.capture_exception(exception.clone());
+                state.exceptions.remove_promise_rejection_entry(&exception);
+
+                drop(state);
+
+                if let Some(error) = check_exceptions(tc_scope) {
+                    report_and_exit(error);
+                }
             }
 
             if let ImportKind::Dynamic(main_promise) = graph.kind.clone() {
@@ -522,7 +550,7 @@ impl JsRuntime {
 
     /// Returns if unhandled promise rejections where caught.
     pub fn has_promise_rejections(&mut self) -> bool {
-        !self.get_state().borrow().promise_exceptions.is_empty()
+        self.get_state().borrow().exceptions.has_promise_rejection()
     }
 
     /// Returns if we have imports in pending state.
@@ -533,25 +561,6 @@ impl JsRuntime {
     /// Returns if we have scheduled any next-tick callbacks.
     pub fn has_next_tick_callbacks(&mut self) -> bool {
         !self.get_state().borrow().next_tick_queue.is_empty()
-    }
-
-    /// Returns all promise unhandled rejections.
-    pub fn promise_rejections(&mut self) -> Vec<JsError> {
-        // Get a v8 handle-scope.
-        let scope = &mut self.handle_scope();
-
-        // Get access to the state.
-        let state_rc = JsRuntime::state(scope);
-        let mut state = state_rc.borrow_mut();
-
-        state
-            .promise_exceptions
-            .drain()
-            .map(|(_, value)| {
-                let exception = v8::Local::new(scope, value);
-                JsError::from_v8_exception(scope, exception, Some("(in promise) "))
-            })
-            .collect()
     }
 }
 
@@ -613,14 +622,116 @@ fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
 
         cb.call(tc_scope, undefined.into(), &args);
 
-        // On exception, report it and exit.
+        // On exception, report it and handle the error.
         if tc_scope.has_caught() {
             let exception = tc_scope.exception().unwrap();
-            let exception = JsError::from_v8_exception(tc_scope, exception, None);
-            println!("{exception:?}");
-            std::process::exit(1);
+            let exception = v8::Global::new(tc_scope, exception);
+            let mut state = state_rc.borrow_mut();
+            state.exceptions.capture_exception(exception);
+
+            drop(state);
+
+            // Check for uncaught errors (capture callbacks might be in place).
+            if let Some(error) = check_exceptions(tc_scope) {
+                report_and_exit(error);
+            }
         }
     }
 
     tc_scope.perform_microtask_checkpoint();
+}
+
+// Returns an error if an uncaught exception or unhandled rejection has been captured.
+pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
+    let state_rc = JsRuntime::state(scope);
+    let maybe_exception = state_rc.borrow_mut().exceptions.exception.take();
+
+    // Check for uncaught exceptions first.
+    if let Some(exception) = maybe_exception {
+        let state = state_rc.borrow();
+        let exception = v8::Local::new(scope, exception);
+        if let Some(callback) = state.exceptions.uncaught_exception_cb.as_ref() {
+            let callback = v8::Local::new(scope, callback);
+            let undefined = v8::undefined(scope).into();
+            let origin = v8::String::new(scope, "uncaughtException").unwrap();
+            let tc_scope = &mut v8::TryCatch::new(scope);
+            drop(state);
+
+            callback.call(tc_scope, undefined, &[exception, origin.into()]);
+
+            // Note: To avoid infinite recursion with these hooks, if this
+            // function throws, return it as error.
+            if tc_scope.has_caught() {
+                let exception = tc_scope.exception().unwrap();
+                let exception = v8::Local::new(tc_scope, exception);
+                let error = JsError::from_v8_exception(tc_scope, exception, None);
+                return Some(error);
+            }
+
+            return None;
+        }
+
+        let error = JsError::from_v8_exception(scope, exception, None);
+        return Some(error);
+    }
+
+    let promise_rejections = state_rc.borrow().exceptions.promise_rejections.to_owned();
+
+    // Then, check for unhandled rejections.
+    for (promise, exception) in promise_rejections.iter() {
+        let mut state = state_rc.borrow_mut();
+        state.exceptions.promise_rejections.remove(promise);
+        let promise = v8::Local::new(scope, promise);
+        let exception = v8::Local::new(scope, exception);
+
+        // If the `unhandled_rejection_cb` is set, invoke it to handle the promise rejection.
+        if let Some(callback) = state.exceptions.unhandled_rejection_cb.as_ref() {
+            let callback = v8::Local::new(scope, callback);
+            let undefined = v8::undefined(scope).into();
+            let tc_scope = &mut v8::TryCatch::new(scope);
+            drop(state);
+
+            callback.call(tc_scope, undefined, &[exception, promise.into()]);
+
+            // Note: To avoid infinite recursion with these hooks, if this
+            // function throws, return it as error.
+            if tc_scope.has_caught() {
+                let exception = tc_scope.exception().unwrap();
+                let exception = v8::Local::new(tc_scope, exception);
+                let error = JsError::from_v8_exception(tc_scope, exception, None);
+                return Some(error);
+            }
+
+            continue;
+        }
+
+        // If the `uncaught_exception_cb` is set, invoke it to handle the promise rejection.
+        if let Some(callback) = state.exceptions.uncaught_exception_cb.as_ref() {
+            let callback = v8::Local::new(scope, callback);
+            let undefined = v8::undefined(scope).into();
+            let origin = v8::String::new(scope, "unhandledRejection").unwrap();
+            let tc_scope = &mut v8::TryCatch::new(scope);
+            drop(state);
+
+            callback.call(tc_scope, undefined, &[exception, origin.into()]);
+
+            // Note: To avoid infinite recursion with these hooks, if this
+            // function throws, return it as error.
+            if tc_scope.has_caught() {
+                let exception = tc_scope.exception().unwrap();
+                let exception = v8::Local::new(tc_scope, exception);
+                let error = JsError::from_v8_exception(tc_scope, exception, None);
+                return Some(error);
+            }
+
+            continue;
+        }
+
+        let prefix = Some("(in promise) ");
+        let error = JsError::from_v8_exception(scope, exception, prefix);
+
+        return Some(error);
+    }
+
+    None
 }
