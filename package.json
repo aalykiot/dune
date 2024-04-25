@@ -1,6 +1,6 @@
 {
   "name": "dune",
-  "version": "0.5.6",
+  "version": "0.6.0",
   "description": "A hobby runtime for JavaScript and TypeScript 🚀",
   "homepage": "https://github.com/aalykiot/dune#readme",
   "keywords": [],
