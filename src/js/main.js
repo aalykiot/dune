@@ -15,6 +15,26 @@ function makeGlobal(name, value) {
   globalThis[name] = value;
 }
 
+const { $$queueMicro, reportError } = globalThis;
+
+// Note: We wrap `queueMicrotask` and manually emit the exception because
+// v8 doesn't provide any mechanism to handle callback exceptions during
+// the microtask_checkpoint phase.
+function queueMicrotask(callback) {
+  // Check if the callback argument is a valid type.
+  if (typeof callback !== 'function') {
+    throw new TypeError(`The "callback" argument must be of type function.`);
+  }
+
+  $$queueMicro(() => {
+    try {
+      callback();
+    } catch (err) {
+      reportError(err);
+    }
+  });
+}
+
 const console = new Console();
 const consoleFromV8 = globalThis['console'];
 
@@ -23,6 +43,7 @@ wrapConsole(console, consoleFromV8);
 /* Initialize global environment for user script */
 
 makeGlobal('process', process);
+makeGlobal('queueMicrotask', queueMicrotask);
 makeGlobal('console', console);
 makeGlobal('prompt', prompt);
 
