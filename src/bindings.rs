@@ -8,6 +8,7 @@ use crate::net;
 use crate::perf_hooks;
 use crate::process;
 use crate::promise;
+use crate::runtime::JsRuntime;
 use crate::signals;
 use crate::stdio;
 use crate::timers;
@@ -48,22 +49,45 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
     let global = context.global(scope);
     let scope = &mut v8::ContextScope::new(scope, context);
 
-    // Simple print function bound to Rust's println! macro (synchronous call).
-    set_function_to(
-        scope,
-        global,
-        "print",
-        |scope: &mut v8::HandleScope,
-         args: v8::FunctionCallbackArguments,
-         mut _rv: v8::ReturnValue| {
-            let value = args.get(0).to_rust_string_lossy(scope);
-            println!("{value}");
-        },
-    );
+    set_function_to(scope, global, "print", global_print);
+    set_function_to(scope, global, "queueMicrotask", global_queue_microtask);
 
     // Expose low-level functions to JavaScript.
     process::initialize(scope, global);
     scope.escape(context)
+}
+
+// Simple print function bound to Rust's println! macro.
+fn global_print(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    let value = args.get(0).to_rust_string_lossy(scope);
+    println!("{value}");
+}
+
+// This method queues a microtask to invoke callback.
+fn global_queue_microtask(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    // Make sure the argument is a callback.
+    let callback = match v8::Local::<v8::Function>::try_from(args.get(0)) {
+        Ok(callback) => callback,
+        Err(_) => {
+            let message = "The \"callback\" argument must be of type function.";
+            throw_type_error(scope, message);
+            return;
+        }
+    };
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow();
+    let ctx = state.context.open(scope);
+
+    ctx.get_microtask_queue().enqueue_microtask(scope, callback);
 }
 
 /// Adds a property with the given name and value, into the given object.
