@@ -90,6 +90,8 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
         set_unhandled_rejection_callback,
     );
 
+    set_function_to(scope, target, "emitException", emit_exception);
+
     // Return v8 global handle.
     v8::Global::new(scope, target)
 }
@@ -98,7 +100,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 fn set_uncaught_exception_callback(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
+    _: v8::ReturnValue,
 ) {
     // Note: Passing `null` from JavaScript essentially will unset the defined callback.
     let callback = match v8::Local::<v8::Function>::try_from(args.get(0)) {
@@ -110,15 +112,13 @@ fn set_uncaught_exception_callback(
     let mut state = state_rc.borrow_mut();
 
     state.exceptions.set_uncaught_exception_callback(callback);
-
-    rv.set(v8::Boolean::new(scope, true).into());
 }
 
 /// Setting the `unhandled_rejection_callback` from JavaScript.
 fn set_unhandled_rejection_callback(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
+    _: v8::ReturnValue,
 ) {
     // Note: Passing `null` from JavaScript essentially will unset the defined callback.
     let callback = match v8::Local::<v8::Function>::try_from(args.get(0)) {
@@ -130,6 +130,17 @@ fn set_unhandled_rejection_callback(
     let mut state = state_rc.borrow_mut();
 
     state.exceptions.set_unhandled_rejection_callback(callback);
+}
 
-    rv.set(v8::Boolean::new(scope, true).into());
+/// Manually setting the current exception from JavaScript.
+fn emit_exception(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    let state_rc = JsRuntime::state(scope);
+    let mut state = state_rc.borrow_mut();
+    let exception = v8::Global::new(scope, args.get(0));
+
+    state.exceptions.capture_exception(exception);
 }

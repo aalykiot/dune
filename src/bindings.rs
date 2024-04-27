@@ -50,7 +50,7 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
     let scope = &mut v8::ContextScope::new(scope, context);
 
     set_function_to(scope, global, "print", global_print);
-    set_function_to(scope, global, "queueMicrotask", global_queue_microtask);
+    set_function_to(scope, global, "$$queueMicro", global_queue_micro);
 
     // Expose low-level functions to JavaScript.
     process::initialize(scope, global);
@@ -68,21 +68,12 @@ fn global_print(
 }
 
 // This method queues a microtask to invoke callback.
-fn global_queue_microtask(
+fn global_queue_micro(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
-    // Make sure the argument is a callback.
-    let callback = match v8::Local::<v8::Function>::try_from(args.get(0)) {
-        Ok(callback) => callback,
-        Err(_) => {
-            let message = "The \"callback\" argument must be of type function.";
-            throw_type_error(scope, message);
-            return;
-        }
-    };
-
+    let callback = v8::Local::<v8::Function>::try_from(args.get(0)).unwrap();
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
     let ctx = state.context.open(scope);
