@@ -90,8 +90,6 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
         set_unhandled_rejection_callback,
     );
 
-    set_function_to(scope, target, "emitException", emit_exception);
-
     // Return v8 global handle.
     v8::Global::new(scope, target)
 }
@@ -130,17 +128,4 @@ fn set_unhandled_rejection_callback(
     let mut state = state_rc.borrow_mut();
 
     state.exceptions.set_unhandled_rejection_callback(callback);
-}
-
-/// Manually setting the current exception from JavaScript.
-fn emit_exception(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
-) {
-    let state_rc = JsRuntime::state(scope);
-    let mut state = state_rc.borrow_mut();
-    let exception = v8::Global::new(scope, args.get(0));
-
-    state.exceptions.capture_exception(exception);
 }

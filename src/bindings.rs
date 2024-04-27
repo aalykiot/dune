@@ -1,5 +1,6 @@
 use crate::dns;
 use crate::errors::extract_error_code;
+use crate::errors::report_and_exit;
 use crate::errors::IoError;
 use crate::exceptions;
 use crate::file;
@@ -8,6 +9,7 @@ use crate::net;
 use crate::perf_hooks;
 use crate::process;
 use crate::promise;
+use crate::runtime::check_exceptions;
 use crate::runtime::JsRuntime;
 use crate::signals;
 use crate::stdio;
@@ -50,6 +52,7 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
     let scope = &mut v8::ContextScope::new(scope, context);
 
     set_function_to(scope, global, "print", global_print);
+    set_function_to(scope, global, "reportError", global_report_error);
     set_function_to(scope, global, "$$queueMicro", global_queue_micro);
 
     // Expose low-level functions to JavaScript.
@@ -65,6 +68,25 @@ fn global_print(
 ) {
     let value = args.get(0).to_rust_string_lossy(scope);
     println!("{value}");
+}
+
+// This method may be used to report errors to global event handlers.
+// https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception
+fn global_report_error(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    let exception = v8::Global::new(scope, args.get(0));
+    let state_rc = JsRuntime::state(scope);
+    let mut state = state_rc.borrow_mut();
+
+    state.exceptions.capture_exception(exception);
+    drop(state);
+
+    if let Some(error) = check_exceptions(scope) {
+        report_and_exit(error);
+    }
 }
 
 // This method queues a microtask to invoke callback.

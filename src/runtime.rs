@@ -639,12 +639,6 @@ fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
     }
 
     tc_scope.perform_microtask_checkpoint();
-
-    // Note: Exceptions may also be thrown from microtask callbacks,
-    // so we must verify and report any uncaught exceptions again.
-    if let Some(error) = check_exceptions(tc_scope) {
-        report_and_exit(error);
-    }
 }
 
 // Returns an error if an uncaught exception or unhandled rejection has been captured.
