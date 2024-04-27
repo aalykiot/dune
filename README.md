@@ -105,6 +105,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `structuredClone`: Creates a deep clone of a given value.
 - [x] `AbortController` / `AbortSignal`: Allows you to communicate with a request and abort it.
 - [x] `fetch`: A wrapper around `http.request` (not fully compatible with WHATWG fetch).
+- [x] `queueMicrotask`: Queues a microtask to invoke a callback.
 
 ### Module Metadata
 
