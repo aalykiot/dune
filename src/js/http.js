@@ -224,7 +224,12 @@ class Request {
   constructor(url, options) {
     // Include protocol in URL.
     const checkedUrl = url.includes('://') ? url : 'http://' + url;
-    const [_, __, hostname, port, path] = urlRegex.exec(checkedUrl); // eslint-disable-line no-unused-vars
+    const [_, protocol, hostname, port, path] = urlRegex.exec(checkedUrl); // eslint-disable-line no-unused-vars
+
+    // Only HTTP requests are supported.
+    if (protocol !== 'http:') {
+      throw new Error(`Protocol "${protocol}" not supported.`);
+    }
 
     this.#hostname = hostname;
     this.#port = port ? Number(port.replace(':', '')) : 80;
