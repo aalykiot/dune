@@ -134,6 +134,14 @@ export function createConnection(...args) {
 }
 
 /**
+ * Aliases to `net.createConnection()`.
+ *
+ * Additional signatures:
+ * - connect(port: number | string, host?: string)
+ */
+export const connect = createConnection;
+
+/**
  * Creates a new TCP server.
  *
  * @param {Function} [onConnection] - A function that is called whenever a connection is made to the server.
@@ -704,6 +712,7 @@ export class Server extends EventEmitter {
 export default {
   TimeoutError,
   Socket,
+  connect,
   createConnection,
   Server,
   createServer,
