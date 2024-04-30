@@ -449,7 +449,7 @@ class Body {
     if (signal) signal.on('uncaughtStreamException', () => this.#socket.end());
 
     if (this.#isComplete && !this.#isChunked) {
-      const remainingContent = this.#body.subarray(this.#bodyLength);
+      const remainingContent = this.#body.subarray(0, this.#bodyLength);
       this.#body = this.#body.subarray(remainingContent.length);
       yield remainingContent;
       return;

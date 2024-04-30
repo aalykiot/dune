@@ -1,6 +1,6 @@
 import http from 'http';
 
-const URL = 'https://jsonplaceholder.typicode.com/posts';
+const URL = 'http://jsonplaceholder.typicode.com/posts';
 
 const response = await http.request(URL, {
   timeout: 0, // <-- No timeout.
