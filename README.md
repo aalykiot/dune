@@ -172,6 +172,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 - [x] `createServer(connectionHandler?)`: Creates a new TCP server.
 - [x] `createConnection(options)`: Creates unix socket connection to a remote host.
+- [x] `connect(options)`: An alias of `createConnection()`.
 - [x] `TimeoutError`: Custom error signalling a socket (read) timeout.
 
 #### `net.Server`
