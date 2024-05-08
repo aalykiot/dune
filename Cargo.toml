@@ -51,7 +51,7 @@ swc_ecma_ast = "0.113.0"
 swc_ecma_loader = "0.45.24"
 swc_atoms = "0.6.5"
 serde = { version = "1.0.197", features = ["derive"] }
-serde_json = "1.0.115"
+serde_json = "1.0.117"
 dns-lookup = "2.0.4"
 tempdir = "0.3.7"
 zstd = "0.13.1"
