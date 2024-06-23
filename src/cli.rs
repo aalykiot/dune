@@ -129,6 +129,12 @@ struct RunArgs {
         value_parser = parse_inspect_address
     )]
     inspect_brk: Option<SocketAddrV4>,
+    #[arg(
+        help = "Expose the garbage collector",
+        action = ArgAction::SetTrue,
+        long = "expose-gc",
+    )]
+    expose_gc: Option<bool>,
 }
 
 #[derive(Debug, Parser)]
@@ -250,6 +256,12 @@ struct TestArgs {
         value_parser = parse_inspect_address
     )]
     inspect_brk: Option<SocketAddrV4>,
+    #[arg(
+        help = "Expose the garbage collector",
+        action = ArgAction::SetTrue,
+        long = "expose-gc",
+    )]
+    expose_gc: Option<bool>,
 }
 
 const PORT_RANGE: RangeInclusive<usize> = 1..=65535;
@@ -338,6 +350,7 @@ fn run_command(args: &RunArgs) {
         inspect,
         root,
         test_mode: false,
+        expose_gc: args.expose_gc.unwrap_or_default(),
     };
 
     // Create new JS runtime.
@@ -412,6 +425,7 @@ fn test_command(args: &TestArgs) {
         test_mode: true,
         import_map,
         inspect,
+        expose_gc: args.expose_gc.unwrap_or_default(),
         ..Default::default()
     };
 
