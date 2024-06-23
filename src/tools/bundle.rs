@@ -27,7 +27,7 @@ use swc_ecma_codegen::text_writer::JsWriter;
 use swc_ecma_codegen::Emitter;
 use swc_ecma_loader::resolve::Resolution;
 use swc_ecma_parser::parse_file_as_module;
-use swc_ecma_parser::EsConfig;
+use swc_ecma_parser::EsSyntax;
 use swc_ecma_parser::Syntax;
 
 #[derive(Debug, Default, Clone)]
@@ -131,7 +131,7 @@ impl<'s> Load for Loader<'s> {
         // Parse JavaScript source into an SWC module.
         let module = match parse_file_as_module(
             &fm,
-            Syntax::Es(EsConfig::default()),
+            Syntax::Es(EsSyntax::default()),
             EsVersion::latest(),
             None,
             &mut vec![],
