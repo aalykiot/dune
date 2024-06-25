@@ -56,7 +56,7 @@ enum Command {
     #[command(about = "Upgrade to the latest dune version")]
     Upgrade,
     #[command(about = "Start the REPL (read, eval, print, loop)")]
-    Repl,
+    Repl(ReplArgs),
 }
 
 #[derive(Debug, Parser)]
@@ -264,6 +264,35 @@ struct TestArgs {
     expose_gc: Option<bool>,
 }
 
+#[derive(Debug, Parser)]
+struct ReplArgs {
+    #[arg(
+        help = "Make the Math.random() method predictable",
+        long = "seed",
+        value_name = "NUMBER"
+    )]
+    seed: Option<i64>,
+    #[arg(
+        help = "Load configuration from local file",
+        long = "env-file",
+        value_name = "FILE",
+        value_hint = ValueHint::FilePath,
+    )]
+    env_file: Option<PathBuf>,
+    #[arg(
+        help = "Set the number of threads used for I/O",
+        long = "threadpool-size",
+        value_name = "NUMBER"
+    )]
+    thread_pool_size: Option<usize>,
+    #[arg(
+        help = "Expose the garbage collector",
+        action = ArgAction::SetTrue,
+        long = "expose-gc",
+    )]
+    expose_gc: Option<bool>,
+}
+
 const PORT_RANGE: RangeInclusive<usize> = 1..=65535;
 
 fn parse_inspect_address(s: &str) -> Result<SocketAddrV4> {
@@ -439,9 +468,32 @@ fn test_command(args: &TestArgs) {
     };
 }
 
-fn repl_command() {
+fn repl_command(args: Option<&ReplArgs>) {
+    // Build a JS runtime based on CLI arguments.
+    let options = match args {
+        None => JsRuntimeOptions::default(),
+        Some(args) => {
+            // Load custom .env file if specified.
+            if let Some(path) = args.env_file.as_ref() {
+                // Try to parse the .env file.
+                if let Err(e) = dotenv::load_env_file(path) {
+                    eprintln!("{}: {}", "Error".red().bold(), e);
+                    std::process::exit(1);
+                }
+            }
+
+            JsRuntimeOptions {
+                num_threads: args.thread_pool_size.to_owned(),
+                expose_gc: args.expose_gc.unwrap_or_default(),
+                seed: args.seed.to_owned(),
+                ..Default::default()
+            }
+        }
+    };
+
     // Start REPL.
-    repl::start(JsRuntime::new());
+    let runtime = JsRuntime::with_options(options);
+    repl::start(runtime);
 }
 
 fn upgrade_command() {
@@ -507,8 +559,8 @@ pub fn process_cli_arguments() {
         Some(Command::Bundle(args)) => bundle_command(&args),
         Some(Command::Compile(args)) => compile_command(&args),
         Some(Command::Test(args)) => test_command(&args),
+        Some(Command::Repl(args)) => repl_command(Some(&args)),
         Some(Command::Upgrade) => upgrade_command(),
-        Some(Command::Repl) => repl_command(),
-        None => repl_command(),
+        None => repl_command(None),
     };
 }
