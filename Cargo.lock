@@ -710,8 +710,8 @@ dependencies = [
 
 [[package]]
 name = "dune_event_loop"
-version = "0.1.0"
-source = "git+https://github.com/aalykiot/dune-event-loop?branch=main#0ab67d13de3f00858a242ceab8646ec5ae296501"
+version = "0.1.1"
+source = "git+https://github.com/aalykiot/dune-event-loop?branch=main#1047453ce2e4ec195e0426f97346268615c38c95"
 dependencies = [
  "anyhow",
  "ctrlc",

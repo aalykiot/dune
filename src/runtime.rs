@@ -100,6 +100,7 @@ pub struct JsRuntime {
     /// The event-loop instance that takes care of polling for I/O.
     pub event_loop: EventLoop,
     /// The state of the runtime.
+    #[allow(unused)]
     pub state: Rc<RefCell<JsRuntimeState>>,
 }
 
