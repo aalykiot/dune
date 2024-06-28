@@ -17,7 +17,7 @@ use swc_ecma_parser::lexer::Lexer;
 use swc_ecma_parser::Parser;
 use swc_ecma_parser::StringInput;
 use swc_ecma_parser::Syntax;
-use swc_ecma_parser::TsConfig;
+use swc_ecma_parser::TsSyntax;
 use swc_ecma_transforms_base::fixer::fixer;
 use swc_ecma_transforms_base::hygiene::hygiene;
 use swc_ecma_transforms_base::resolver;
@@ -48,7 +48,7 @@ impl TypeScript {
 
         // Initialize the TypeScript lexer.
         let lexer = Lexer::new(
-            Syntax::Typescript(TsConfig {
+            Syntax::Typescript(TsSyntax {
                 tsx: true,
                 decorators: true,
                 no_early_errors: true,
@@ -116,7 +116,7 @@ impl Jsx {
         // of JavaScript and we also want to support .tsx files.
 
         let lexer = Lexer::new(
-            Syntax::Typescript(TsConfig {
+            Syntax::Typescript(TsSyntax {
                 tsx: true,
                 decorators: true,
                 no_early_errors: true,

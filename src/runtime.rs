@@ -89,6 +89,8 @@ pub struct JsRuntimeOptions {
     pub test_mode: bool,
     // Defines the inspector listening options.
     pub inspect: Option<(SocketAddrV4, bool)>,
+    // Exposes v8's garbage collector.
+    pub expose_gc: bool,
 }
 
 pub struct JsRuntime {
@@ -98,6 +100,7 @@ pub struct JsRuntime {
     /// The event-loop instance that takes care of polling for I/O.
     pub event_loop: EventLoop,
     /// The state of the runtime.
+    #[allow(unused)]
     pub state: Rc<RefCell<JsRuntimeState>>,
 }
 
@@ -110,23 +113,23 @@ impl JsRuntime {
     /// Creates a new JsRuntime based on provided options.
     pub fn with_options(options: JsRuntimeOptions) -> JsRuntime {
         // Configuration flags for V8.
-        let flags = concat!(
+        let mut flags = String::from(concat!(
             " --no-validate-asm",
             " --turbo_fast_api_calls",
             " --harmony-import-assertions",
             " --harmony-array-from_async",
             " --harmony-iterator-helpers",
-        );
+        ));
 
-        if options.seed.is_some() {
-            v8::V8::set_flags_from_string(&format!(
-                "{} --predictable --random-seed={}",
-                flags,
-                options.seed.unwrap()
-            ));
-        } else {
-            v8::V8::set_flags_from_string(flags);
+        if let Some(seed) = options.seed {
+            flags.push_str(&format!(" --predictable --random-seed={seed}"))
         }
+
+        if options.expose_gc {
+            flags.push_str(" --expose-gc")
+        }
+
+        v8::V8::set_flags_from_string(&flags);
 
         // Fire up the v8 engine.
         static V8_INIT: Once = Once::new();

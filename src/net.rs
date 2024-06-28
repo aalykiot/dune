@@ -423,7 +423,17 @@ fn shutdown(
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
 
-    state.handle.tcp_shutdown(index);
+    let on_shutdown = {
+        let state_rc = state_rc.clone();
+        let promise = v8::Global::new(scope, promise_resolver);
+        move |_: LoopHandle| {
+            let mut state = state_rc.borrow_mut();
+            let future = TcpShutdownFuture { promise };
+            state.pending_futures.push(Box::new(future));
+        }
+    };
+
+    state.handle.tcp_shutdown(index, on_shutdown);
     rv.set(promise.into());
 }
 
