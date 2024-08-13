@@ -47,7 +47,7 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
     let scope = &mut v8::EscapableHandleScope::new(scope);
 
     // Create and enter a new JavaScript context.
-    let context = v8::Context::new(scope);
+    let context = v8::Context::new(scope, Default::default());
     let global = context.global(scope);
     let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -174,10 +174,10 @@ pub fn get_internal_ref<'s, T>(
     index: usize,
 ) -> &'s mut T {
     let v8_ref = source.get_internal_field(scope, index).unwrap();
-    let stored_item = unsafe { v8::Local::<v8::External>::cast(v8_ref) };
-    let stored_item = stored_item.value() as *mut T;
+    let external = v8_ref.cast::<v8::External>();
+    let value = external.value() as *mut T;
 
-    unsafe { &mut *stored_item }
+    unsafe { &mut *value }
 }
 
 /// Sets error code to exception if possible.

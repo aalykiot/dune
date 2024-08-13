@@ -3,6 +3,7 @@ use crate::errors::report_and_exit;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::exceptions::ExceptionState;
+use crate::exceptions::PromiseRejectionEntry;
 use crate::hooks::host_import_module_dynamically_cb;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
@@ -116,9 +117,8 @@ impl JsRuntime {
         let mut flags = String::from(concat!(
             " --no-validate-asm",
             " --turbo_fast_api_calls",
-            " --harmony-import-assertions",
-            " --harmony-array-from_async",
-            " --harmony-iterator-helpers",
+            " --harmony-temporal",
+            " --js-float16array",
         ));
 
         if let Some(seed) = options.seed {
@@ -678,12 +678,16 @@ pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
         return Some(error);
     }
 
-    let promise_rejections = state_rc.borrow().exceptions.promise_rejections.to_owned();
+    let promise_rejections: Vec<PromiseRejectionEntry> = state_rc
+        .borrow_mut()
+        .exceptions
+        .promise_rejections
+        .drain(..)
+        .collect();
 
     // Then, check for unhandled rejections.
     for (promise, exception) in promise_rejections.iter() {
-        let mut state = state_rc.borrow_mut();
-        state.exceptions.promise_rejections.remove(promise);
+        let state = state_rc.borrow_mut();
         let promise = v8::Local::new(scope, promise);
         let exception = v8::Local::new(scope, exception);
 

@@ -66,10 +66,11 @@ pub fn create_origin<'s>(
         0,
         false,
         0,
-        source_map.into(),
+        Some(source_map.into()),
         false,
         false,
         is_module,
+        None,
     )
 }
 
@@ -295,9 +296,9 @@ impl JsFuture for EsModuleFuture {
 
         // Compile source and get it's dependencies.
         let source = v8::String::new(tc_scope, &source).unwrap();
-        let source = v8::script_compiler::Source::new(source, Some(&origin));
+        let mut source = v8::script_compiler::Source::new(source, Some(&origin));
 
-        let module = match v8::script_compiler::compile_module(tc_scope, source) {
+        let module = match v8::script_compiler::compile_module(tc_scope, &mut source) {
             Some(module) => module,
             None => {
                 assert!(tc_scope.has_caught());
@@ -535,9 +536,9 @@ pub fn fetch_module_tree<'a>(
         None => unwrap_or_exit(load_import(filename, true)),
     };
     let source = v8::String::new(scope, &source).unwrap();
-    let source = v8::script_compiler::Source::new(source, Some(&origin));
+    let mut source = v8::script_compiler::Source::new(source, Some(&origin));
 
-    let module = match v8::script_compiler::compile_module(scope, source) {
+    let module = match v8::script_compiler::compile_module(scope, &mut source) {
         Some(module) => module,
         None => return None,
     };
