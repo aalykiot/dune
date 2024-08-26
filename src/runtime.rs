@@ -69,8 +69,6 @@ pub struct JsRuntimeState {
     pub options: JsRuntimeOptions,
     /// Tracks wake event for current loop iteration.
     pub wake_event_queued: bool,
-    /// A structure responsible for providing inspector interface to the runtime.
-    pub inspector: Option<Rc<RefCell<JsRuntimeInspector>>>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -98,6 +96,8 @@ pub struct JsRuntime {
     /// A VM instance with its own heap.
     /// https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html
     isolate: v8::OwnedIsolate,
+    /// A structure responsible for providing inspector interface to the runtime.
+    pub inspector: Option<Rc<RefCell<JsRuntimeInspector>>>,
     /// The event-loop instance that takes care of polling for I/O.
     pub event_loop: EventLoop,
     /// The state of the runtime.
@@ -192,7 +192,6 @@ impl JsRuntime {
             next_tick_queue: Vec::new(),
             exceptions: ExceptionState::new(),
             options,
-            inspector,
             wake_event_queued: false,
         }));
 
@@ -202,6 +201,7 @@ impl JsRuntime {
             isolate,
             event_loop,
             state,
+            inspector,
         };
 
         runtime.load_main_environment();
@@ -371,9 +371,7 @@ impl JsRuntime {
 
     /// Polls the inspector for new devtools messages.
     pub fn poll_inspect_session(&mut self) {
-        let state = self.get_state();
-        let mut state_rc = state.borrow_mut();
-        if let Some(inspector) = state_rc.inspector.as_mut() {
+        if let Some(inspector) = self.inspector.as_mut() {
             inspector.borrow_mut().poll_session();
         }
     }
@@ -601,9 +599,7 @@ impl JsRuntime {
 
     /// Returns the inspector created for the runtime.
     pub fn inspector(&mut self) -> Option<Rc<RefCell<JsRuntimeInspector>>> {
-        let state = self.get_state();
-        let state = state.borrow();
-        state.inspector.as_ref().cloned()
+        self.inspector.as_ref().cloned()
     }
 }
 

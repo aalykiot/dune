@@ -259,16 +259,6 @@ impl JsRuntimeInspector {
     }
 }
 
-impl Drop for JsRuntimeInspector {
-    fn drop(&mut self) {
-        // V8 automatically deletes all sessions when an `V8Inspector` instance is
-        // deleted, however InspectorSession also has a drop handler that cleans
-        // up after itself. To avoid a double free, make sure the inspector is
-        // dropped last.
-        self.session.take();
-    }
-}
-
 impl v8::inspector::V8InspectorClientImpl for JsRuntimeInspector {
     fn base(&self) -> &v8::inspector::V8InspectorClientBase {
         &self.v8_inspector_client
@@ -488,6 +478,7 @@ async fn websocket(socket: WebSocket, state: AppState) {
             // Wake up the event-loop if necessary.
             let _ = inbound_tx.send(FrontendMessage::Command(data.clone()));
             handle.interrupt();
+
             // Notify main thread that a debugger is attached and ready.
             if data.contains("Runtime.runIfWaitingForDebugger") {
                 state.handshake_tx.send(()).unwrap();
