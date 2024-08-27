@@ -123,7 +123,7 @@ impl<'s> Load for Loader<'s> {
         // Try load the module's source-code.
         let source = load_import(&specifier, self.options.skip_cache)?;
         let path = FileName::Real(specifier.into());
-        let fm = self.cm.new_source_file(path, source);
+        let fm = self.cm.new_source_file(path.into(), source);
 
         let handler =
             Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(self.cm.clone()));
@@ -193,7 +193,7 @@ impl swc_bundler::Hook for Hook {
         // Compute .main and .url properties.
         Ok(vec![
             KeyValueProp {
-                key: PropName::Ident(Ident::new(js_word!("url"), span)),
+                key: PropName::Ident(IdentName::new(js_word!("url"), span)),
                 value: Box::new(Expr::Lit(Lit::Str(Str {
                     span,
                     raw: None,
@@ -201,7 +201,7 @@ impl swc_bundler::Hook for Hook {
                 }))),
             },
             KeyValueProp {
-                key: PropName::Ident(Ident::new(js_word!("main"), span)),
+                key: PropName::Ident(IdentName::new(js_word!("main"), span)),
                 value: Box::new(if module.is_entry {
                     Expr::Member(MemberExpr {
                         span,
@@ -209,7 +209,7 @@ impl swc_bundler::Hook for Hook {
                             span,
                             kind: MetaPropKind::ImportMeta,
                         })),
-                        prop: MemberProp::Ident(Ident::new(js_word!("main"), span)),
+                        prop: MemberProp::Ident(IdentName::new(js_word!("main"), span)),
                     })
                 } else {
                     Expr::Lit(Lit::Bool(Bool { span, value: false }))
