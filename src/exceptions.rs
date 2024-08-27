@@ -1,12 +1,13 @@
 use crate::bindings::set_function_to;
 use crate::runtime::JsRuntime;
-use std::collections::HashMap;
+
+pub type PromiseRejectionEntry = (v8::Global<v8::Promise>, v8::Global<v8::Value>);
 
 pub struct ExceptionState {
     /// Holds the current uncaught exception.
     pub exception: Option<v8::Global<v8::Value>>,
     /// Holds uncaught promise rejections.
-    pub promise_rejections: HashMap<v8::Global<v8::Promise>, v8::Global<v8::Value>>,
+    pub promise_rejections: Vec<PromiseRejectionEntry>,
     /// Hook to run on an uncaught exception.
     pub uncaught_exception_cb: Option<v8::Global<v8::Function>>,
     /// Hook to run on an uncaught promise rejection.
@@ -18,7 +19,7 @@ impl ExceptionState {
     pub fn new() -> Self {
         ExceptionState {
             exception: None,
-            promise_rejections: HashMap::new(),
+            promise_rejections: Vec::default(),
             uncaught_exception_cb: None,
             unhandled_rejection_cb: None,
         }
@@ -37,7 +38,7 @@ impl ExceptionState {
         promise: v8::Global<v8::Promise>,
         reason: v8::Global<v8::Value>,
     ) {
-        self.promise_rejections.insert(promise, reason);
+        self.promise_rejections.push((promise, reason));
     }
 
     pub fn has_promise_rejection(&self) -> bool {
@@ -45,22 +46,15 @@ impl ExceptionState {
     }
 
     pub fn remove_promise_rejection(&mut self, promise: &v8::Global<v8::Promise>) {
-        self.promise_rejections.remove(promise);
+        // Find the correct entry to remove.
+        self.promise_rejections
+            .retain(|(value, _)| value != promise);
     }
 
     pub fn remove_promise_rejection_entry(&mut self, exception: &v8::Global<v8::Value>) {
         // Find the correct entry to remove.
-        let mut key_to_remove = None;
-        for (key, value) in self.promise_rejections.iter() {
-            if value == exception {
-                key_to_remove = Some(key.clone());
-                break;
-            }
-        }
-
-        if let Some(promise) = key_to_remove {
-            self.promise_rejections.remove(&promise);
-        }
+        self.promise_rejections
+            .retain(|(_, value)| value != exception);
     }
 
     pub fn set_uncaught_exception_callback(&mut self, callback: Option<v8::Global<v8::Function>>) {

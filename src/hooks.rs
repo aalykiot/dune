@@ -128,12 +128,15 @@ pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
     let mut state = state_rc.borrow_mut();
 
     match event {
-        PromiseHandlerAddedAfterReject => {
-            state.exceptions.remove_promise_rejection(&promise);
-        }
+        // Note: We might need to "interrupt" the event loop to handle
+        // the promise rejection in a timely manner.
         PromiseRejectWithNoHandler => {
             let reason = v8::Global::new(scope, reason);
             state.exceptions.capture_promise_rejection(promise, reason);
+            state.interrupt_handle.interrupt();
+        }
+        PromiseHandlerAddedAfterReject => {
+            state.exceptions.remove_promise_rejection(&promise);
         }
         PromiseRejectAfterResolved | PromiseResolveAfterResolved => {}
     }

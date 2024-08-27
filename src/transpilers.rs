@@ -44,7 +44,7 @@ impl TypeScript {
             None => FileName::Anon,
         };
 
-        let fm = cm.new_source_file(filename, source.into());
+        let fm = cm.new_source_file(filename.into(), source.into());
 
         // Initialize the TypeScript lexer.
         let lexer = Lexer::new(
@@ -76,7 +76,7 @@ impl TypeScript {
             // Apply the rest SWC transforms to generated code.
             let program = program
                 .fold_with(&mut resolver(Mark::new(), Mark::new(), true))
-                .fold_with(&mut strip(Mark::new()))
+                .fold_with(&mut strip(Mark::new(), Mark::new()))
                 .fold_with(&mut hygiene())
                 .fold_with(&mut fixer(None));
 
@@ -110,7 +110,7 @@ impl Jsx {
             None => FileName::Anon,
         };
 
-        let fm = cm.new_source_file(filename, source.into());
+        let fm = cm.new_source_file(filename.into(), source.into());
 
         // NOTE: We're using a TypeScript lexer to parse JSX because it's a super-set
         // of JavaScript and we also want to support .tsx files.

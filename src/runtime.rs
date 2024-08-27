@@ -3,6 +3,7 @@ use crate::errors::report_and_exit;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::exceptions::ExceptionState;
+use crate::exceptions::PromiseRejectionEntry;
 use crate::hooks::host_import_module_dynamically_cb;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
@@ -68,8 +69,6 @@ pub struct JsRuntimeState {
     pub options: JsRuntimeOptions,
     /// Tracks wake event for current loop iteration.
     pub wake_event_queued: bool,
-    /// A structure responsible for providing inspector interface to the runtime.
-    pub inspector: Option<Rc<RefCell<JsRuntimeInspector>>>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -97,6 +96,8 @@ pub struct JsRuntime {
     /// A VM instance with its own heap.
     /// https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html
     isolate: v8::OwnedIsolate,
+    /// A structure responsible for providing inspector interface to the runtime.
+    pub inspector: Option<Rc<RefCell<JsRuntimeInspector>>>,
     /// The event-loop instance that takes care of polling for I/O.
     pub event_loop: EventLoop,
     /// The state of the runtime.
@@ -116,9 +117,8 @@ impl JsRuntime {
         let mut flags = String::from(concat!(
             " --no-validate-asm",
             " --turbo_fast_api_calls",
-            " --harmony-import-assertions",
-            " --harmony-array-from_async",
-            " --harmony-iterator-helpers",
+            " --harmony-temporal",
+            " --js-float16array",
         ));
 
         if let Some(seed) = options.seed {
@@ -192,7 +192,6 @@ impl JsRuntime {
             next_tick_queue: Vec::new(),
             exceptions: ExceptionState::new(),
             options,
-            inspector,
             wake_event_queued: false,
         }));
 
@@ -202,6 +201,7 @@ impl JsRuntime {
             isolate,
             event_loop,
             state,
+            inspector,
         };
 
         runtime.load_main_environment();
@@ -371,9 +371,7 @@ impl JsRuntime {
 
     /// Polls the inspector for new devtools messages.
     pub fn poll_inspect_session(&mut self) {
-        let state = self.get_state();
-        let mut state_rc = state.borrow_mut();
-        if let Some(inspector) = state_rc.inspector.as_mut() {
+        if let Some(inspector) = self.inspector.as_mut() {
             inspector.borrow_mut().poll_session();
         }
     }
@@ -601,9 +599,7 @@ impl JsRuntime {
 
     /// Returns the inspector created for the runtime.
     pub fn inspector(&mut self) -> Option<Rc<RefCell<JsRuntimeInspector>>> {
-        let state = self.get_state();
-        let state = state.borrow();
-        state.inspector.as_ref().cloned()
+        self.inspector.as_ref().cloned()
     }
 }
 
@@ -678,12 +674,16 @@ pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
         return Some(error);
     }
 
-    let promise_rejections = state_rc.borrow().exceptions.promise_rejections.to_owned();
+    let promise_rejections: Vec<PromiseRejectionEntry> = state_rc
+        .borrow_mut()
+        .exceptions
+        .promise_rejections
+        .drain(..)
+        .collect();
 
     // Then, check for unhandled rejections.
     for (promise, exception) in promise_rejections.iter() {
-        let mut state = state_rc.borrow_mut();
-        state.exceptions.promise_rejections.remove(promise);
+        let state = state_rc.borrow_mut();
         let promise = v8::Local::new(scope, promise);
         let exception = v8::Local::new(scope, exception);
 
