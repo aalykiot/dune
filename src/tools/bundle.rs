@@ -6,8 +6,7 @@ use anyhow::Error;
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::Path;
-use swc_atoms::js_word;
-use swc_atoms::JsWord;
+use swc_atoms::Atom;
 use swc_bundler::Bundler;
 use swc_bundler::Config;
 use swc_bundler::Load;
@@ -44,7 +43,7 @@ pub fn run_bundle(entry: &str, options: &Options) -> Result<String> {
 
     // NOTE: Core modules are built-in to dune's binary so there is no point to pollute
     // the bundle with extra code that the runtime can load anyway.
-    let external_modules: Vec<JsWord> = CORE_MODULES.keys().map(|k| (*k).into()).collect();
+    let external_modules: Vec<Atom> = CORE_MODULES.keys().map(|k| (*k).into()).collect();
 
     // Create the bundler.
     let mut bundler = Bundler::new(
@@ -193,7 +192,7 @@ impl swc_bundler::Hook for Hook {
         // Compute .main and .url properties.
         Ok(vec![
             KeyValueProp {
-                key: PropName::Ident(IdentName::new(js_word!("url"), span)),
+                key: PropName::Ident(IdentName::new("url".into(), span)),
                 value: Box::new(Expr::Lit(Lit::Str(Str {
                     span,
                     raw: None,
@@ -201,7 +200,7 @@ impl swc_bundler::Hook for Hook {
                 }))),
             },
             KeyValueProp {
-                key: PropName::Ident(IdentName::new(js_word!("main"), span)),
+                key: PropName::Ident(IdentName::new("main".into(), span)),
                 value: Box::new(if module.is_entry {
                     Expr::Member(MemberExpr {
                         span,
@@ -209,7 +208,7 @@ impl swc_bundler::Hook for Hook {
                             span,
                             kind: MetaPropKind::ImportMeta,
                         })),
-                        prop: MemberProp::Ident(IdentName::new(js_word!("main"), span)),
+                        prop: MemberProp::Ident(IdentName::new("main".into(), span)),
                     })
                 } else {
                     Expr::Lit(Lit::Bool(Bool { span, value: false }))
