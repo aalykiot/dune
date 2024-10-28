@@ -7,9 +7,11 @@ use swc_common::comments::SingleThreadedComments;
 use swc_common::errors::ColorConfig;
 use swc_common::errors::Handler;
 use swc_common::sync::Lrc;
+use swc_common::BytePos;
 use swc_common::FileName;
 use swc_common::FilePathMapping;
 use swc_common::Globals;
+use swc_common::LineCol;
 use swc_common::Mark;
 use swc_common::SourceMap;
 use swc_common::GLOBALS;
@@ -95,13 +97,8 @@ impl TypeScript {
             }
         });
 
-        // Turn source-map struct into a string representation.
-        let mut source_map_buf = Vec::new();
-        let source_map = cm.build_source_map(&source_map);
-        source_map.to_writer(&mut source_map_buf).unwrap();
-
         // Prepare the inline source map comment.
-        let source_map = String::from_utf8_lossy(&source_map_buf).to_string();
+        let source_map = source_map_to_string(cm, &source_map);
         let source_map = BASE64_STANDARD.encode(source_map.as_bytes());
         let source_map = format!(
             "//# sourceMappingURL=data:application/json;base64,{}",
@@ -193,13 +190,8 @@ impl Jsx {
             }
         });
 
-        // Turn source-map struct into a string representation.
-        let mut source_map_buf = Vec::new();
-        let source_map = cm.build_source_map(&source_map);
-        source_map.to_writer(&mut source_map_buf).unwrap();
-
         // Prepare the inline source map comment.
-        let source_map = String::from_utf8_lossy(&source_map_buf).to_string();
+        let source_map = source_map_to_string(cm, &source_map);
         let source_map = BASE64_STANDARD.encode(source_map.as_bytes());
         let source_map = format!(
             "//# sourceMappingURL=data:application/json;base64,{}",
@@ -228,4 +220,12 @@ impl Wasm {
             source.as_bytes()
         )
     }
+}
+
+/// Returns the string (JSON) representation of the source-map.
+fn source_map_to_string(cm: Lrc<SourceMap>, mappings: &[(BytePos, LineCol)]) -> String {
+    let mut buffer = Vec::new();
+    let source_map = cm.build_source_map(mappings);
+    source_map.to_writer(&mut buffer).unwrap();
+    String::from_utf8_lossy(&buffer).to_string()
 }
