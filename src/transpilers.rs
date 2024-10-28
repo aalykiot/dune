@@ -121,7 +121,7 @@ impl Jsx {
     /// Compiles JSX code into JavaScript.
     pub fn compile(filename: Option<&str>, source: &str) -> Result<String> {
         let globals = Globals::default();
-        let cm: Lrc<SourceMap> = Default::default();
+        let cm: Lrc<SourceMap> = Lrc::new(SourceMap::new(FilePathMapping::empty()));
         let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(cm.clone()));
 
         let filename = match filename {
@@ -157,7 +157,8 @@ impl Jsx {
         };
 
         // This is where we're gonna store the JavaScript output.
-        let mut buffer = vec![];
+        let mut output = vec![];
+        let mut source_map = vec![];
 
         // Look for the JSX pragma in the source code.
         // https://www.gatsbyjs.com/blog/2019-08-02-what-is-jsx-pragma/
@@ -185,14 +186,30 @@ impl Jsx {
                     cfg: swc_ecma_codegen::Config::default(),
                     cm: cm.clone(),
                     comments: None,
-                    wr: JsWriter::new(cm, "\n", &mut buffer, None),
+                    wr: JsWriter::new(cm.clone(), "\n", &mut output, Some(&mut source_map)),
                 };
 
                 emitter.emit_module(&module).unwrap();
             }
         });
 
-        Ok(String::from_utf8_lossy(&buffer).to_string())
+        // Turn source-map struct into a string representation.
+        let mut source_map_buf = Vec::new();
+        let source_map = cm.build_source_map(&source_map);
+        source_map.to_writer(&mut source_map_buf).unwrap();
+
+        // Prepare the inline source map comment.
+        let source_map = String::from_utf8_lossy(&source_map_buf).to_string();
+        let source_map = BASE64_STANDARD.encode(source_map.as_bytes());
+        let source_map = format!(
+            "//# sourceMappingURL=data:application/json;base64,{}",
+            source_map
+        );
+
+        let code = String::from_utf8_lossy(&output).to_string();
+        let output = format!("{}\n{}", code, source_map);
+
+        Ok(output)
     }
 }
 
