@@ -445,7 +445,7 @@ Currently, there is no extension available for Dune in VS Code. However, you can
 ```
 
 > [!WARNING]
-> Currently, there is a known bug in the inspector that causes Dune to panic with a double free error when either the debugging client disconnects or the program terminates. Despite extensive investigation, the root cause remains unresolved.
+> Currently, there is a known bug in the inspector that causes Dune to panic with a segmentation fault when either the debugging client disconnects or the program terminates. Despite extensive investigation, I have not yet identified the underlying cause.
 
 ## Contributing
 
