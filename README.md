@@ -444,7 +444,8 @@ Currently, there is no extension available for Dune in VS Code. However, you can
 }
 ```
 
-> Unfortunately, debugging TypeScript programs in Dune is currently suboptimal due to the absence of source maps during the transpilation process to JavaScript. :(
+> [!WARNING]
+> Currently, there is a known bug in the inspector that causes Dune to panic with a double free error when either the debugging client disconnects or the program terminates. Despite extensive investigation, the root cause remains unresolved.
 
 ## Contributing
 
