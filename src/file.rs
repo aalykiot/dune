@@ -11,9 +11,9 @@ use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::Result;
 use dune_event_loop::FsEvent;
+use dune_event_loop::FsEventKind;
 use dune_event_loop::LoopHandle;
 use dune_event_loop::TaskResult;
-use notify::EventKind;
 use serde::Deserialize;
 use serde::Serialize;
 use std::ffi::OsString;
@@ -1100,12 +1100,12 @@ impl JsFuture for WatchFuture {
 
         // Format the event type.
         let kind = match self.event.kind {
-            EventKind::Any => v8::String::new(scope, "any"),
-            EventKind::Access(_) => v8::String::new(scope, "access"),
-            EventKind::Create(_) => v8::String::new(scope, "create"),
-            EventKind::Modify(_) => v8::String::new(scope, "modify"),
-            EventKind::Remove(_) => v8::String::new(scope, "remove"),
-            EventKind::Other => v8::String::new(scope, "other"),
+            FsEventKind::Any => v8::String::new(scope, "any"),
+            FsEventKind::Access(_) => v8::String::new(scope, "access"),
+            FsEventKind::Create(_) => v8::String::new(scope, "create"),
+            FsEventKind::Modify(_) => v8::String::new(scope, "modify"),
+            FsEventKind::Remove(_) => v8::String::new(scope, "remove"),
+            FsEventKind::Other => v8::String::new(scope, "other"),
         };
 
         let event = v8::Object::new(scope);
