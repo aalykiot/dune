@@ -28,7 +28,6 @@ use swc_ecma_transforms_base::resolver;
 use swc_ecma_transforms_react::react;
 use swc_ecma_transforms_react::Options;
 use swc_ecma_transforms_typescript::strip;
-use swc_ecma_visit::FoldWith;
 
 lazy_static! {
     static ref PRAGMA_REGEX: Regex = Regex::new(r"@jsx\s+([^\s]+)").unwrap();
@@ -42,6 +41,7 @@ impl TypeScript {
         let globals = Globals::default();
         let cm: Lrc<SourceMap> = Lrc::new(SourceMap::new(FilePathMapping::empty()));
         let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(cm.clone()));
+        let comments = SingleThreadedComments::default();
 
         let filename = match filename {
             Some(filename) => FileName::Custom(filename.into()),
@@ -78,12 +78,21 @@ impl TypeScript {
         let mut source_map = vec![];
 
         GLOBALS.set(&globals, || {
-            // Apply the rest SWC transforms to generated code.
+            // We're gonna apply the following transformations.
+            //
+            // 1. Conduct identifier scope analysis.
+            // 2. Remove typescript types.
+            // 3. Fix up any identifiers with the same name, but different contexts.
+            // 4. Ensure that we have enough parenthesis.
+            //
+            let unresolved_mark = Mark::new();
+            let top_level_mark = Mark::new();
+
             let program = program
-                .fold_with(&mut resolver(Mark::new(), Mark::new(), true))
-                .fold_with(&mut strip(Mark::new(), Mark::new()))
-                .fold_with(&mut hygiene())
-                .fold_with(&mut fixer(None));
+                .apply(resolver(unresolved_mark, top_level_mark, true))
+                .apply(strip(unresolved_mark, top_level_mark))
+                .apply(hygiene())
+                .apply(fixer(Some(&comments)));
 
             {
                 let mut emitter = Emitter {
@@ -120,6 +129,7 @@ impl Jsx {
         let globals = Globals::default();
         let cm: Lrc<SourceMap> = Lrc::new(SourceMap::new(FilePathMapping::empty()));
         let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(cm.clone()));
+        let comments = SingleThreadedComments::default();
 
         let filename = match filename {
             Some(filename) => FileName::Custom(filename.into()),
@@ -145,8 +155,8 @@ impl Jsx {
 
         let mut parser = Parser::new_from(lexer);
 
-        let module = match parser
-            .parse_module()
+        let program = match parser
+            .parse_program()
             .map_err(|e| e.into_diagnostic(&handler).emit())
         {
             Ok(module) => module,
@@ -166,17 +176,26 @@ impl Jsx {
             .map(|m| m.as_str().to_string().replace("@jsx ", ""));
 
         GLOBALS.set(&globals, || {
-            // Apply SWC transforms to given code.
-            let module = module.fold_with(&mut react::<SingleThreadedComments>(
-                cm.clone(),
-                None,
-                Options {
-                    pragma,
-                    ..Default::default()
-                },
-                Mark::new(),
-                Mark::new(),
-            ));
+            // We're gonna apply the following transformations.
+            //
+            // 1. Conduct identifier scope analysis.
+            // 2. Turn JSX into plan JS code.
+            //
+            let unresolved_mark = Mark::new();
+            let top_level_mark = Mark::new();
+
+            let program = program
+                .apply(resolver(unresolved_mark, top_level_mark, true))
+                .apply(react(
+                    cm.clone(),
+                    Some(&comments),
+                    Options {
+                        pragma,
+                        ..Default::default()
+                    },
+                    top_level_mark,
+                    unresolved_mark,
+                ));
 
             {
                 let mut emitter = Emitter {
@@ -186,7 +205,7 @@ impl Jsx {
                     wr: JsWriter::new(cm.clone(), "\n", &mut output, Some(&mut source_map)),
                 };
 
-                emitter.emit_module(&module).unwrap();
+                emitter.emit_program(&program).unwrap();
             }
         });
 
