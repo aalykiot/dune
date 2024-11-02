@@ -714,22 +714,18 @@ dependencies = [
  "colored",
  "dirs 5.0.1",
  "dns-lookup",
- "downcast-rs",
  "dune_event_loop",
  "enable-ansi-support",
  "futures",
  "httparse",
  "indicatif",
  "lazy_static",
- "nanoid",
  "nix 0.29.0",
  "notify",
  "path-absolutize",
- "path-clean",
  "pest",
  "pest_derive",
  "phf",
- "rayon",
  "regex",
  "rustyline",
  "rustyline-derive",
@@ -1493,15 +1489,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nanoid"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ffa00dec017b5b1a8b7cf5e2c008bfda1aa7e0697ac1508b491fdf2622fb4d8"
-dependencies = [
- "rand 0.8.5",
-]
-
-[[package]]
 name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1687,12 +1674,6 @@ checksum = "e4af381fe79fa195b4909485d99f73a80792331df0625188e707854f0b3383f5"
 dependencies = [
  "path-dedot",
 ]
-
-[[package]]
-name = "path-clean"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17359afc20d7ab31fdb42bb844c8b3bb1dabd7dcf7e68428492da7f16966fcef"
 
 [[package]]
 name = "path-dedot"
