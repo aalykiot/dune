@@ -1,4 +1,6 @@
 use anyhow::Result;
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
 use std::fs;
 use std::io::Read;
 use std::process::Command;
@@ -33,14 +35,44 @@ pub fn run_upgrade() -> Result<()> {
     // Download the new binary.
     let response = ureq::get(&download_url).call()?;
 
-    let mut binary = vec![];
-    response.into_reader().read_to_end(&mut binary)?;
+    let total_bytes = response
+        .header("content-length")
+        .and_then(|len| len.parse::<u64>().ok())
+        .unwrap_or(0);
+
+    // Create a buffer and read in chunks.
+    let mut reader = response.into_reader();
+    let mut buffer = [0; 8192];
+    let mut downloaded_data = vec![];
+    let mut downloaded: u64 = 0;
+
+    // Display a progress bar when downloading for better UX.
+    let pb = ProgressBar::new(total_bytes);
+    let pb_template =
+        "{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes}";
+
+    pb.set_style(
+        ProgressStyle::with_template(pb_template)
+            .unwrap()
+            .progress_chars("#>-"),
+    );
+
+    while let Ok(bytes_read) = reader.read(&mut buffer) {
+        if bytes_read == 0 {
+            break;
+        }
+        downloaded_data.extend_from_slice(&buffer);
+        downloaded += bytes_read as u64;
+        pb.set_position(downloaded);
+    }
+
+    pb.finish_and_clear();
 
     // Get handles to temp and home directories.
     let temp_dir = TempDir::new("dune_zip_binary")?;
 
     // Write binary to disk.
-    fs::write(temp_dir.path().join(&archive), binary)?;
+    fs::write(temp_dir.path().join(&archive), downloaded_data)?;
 
     let exe_name = "dune";
     let exe_extension = if cfg!(windows) { "exe" } else { "" };
