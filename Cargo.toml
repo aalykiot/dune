@@ -38,7 +38,7 @@ swc_common = { version = "2.0.1", features = ["tty-emitter", "sourcemap"] }
 swc_ecma_codegen = "2.0.0"
 swc_ecma_parser = "3.0.1"
 swc_ecma_transforms_base = "3.0.1"
-swc_ecma_transforms_typescript = "3.0.0"
+swc_ecma_transforms_typescript = "6.0.0"
 swc_ecma_transforms_react = "3.0.0"
 swc_bundler = "3.0.0"
 swc_ecma_ast = "2.0.0"
