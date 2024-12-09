@@ -22,7 +22,7 @@ v8 = { version = "129.0.0", default-features = false }
 clap = { version = "4.5.20", features = ["derive"] }
 anyhow = "1.0.90"
 colored = "2.1.0"
-rustyline = "14.0.0"
+rustyline = "15.0.0"
 rustyline-derive = "0.10.0"
 lazy_static = "1.5.0"
 sha = "1.0.3"
