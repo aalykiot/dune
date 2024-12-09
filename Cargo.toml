@@ -52,7 +52,7 @@ tempdir = "0.3.7"
 zstd = "0.13.2"
 notify = "7.0.0"
 httparse = "1.9.5"
-pest = "2.7.14"
+pest = "2.7.15"
 pest_derive = "2.7.14"
 futures = "0.3.31"
 tokio = { version = "1.40.0", features = ["full"] }
