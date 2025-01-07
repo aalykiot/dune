@@ -15,6 +15,7 @@ use rustyline::Editor;
 use rustyline_derive::Completer;
 use rustyline_derive::Helper;
 use rustyline_derive::Hinter;
+use rustyline::highlight::CmdKind;
 use std::borrow::Cow;
 use std::fs;
 use std::sync::mpsc;
@@ -114,7 +115,7 @@ impl Highlighter for RLHelper {
         self.highlighter.highlight(candidate, 0)
     }
 
-    fn highlight_char(&self, line: &str, _: usize, _: bool) -> bool {
+    fn highlight_char(&self, line: &str, _: usize, _: CmdKind) -> bool {
         !line.is_empty()
     }
 }
