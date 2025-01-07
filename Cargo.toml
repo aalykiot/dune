@@ -1,6 +1,6 @@
 [package]
 name = "dune"
-version = "0.9.1"
+version = "0.9.2"
 authors = ["Alex Alikiotis <alexalikiotis5@gmail.com>"]
 edition = "2021"
 license = "MIT"
