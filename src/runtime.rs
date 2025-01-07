@@ -565,6 +565,16 @@ impl JsRuntime {
     }
 }
 
+impl std::ops::Drop for JsRuntime {
+    fn drop(&mut self) {
+        // HACK: This is a BIGGGG hack to prevent V8 from segfaulting when the inspector
+        // is discarded. The exact cause is unclear, but avoiding manual memory cleanup
+        // and allowing the the OS to handle memory purging at the program's
+        // termination resolves the issue.
+        std::mem::forget(self.inspector.take());
+    }
+}
+
 // State management specific methods.
 // https://github.com/lmt-swallow/puppy-browser/blob/main/src/javascript/runtime.rs
 
