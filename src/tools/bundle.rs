@@ -111,7 +111,7 @@ struct Loader<'s> {
     options: &'s Options,
 }
 
-impl<'s> Load for Loader<'s> {
+impl Load for Loader<'_> {
     fn load(&self, file: &FileName) -> Result<ModuleData, Error> {
         // We only dealing with `Real` filenames.
         let specifier = match file {
@@ -153,7 +153,7 @@ struct Resolver<'a> {
     options: &'a Options,
 }
 
-impl<'a> Resolve for Resolver<'a> {
+impl Resolve for Resolver<'_> {
     fn resolve(&self, base: &FileName, specifier: &str) -> Result<Resolution, Error> {
         // We only dealing with `Real` filenames.
         let base = match base {
