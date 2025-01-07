@@ -6,6 +6,7 @@ use phf::Set;
 use regex::Captures;
 use regex::Regex;
 use rustyline::error::ReadlineError;
+use rustyline::highlight::CmdKind;
 use rustyline::highlight::Highlighter;
 use rustyline::validate::MatchingBracketValidator;
 use rustyline::validate::ValidationContext;
@@ -114,7 +115,7 @@ impl Highlighter for RLHelper {
         self.highlighter.highlight(candidate, 0)
     }
 
-    fn highlight_char(&self, line: &str, _: usize, _: bool) -> bool {
+    fn highlight_char(&self, line: &str, _: usize, _: CmdKind) -> bool {
         !line.is_empty()
     }
 }

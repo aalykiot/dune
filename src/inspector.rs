@@ -476,6 +476,7 @@ async fn websocket(socket: WebSocket, state: AppState) {
     let mut receive_task = tokio::spawn(async move {
         while let Some(Ok(Message::Text(data))) = receiver.next().await {
             // Wake up the event-loop if necessary.
+            let data = data.to_string();
             let _ = inbound_tx.send(FrontendMessage::Command(data.clone()));
             handle.interrupt();
 
@@ -490,7 +491,7 @@ async fn websocket(socket: WebSocket, state: AppState) {
     let mut send_task = tokio::spawn(async move {
         while let Ok(message) = outbound_tx.recv().await {
             // In any websocket error, break loop.
-            if sender.send(Message::Text(message)).await.is_err() {
+            if sender.send(Message::Text(message.into())).await.is_err() {
                 break;
             }
         }
