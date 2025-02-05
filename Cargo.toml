@@ -57,7 +57,7 @@ pest_derive = "2.7.15"
 futures = "0.3.31"
 tokio = { version = "1.42.0", features = ["full"] }
 axum = { version = "0.8.1", features = ["ws"] }
-uuid = { version = "1.11.0", features = ["v4", "fast-rng"] }
+uuid = { version = "1.13.1", features = ["v4", "fast-rng"] }
 base64 = "0.22.1"
 indicatif = "0.17.9"
 
