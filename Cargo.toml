@@ -18,7 +18,7 @@ git = "https://github.com/aalykiot/dune-event-loop"
 branch = "main"
 
 [dependencies]
-v8 = { version = "130.0.6", default-features = false }
+v8 = { version = "135.0.0", default-features = false }
 clap = { version = "4.5.24", features = ["derive"] }
 anyhow = "1.0.95"
 colored = "3.0.0"
