@@ -210,7 +210,7 @@ impl ModuleLoader for UrlModuleLoader {
         println!("{} {}", "Downloading".green(), specifier);
 
         // Download file and, save it to cache.
-        let source = match ureq::get(specifier).call()?.into_string() {
+        let source = match ureq::get(specifier).call()?.body_mut().read_to_string() {
             Ok(source) => source,
             Err(_) => bail!(format!("Module not found \"{specifier}\"")),
         };
