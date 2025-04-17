@@ -310,6 +310,31 @@ Body Mixins
 - [x] `timeOrigin`: Specifies the millisecond timestamp at which the current process began.
 - [x] `now()`: Returns the millisecond timestamp, where 0 represents the start of the current process.
 
+### SQLite
+
+> All APIs exposed by this module execute synchronously.
+
+#### `sqlite.Database`
+
+- [ ] `open()`: Opens the database specified in the constructor.
+- [ ] `loadExtension(path)`: Loads a shared library into the database connection.
+- [ ] `enableLoadExtension(flag)`: Enables or disables the loadExtension SQL function.
+- [ ] `exec(sql)`: SQL statements to be executed without returning any results.
+- [ ] `prepare(sql)`: Compiles a SQL statement into a [prepared statement](https://sqlite.org/c3ref/stmt.html).
+- [ ] `close()`: Closes the database connection.
+- [ ] `isOpen`: Whether the database is currently open or not.
+
+#### `sqlite.Statement`
+
+- [ ] `run(...params?)`: Executes a prepared statement and returns the resulting changes.
+- [ ] `columns()`: Used to retrieve information about the columns.
+- [ ] `all(...params?)`: Executes a prepared statement and returns all results.
+- [ ] `get(...params?)`: Returns the first result.
+- [ ] `iterate(...params?)`: Returns an iterator with the results.
+- [ ] `setReadBigInts(flag)`: Enables or disables the use of `BigInt`s when reading `INTEGER` fields.
+- [ ] `sourceSQL`: The source SQL text of the prepared statement.
+- [ ] `expandedSQL`: The source SQL text of the prepared statement with parameter placeholders replaced.
+
 ### Test Runner
 
 - [x] `test(description, [options], testFn)`: Registers a test with the default test runner.
