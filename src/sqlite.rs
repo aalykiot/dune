@@ -3,8 +3,11 @@ use crate::bindings::set_function_to;
 use crate::bindings::set_internal_ref;
 use crate::bindings::throw_exception;
 use anyhow::anyhow;
+use anyhow::Result;
 use rusqlite::Connection;
+use rusqlite::LoadExtensionGuard;
 use rusqlite::OpenFlags;
+use std::path::Path;
 use std::rc::Rc;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
@@ -13,6 +16,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 
     set_function_to(scope, target, "open", open);
     set_function_to(scope, target, "enable_extentions", enable_extentions);
+    set_function_to(scope, target, "load_extension", load_extension);
     set_function_to(scope, target, "close", close);
 
     // Return v8 global handle.
@@ -123,6 +127,31 @@ fn enable_extentions(
     }
 }
 
+/// Loads a shared library into an SQLite database.
+fn load_extension(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    // Get the connection and extension path.
+    let connection_wrap = args.get(0).to_object(scope).unwrap();
+    let path = args.get(1).to_rust_string_lossy(scope);
+
+    // Extract the connection from V8 handle.
+    let connection = get_internal_ref::<Rc<Option<Connection>>>(scope, connection_wrap, 0);
+    let connection = match connection.as_ref() {
+        Some(connection) => connection,
+        None => {
+            throw_exception(scope, &anyhow!("Connection is closed."));
+            return;
+        }
+    };
+
+    if let Err(e) = load_sqlite_extetnion_op(connection, path) {
+        throw_exception(scope, &anyhow!(e));
+    }
+}
+
 /// Closes the database connection.
 fn close(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get the connection wrap object.
@@ -131,4 +160,14 @@ fn close(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8
 
     // Drop the connection.
     drop(std::mem::take(connection));
+}
+
+// Load the SQLite extension.
+// https://docs.rs/rusqlite/latest/rusqlite/struct.Connection.html#example-11
+fn load_sqlite_extetnion_op<P: AsRef<Path>>(conn: &Connection, path: P) -> Result<()> {
+    // Safety: we don't execute any SQL statements while
+    // extension loading is enabled.
+    let _guard = unsafe { LoadExtensionGuard::new(conn)? };
+
+    unsafe { conn.load_extension(path, None).map_err(|e| anyhow!(e)) }
 }
