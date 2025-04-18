@@ -1,3 +1,4 @@
+use crate::bindings::get_internal_ref;
 use crate::bindings::set_function_to;
 use crate::bindings::set_internal_ref;
 use crate::bindings::throw_exception;
@@ -11,6 +12,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     let target = v8::Object::new(scope);
 
     set_function_to(scope, target, "open", open);
+    set_function_to(scope, target, "close", close);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
@@ -32,7 +34,7 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
         flags.insert(OpenFlags::SQLITE_OPEN_READ_ONLY);
     }
 
-    // Note: When the ":memory:" is provided as path we should open the
+    // When the ":memory:" is provided as path we should open the
     // DB connection in memory.
     let connection = match path.as_str() {
         ":memory:" => Connection::open_in_memory_with_flags(flags),
@@ -79,8 +81,18 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
         }),
     );
 
-    set_internal_ref(scope, connection_wrap, 0, Some(connection));
-    set_internal_ref(scope, connection_wrap, 1, Some(connection_weak));
+    set_internal_ref(scope, connection_wrap, 0, connection);
+    set_internal_ref(scope, connection_wrap, 1, connection_weak);
 
     rv.set(connection_wrap.into());
+}
+
+/// Closes the database connection.
+fn close(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+    // Get the connection wrap object.
+    let connection_wrap = args.get(0).to_object(scope).unwrap();
+    let connection = get_internal_ref::<Rc<Option<Connection>>>(scope, connection_wrap, 0);
+
+    // Drop the connection.
+    drop(std::mem::take(connection));
 }
