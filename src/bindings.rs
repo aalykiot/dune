@@ -12,6 +12,7 @@ use crate::promise;
 use crate::runtime::check_exceptions;
 use crate::runtime::JsRuntime;
 use crate::signals;
+use crate::sqlite;
 use crate::stdio;
 use crate::timers;
 use anyhow::Error;
@@ -35,6 +36,7 @@ lazy_static! {
             ("http_parser", http_parser::initialize),
             ("signals", signals::initialize),
             ("exceptions", exceptions::initialize),
+            ("sqlite", sqlite::initialize),
         ];
         HashMap::from_iter(bindings.into_iter())
     };

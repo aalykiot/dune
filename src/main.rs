@@ -17,6 +17,7 @@ mod promise;
 mod repl;
 mod runtime;
 mod signals;
+mod sqlite;
 mod stdio;
 mod timers;
 mod tools;
