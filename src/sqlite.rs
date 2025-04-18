@@ -12,6 +12,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     let target = v8::Object::new(scope);
 
     set_function_to(scope, target, "open", open);
+    set_function_to(scope, target, "enable_extentions", enable_extentions);
     set_function_to(scope, target, "close", close);
 
     // Return v8 global handle.
@@ -85,6 +86,41 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     set_internal_ref(scope, connection_wrap, 1, connection_weak);
 
     rv.set(connection_wrap.into());
+}
+
+/// Enables or disables loading extetnions to SQLite.
+fn enable_extentions(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _: v8::ReturnValue,
+) {
+    // Get the connection and flag from the params.
+    let connection_wrap = args.get(0).to_object(scope).unwrap();
+    let allow = args.get(1).to_boolean(scope);
+
+    // Extract the connection from V8 handle.
+    let connection = get_internal_ref::<Rc<Option<Connection>>>(scope, connection_wrap, 0);
+    let connection = match connection.as_ref() {
+        Some(connection) => connection,
+        None => {
+            throw_exception(scope, &anyhow!("Connection is closed."));
+            return;
+        }
+    };
+
+    // Try enable extentions for the SQLite database.
+    if allow.is_true() {
+        unsafe {
+            if let Err(e) = connection.load_extension_enable() {
+                throw_exception(scope, &anyhow!(e));
+                return;
+            }
+        }
+    }
+
+    if let Err(e) = connection.load_extension_disable() {
+        throw_exception(scope, &anyhow!(e));
+    }
 }
 
 /// Closes the database connection.
