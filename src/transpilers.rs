@@ -3,6 +3,7 @@ use anyhow::Result;
 use base64::prelude::*;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::rc::Rc;
 use swc_common::comments::SingleThreadedComments;
 use swc_common::errors::ColorConfig;
 use swc_common::errors::Handler;
@@ -173,7 +174,7 @@ impl Jsx {
         let pragma = PRAGMA_REGEX
             .find_iter(source)
             .next()
-            .map(|m| m.as_str().to_string().replace("@jsx ", ""));
+            .map(|m| Rc::new(m.as_str().to_string().replace("@jsx ", "")));
 
         GLOBALS.set(&globals, || {
             // We're gonna apply the following transformations.
