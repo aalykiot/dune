@@ -15,6 +15,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     let target = v8::Object::new(scope);
 
     set_function_to(scope, target, "open", open);
+    set_function_to(scope, target, "execute", execute);
     set_function_to(scope, target, "enable_extentions", enable_extentions);
     set_function_to(scope, target, "load_extension", load_extension);
     set_function_to(scope, target, "close", close);
@@ -90,6 +91,28 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     set_internal_ref(scope, connection_wrap, 1, connection_weak);
 
     rv.set(connection_wrap.into());
+}
+
+/// Run multiple SQL statements (that cannot take any parameters).
+fn execute(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+    // Get connection and SQL query.
+    let connection_wrap = args.get(0).to_object(scope).unwrap();
+    let sql = args.get(1).to_rust_string_lossy(scope);
+
+    // Extract the connection from V8 handle.
+    let connection = get_internal_ref::<Rc<Option<Connection>>>(scope, connection_wrap, 0);
+    let connection = match connection.as_ref() {
+        Some(connection) => connection,
+        None => {
+            throw_exception(scope, &anyhow!("Connection is closed."));
+            return;
+        }
+    };
+
+    // Execute SQL (batch) query.
+    if let Err(e) = connection.execute_batch(&sql) {
+        throw_exception(scope, &anyhow!(e));
+    }
 }
 
 /// Enables or disables loading extetnions to SQLite.
