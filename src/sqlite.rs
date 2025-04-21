@@ -7,9 +7,17 @@ use anyhow::Result;
 use rusqlite::Connection;
 use rusqlite::LoadExtensionGuard;
 use rusqlite::OpenFlags;
+use rusqlite::Statement;
 use std::cell::Cell;
+use std::cell::RefCell;
+use std::cell::RefMut;
+use std::collections::HashMap;
+use std::ops::Deref;
+use std::ops::DerefMut;
+use std::ops::Drop;
 use std::path::Path;
 use std::rc::Rc;
+use uuid::Uuid;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     // Create local JS object.
@@ -17,12 +25,61 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 
     set_function_to(scope, target, "open", open);
     set_function_to(scope, target, "execute", execute);
+    set_function_to(scope, target, "prepare", prepare);
     set_function_to(scope, target, "enable_extentions", enable_extentions);
     set_function_to(scope, target, "load_extension", load_extension);
     set_function_to(scope, target, "close", close);
 
     // Return v8 global handle.
     v8::Global::new(scope, target)
+}
+
+type StatementMap<'s> = HashMap<Uuid, Statement<'s>>;
+
+/// A connection wrapper that also stores SQLite prepared statements.
+struct SQLiteConnection<'s> {
+    // The actual SQLite connection.
+    conn: Option<Connection>,
+    // Prepared statements associated with the connection.
+    statements: RefCell<StatementMap<'s>>,
+}
+
+impl<'s> SQLiteConnection<'s> {
+    // Creates a new SQLite connection wrapper.
+    pub fn new(conn: Connection) -> Self {
+        SQLiteConnection {
+            conn: Some(conn),
+            statements: RefCell::new(HashMap::new()),
+        }
+    }
+
+    // Returns a mut reference to statements.
+    pub fn statements(&self) -> RefMut<'s, StatementMap> {
+        self.statements.borrow_mut()
+    }
+}
+
+impl<'s> Drop for SQLiteConnection<'s> {
+    // Note: We need to first drop all the prepared statements tied
+    // to the connection and then the connection itself.
+    fn drop(&mut self) {
+        self.statements.borrow_mut().clear();
+    }
+}
+
+impl<'s> Deref for SQLiteConnection<'s> {
+    // We should return a ref to the inner connection.
+    type Target = Option<Connection>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.conn
+    }
+}
+
+impl<'s> DerefMut for SQLiteConnection<'s> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.conn
+    }
 }
 
 /// Opens a new connection to an SQLite database.
@@ -50,7 +107,7 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
 
     let connection_wrap = v8::ObjectTemplate::new(scope);
     let connection = match connection {
-        Ok(conn) => conn,
+        Ok(conn) => SQLiteConnection::new(conn),
         Err(e) => {
             throw_exception(scope, &anyhow!(e));
             return;
@@ -61,7 +118,8 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
     // enable it here only if the caller requests it during initialization.
     if allow_extention.is_true() {
         unsafe {
-            if let Err(e) = connection.load_extension_enable() {
+            // We know connection is not None.
+            if let Err(e) = connection.as_ref().unwrap().load_extension_enable() {
                 throw_exception(scope, &anyhow!(e));
                 return;
             }
@@ -72,7 +130,7 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
 
     // Store Rust instance inside a V8 handle.
     let connection_wrap = connection_wrap.new_instance(scope).unwrap();
-    let connection_ptr = set_internal_ref(scope, connection_wrap, 0, Some(connection));
+    let connection_ptr = set_internal_ref(scope, connection_wrap, 0, connection);
     let weak_rc = Rc::new(Cell::new(None));
 
     // Note: To automatically close the connection (i.e., drop the instance) when
@@ -104,7 +162,7 @@ fn execute(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: 
     let sql = args.get(1).to_rust_string_lossy(scope);
 
     // Extract connection and execute SQL (batch) query.
-    let connection = get_internal_ref::<Option<Connection>>(scope, connection, 0);
+    let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
     let connection = match connection.as_ref() {
         Some(connection) => connection,
         None => {
@@ -118,6 +176,38 @@ fn execute(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: 
     }
 }
 
+/// Compiles a SQL statement into a prepared statement.
+fn prepare(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get connection and SQL query.
+    let connection = args.get(0).to_object(scope).unwrap();
+    let sql = args.get(1).to_rust_string_lossy(scope);
+
+    // Compile a new SQL statement.
+    let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
+    let statement = match connection.as_ref() {
+        Some(connection) => connection.prepare(&sql).map_err(|e| anyhow!(e)),
+        None => Err(anyhow!("Connection is closed.")),
+    };
+
+    let (id, statement) = match statement {
+        Ok(statement) => (Uuid::new_v4(), statement),
+        Err(e) => {
+            throw_exception(scope, &anyhow!(e));
+            return;
+        }
+    };
+
+    // Save SQL prepared statement into the hash-map.
+    let _ = connection.statements().insert(id.clone(), statement);
+    let reference = v8::String::new(scope, &id.to_string()).unwrap();
+
+    rv.set(reference.into());
+}
+
 /// Enables or disables loading extetnions to SQLite.
 fn enable_extentions(
     scope: &mut v8::HandleScope,
@@ -128,7 +218,7 @@ fn enable_extentions(
     let connection = args.get(0).to_object(scope).unwrap();
     let allow = args.get(1).to_boolean(scope);
 
-    let connection = get_internal_ref::<Option<Connection>>(scope, connection, 0);
+    let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
     let connection = match connection.as_ref() {
         Some(connection) => connection,
         None => {
@@ -162,7 +252,7 @@ fn load_extension(
     let connection = args.get(0).to_object(scope).unwrap();
     let path = args.get(1).to_rust_string_lossy(scope);
 
-    let connection = get_internal_ref::<Option<Connection>>(scope, connection, 0);
+    let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
     let connection = match connection.as_ref() {
         Some(connection) => connection,
         None => {
@@ -180,7 +270,7 @@ fn load_extension(
 fn close(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get the connection wrap object.
     let connection = args.get(0).to_object(scope).unwrap();
-    let connection = get_internal_ref::<Option<Connection>>(scope, connection, 0);
+    let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
     let connection = match connection.take() {
         Some(connection) => connection,
         None => {
