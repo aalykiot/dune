@@ -45,21 +45,21 @@ swc_ecma_ast = "8.1.2"
 swc_ecma_loader = "8.0.0"
 swc_atoms = "5.0.0"
 swc_ecma_transforms = "15.0.0"
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.135"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
 dns-lookup = "2.0.4"
 tempdir = "0.3.7"
-zstd = "0.13.2"
+zstd = "0.13.3"
 notify = "8.0.0"
-httparse = "1.9.5"
-pest = "2.7.15"
-pest_derive = "2.7.15"
+httparse = "1.10.1"
+pest = "2.8.0"
+pest_derive = "2.8.0"
 futures = "0.3.31"
-tokio = { version = "1.42.0", features = ["full"] }
-axum = { version = "0.8.1", features = ["ws"] }
+tokio = { version = "1.42.1", features = ["full"] }
+axum = { version = "0.8.3", features = ["ws"] }
 uuid = { version = "1.16.0", features = ["v4", "fast-rng"] }
 base64 = "0.22.1"
-indicatif = "0.17.9"
+indicatif = "0.17.11"
 rusqlite = { version = "0.34.0", features = ["bundled", "load_extension"] }
 
 [target.'cfg(unix)'.dependencies]

@@ -59,7 +59,7 @@ impl<'s> SQLiteConnection<'s> {
     }
 }
 
-impl<'s> Drop for SQLiteConnection<'s> {
+impl Drop for SQLiteConnection<'_> {
     // Note: We need to first drop all the prepared statements tied
     // to the connection and then the connection itself.
     fn drop(&mut self) {
@@ -67,7 +67,7 @@ impl<'s> Drop for SQLiteConnection<'s> {
     }
 }
 
-impl<'s> Deref for SQLiteConnection<'s> {
+impl Deref for SQLiteConnection<'_> {
     // We should return a ref to the inner connection.
     type Target = Option<Connection>;
 
@@ -76,7 +76,7 @@ impl<'s> Deref for SQLiteConnection<'s> {
     }
 }
 
-impl<'s> DerefMut for SQLiteConnection<'s> {
+impl DerefMut for SQLiteConnection<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.conn
     }
@@ -202,7 +202,7 @@ fn prepare(
     };
 
     // Save SQL prepared statement into the hash-map.
-    let _ = connection.statements().insert(id.clone(), statement);
+    let _ = connection.statements().insert(id, statement);
     let reference = v8::String::new(scope, &id.to_string()).unwrap();
 
     rv.set(reference.into());
