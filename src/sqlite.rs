@@ -7,6 +7,7 @@ use anyhow::Result;
 use rusqlite::Connection;
 use rusqlite::LoadExtensionGuard;
 use rusqlite::OpenFlags;
+use std::cell::Cell;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -47,6 +48,7 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
         _ => Connection::open_with_flags(path, flags),
     };
 
+    let connection_wrap = v8::ObjectTemplate::new(scope);
     let connection = match connection {
         Ok(conn) => conn,
         Err(e) => {
@@ -66,29 +68,31 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
         }
     }
 
-    let connection = Rc::new(Some(connection));
-    let connection_wrap = v8::ObjectTemplate::new(scope);
-
     connection_wrap.set_internal_field_count(2);
 
     // Store Rust instance inside a V8 handle.
     let connection_wrap = connection_wrap.new_instance(scope).unwrap();
+    let connection_ptr = set_internal_ref(scope, connection_wrap, 0, Some(connection));
+    let weak_rc = Rc::new(Cell::new(None));
 
     // Note: To automatically close the connection (i.e., drop the instance) when
     // V8 garbage collects the object that internally holds the Rust connection,
-    // we use a Weak reference and a finalizer callback. This is why the connection
-    // is wrapped in an Rc<Option<T>>.
-    let mut connection_rc = connection.clone();
-    let connection_weak = v8::Weak::with_guaranteed_finalizer(
+    // we use a Weak reference with a finalizer callback.
+    let connection_weak = v8::Weak::with_finalizer(
         scope,
         connection_wrap,
-        Box::new(move || {
-            drop(std::mem::take(&mut connection_rc));
+        Box::new({
+            let weak_rc = weak_rc.clone();
+            move |isolate| unsafe {
+                drop(Box::from_raw(connection_ptr));
+                drop(v8::Weak::from_raw(isolate, weak_rc.get()));
+            }
         }),
     );
 
-    set_internal_ref(scope, connection_wrap, 0, connection);
-    set_internal_ref(scope, connection_wrap, 1, connection_weak);
+    // Store the weak ref pointer into the "shared" cell.
+    weak_rc.set(connection_weak.into_raw());
+    set_internal_ref(scope, connection_wrap, 1, weak_rc);
 
     rv.set(connection_wrap.into());
 }
@@ -96,11 +100,11 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
 /// Run multiple SQL statements (that cannot take any parameters).
 fn execute(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get connection and SQL query.
-    let connection_wrap = args.get(0).to_object(scope).unwrap();
+    let connection = args.get(0).to_object(scope).unwrap();
     let sql = args.get(1).to_rust_string_lossy(scope);
 
-    // Extract the connection from V8 handle.
-    let connection = get_internal_ref::<Rc<Option<Connection>>>(scope, connection_wrap, 0);
+    // Extract connection and execute SQL (batch) query.
+    let connection = get_internal_ref::<Option<Connection>>(scope, connection, 0);
     let connection = match connection.as_ref() {
         Some(connection) => connection,
         None => {
@@ -109,7 +113,6 @@ fn execute(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: 
         }
     };
 
-    // Execute SQL (batch) query.
     if let Err(e) = connection.execute_batch(&sql) {
         throw_exception(scope, &anyhow!(e));
     }
@@ -122,11 +125,10 @@ fn enable_extentions(
     _: v8::ReturnValue,
 ) {
     // Get the connection and flag from the params.
-    let connection_wrap = args.get(0).to_object(scope).unwrap();
+    let connection = args.get(0).to_object(scope).unwrap();
     let allow = args.get(1).to_boolean(scope);
 
-    // Extract the connection from V8 handle.
-    let connection = get_internal_ref::<Rc<Option<Connection>>>(scope, connection_wrap, 0);
+    let connection = get_internal_ref::<Option<Connection>>(scope, connection, 0);
     let connection = match connection.as_ref() {
         Some(connection) => connection,
         None => {
@@ -157,11 +159,10 @@ fn load_extension(
     _: v8::ReturnValue,
 ) {
     // Get the connection and extension path.
-    let connection_wrap = args.get(0).to_object(scope).unwrap();
+    let connection = args.get(0).to_object(scope).unwrap();
     let path = args.get(1).to_rust_string_lossy(scope);
 
-    // Extract the connection from V8 handle.
-    let connection = get_internal_ref::<Rc<Option<Connection>>>(scope, connection_wrap, 0);
+    let connection = get_internal_ref::<Option<Connection>>(scope, connection, 0);
     let connection = match connection.as_ref() {
         Some(connection) => connection,
         None => {
@@ -178,11 +179,19 @@ fn load_extension(
 /// Closes the database connection.
 fn close(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get the connection wrap object.
-    let connection_wrap = args.get(0).to_object(scope).unwrap();
-    let connection = get_internal_ref::<Rc<Option<Connection>>>(scope, connection_wrap, 0);
+    let connection = args.get(0).to_object(scope).unwrap();
+    let connection = get_internal_ref::<Option<Connection>>(scope, connection, 0);
+    let connection = match connection.take() {
+        Some(connection) => connection,
+        None => {
+            throw_exception(scope, &anyhow!("Connection is closed."));
+            return;
+        }
+    };
 
-    // Drop the connection.
-    drop(std::mem::take(connection));
+    if let Err((_, e)) = connection.close() {
+        throw_exception(scope, &anyhow!(e));
+    }
 }
 
 // Load the SQLite extension.
