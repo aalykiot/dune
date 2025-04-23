@@ -26,8 +26,8 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "open", open);
     set_function_to(scope, target, "execute", execute);
     set_function_to(scope, target, "prepare", prepare);
-    set_function_to(scope, target, "enable_extentions", enable_extentions);
-    set_function_to(scope, target, "load_extension", load_extension);
+    set_function_to(scope, target, "enableExtentions", enable_extentions);
+    set_function_to(scope, target, "loadExtension", load_extension);
     set_function_to(scope, target, "close", close);
 
     // Return v8 global handle.
@@ -280,6 +280,7 @@ fn close(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8
     };
 
     if let Err((_, e)) = connection.close() {
+        // TODO(aalykiot): Move connection back to the Option.
         throw_exception(scope, &anyhow!(e));
     }
 }

@@ -316,13 +316,13 @@ Body Mixins
 
 #### `sqlite.Database`
 
-- [ ] `open()`: Opens the database specified in the constructor.
-- [ ] `loadExtension(path)`: Loads a shared library into the database connection.
-- [ ] `enableLoadExtension(flag)`: Enables or disables the loadExtension SQL function.
-- [ ] `exec(sql)`: SQL statements to be executed without returning any results.
+- [x] `open()`: Opens the database specified in the constructor.
+- [x] `loadExtension(path)`: Loads a shared library into the database connection.
+- [x] `enableLoadExtension(flag)`: Enables or disables the loadExtension SQL function.
+- [x] `exec(sql)`: SQL statements to be executed without returning any results.
 - [ ] `prepare(sql)`: Compiles a SQL statement into a [prepared statement](https://sqlite.org/c3ref/stmt.html).
-- [ ] `close()`: Closes the database connection.
-- [ ] `isOpen`: Whether the database is currently open or not.
+- [x] `close()`: Closes the database connection.
+- [x] `isOpen`: Whether the database is currently open or not.
 
 #### `sqlite.Statement`
 
