@@ -1,9 +1,14 @@
 use crate::bindings::get_internal_ref;
+use crate::bindings::set_constant_to;
 use crate::bindings::set_function_to;
 use crate::bindings::set_internal_ref;
 use crate::bindings::throw_exception;
 use anyhow::anyhow;
+use anyhow::bail;
 use anyhow::Result;
+use rusqlite::params_from_iter;
+use rusqlite::types::Value as SqlValue;
+use rusqlite::types::ValueRef;
 use rusqlite::Connection;
 use rusqlite::LoadExtensionGuard;
 use rusqlite::OpenFlags;
@@ -17,6 +22,8 @@ use std::ops::DerefMut;
 use std::ops::Drop;
 use std::path::Path;
 use std::rc::Rc;
+use std::str::FromStr;
+use std::vec;
 use uuid::Uuid;
 
 pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
@@ -26,6 +33,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "open", open);
     set_function_to(scope, target, "execute", execute);
     set_function_to(scope, target, "prepare", prepare);
+    set_function_to(scope, target, "queryAll", query_all);
     set_function_to(scope, target, "enableExtentions", enable_extentions);
     set_function_to(scope, target, "loadExtension", load_extension);
     set_function_to(scope, target, "close", close);
@@ -208,6 +216,76 @@ fn prepare(
     rv.set(reference.into());
 }
 
+/// Executes a prepared statement and returns all results.
+fn query_all(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get connection and required params.
+    let connection = args.get(0).to_object(scope).unwrap();
+    let stmt_reference = args.get(1).to_rust_string_lossy(scope);
+    let params = v8::Local::<v8::Array>::try_from(args.get(2)).unwrap();
+    let use_big_int = args.get(3).to_boolean(scope);
+
+    // Extract prepared statement.
+    let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
+    let stmt_reference = Uuid::from_str(&stmt_reference).unwrap();
+    let mut statements = connection.statements();
+    let statement = match statements.get_mut(&stmt_reference) {
+        Some(statement) => statement,
+        None => {
+            throw_exception(scope, &anyhow!("Invalid statement reference."));
+            return;
+        }
+    };
+
+    // Convert JavaScript values to SQLite values.
+    let mut params = (0..params.length()).map(|i| {
+        let value = params.get_index(scope, i).unwrap();
+        to_sql_value(scope, value)
+    });
+
+    // Check for conversion errors.
+    if let Some(Err(e)) = params.find(|value| value.is_err()) {
+        throw_exception(scope, &anyhow!(e));
+        return;
+    }
+
+    // Note: Since this is a prepared statement we can extract the names
+    // of the result columns.
+    let column_names: Vec<String> = statement
+        .column_names()
+        .iter()
+        .map(|name| name.to_string())
+        .collect();
+
+    // Execute prepared statement with provided params.
+    let params: Vec<SqlValue> = params.map(|value| value.unwrap()).collect();
+    let mut rows = match statement.query(params_from_iter(params)) {
+        Ok(rows) => rows,
+        Err(e) => {
+            throw_exception(scope, &anyhow!(e));
+            return;
+        }
+    };
+
+    let mut entries = vec![];
+
+    // Convert each database row into a V8 object and collect them into a vector.
+    while let Ok(Some(row)) = rows.next() {
+        let target = v8::Object::new(scope);
+        for (i, name) in column_names.iter().enumerate() {
+            let value = row.get_ref_unwrap(i);
+            let value = to_js_value(scope, value, use_big_int.is_true());
+            set_constant_to(scope, target, name, value);
+        }
+        entries.push(target.into());
+    }
+
+    rv.set(v8::Array::new_with_elements(scope, entries.as_slice()).into());
+}
+
 /// Enables or disables loading extetnions to SQLite.
 fn enable_extentions(
     scope: &mut v8::HandleScope,
@@ -293,4 +371,73 @@ fn load_sqlite_extetnion_op<P: AsRef<Path>>(conn: &Connection, path: P) -> Resul
     let _guard = unsafe { LoadExtensionGuard::new(conn)? };
 
     unsafe { conn.load_extension(path, None).map_err(|e| anyhow!(e)) }
+}
+
+// Converts V8 values to SQLite values. (https://www.sqlite.org/datatype3.html)
+fn to_sql_value(scope: &mut v8::HandleScope, value: v8::Local<'_, v8::Value>) -> Result<SqlValue> {
+    // Note: This approach is a bit messy, but it's the only reliable way
+    // to map JavaScript values to SQLite-supported types.
+    //
+    // SQLite::NULL
+    if value.is_null_or_undefined() {
+        return Ok(SqlValue::Null);
+    }
+    // SQLite::REAL
+    if value.is_number() {
+        let value = value.number_value(scope).unwrap();
+        return Ok(SqlValue::Real(value));
+    }
+    // SQLite::TEXT
+    if value.is_string() {
+        let value = value.to_rust_string_lossy(scope);
+        return Ok(SqlValue::Text(value));
+    }
+    // SQLite::INTEGER
+    if value.is_big_int() {
+        return match value.integer_value(scope) {
+            Some(value) => Ok(SqlValue::Integer(value)),
+            None => bail!("BigInt value couldn't be converted to SQLite integer."),
+        };
+    }
+    // SQLite::BLOB
+    if value.is_array_buffer_view() {
+        // Get data as ArrayBuffer.
+        let data: v8::Local<v8::ArrayBufferView> = value.try_into().unwrap();
+        let mut buffer = vec![0; data.byte_length()];
+        data.copy_contents(&mut buffer);
+
+        return Ok(SqlValue::Blob(buffer));
+    }
+
+    bail!("JavaScript value cannot be converted to a SQLite value.");
+}
+
+// Converts SQLite values to JavaScript values.
+fn to_js_value<'a>(
+    scope: &mut v8::HandleScope<'a>,
+    sql_value: ValueRef<'_>,
+    use_big_int: bool,
+) -> v8::Local<'a, v8::Value> {
+    match sql_value {
+        ValueRef::Null => v8::null(scope).into(),
+        ValueRef::Real(value) => v8::Number::new(scope, value).into(),
+        ValueRef::Integer(value) => match use_big_int {
+            true => v8::BigInt::new_from_i64(scope, value).into(),
+            false => v8::Number::new(scope, value as f64).into(),
+        },
+        ValueRef::Text(bytes) => {
+            let value = String::from_utf8(bytes.to_vec()).unwrap();
+            v8::String::new(scope, &value).unwrap().into()
+        }
+        ValueRef::Blob(bytes) => {
+            // Create array buffer to store the blob.
+            let buffer = v8::ArrayBuffer::new(scope, bytes.len());
+            let buffer_store = buffer.get_backing_store();
+            // Copy the slice's bytes into v8's typed-array backing store.
+            for (i, value) in bytes.iter().enumerate() {
+                buffer_store[i].set(*value);
+            }
+            buffer.into()
+        }
+    }
 }
