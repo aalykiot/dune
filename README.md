@@ -330,7 +330,6 @@ Body Mixins
 - [ ] `columns()`: Used to retrieve information about the columns.
 - [ ] `all(...params?)`: Executes a prepared statement and returns all results.
 - [ ] `get(...params?)`: Returns the first result.
-- [ ] `iterate(...params?)`: Returns an iterator with the results.
 - [ ] `setReadBigInts(flag)`: Enables or disables the use of `BigInt`s when reading `INTEGER` fields.
 - [ ] `sourceSQL`: The source SQL text of the prepared statement.
 - [ ] `expandedSQL`: The source SQL text of the prepared statement with parameter placeholders replaced.

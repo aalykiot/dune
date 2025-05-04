@@ -12,6 +12,7 @@ use rusqlite::types::ValueRef;
 use rusqlite::Connection;
 use rusqlite::LoadExtensionGuard;
 use rusqlite::OpenFlags;
+use rusqlite::Row;
 use rusqlite::Statement;
 use std::cell::Cell;
 use std::cell::RefCell;
@@ -33,7 +34,9 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "open", open);
     set_function_to(scope, target, "execute", execute);
     set_function_to(scope, target, "prepare", prepare);
-    set_function_to(scope, target, "queryAll", query_all);
+    set_function_to(scope, target, "query", query);
+    set_function_to(scope, target, "columns", columns);
+    set_function_to(scope, target, "expandedSql", expanded_sql);
     set_function_to(scope, target, "enableExtentions", enable_extentions);
     set_function_to(scope, target, "loadExtension", load_extension);
     set_function_to(scope, target, "close", close);
@@ -216,8 +219,8 @@ fn prepare(
     rv.set(reference.into());
 }
 
-/// Executes a prepared statement and returns all results.
-fn query_all(
+/// Executes a prepared statement and returns all or a single result.
+fn query(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
@@ -272,18 +275,114 @@ fn query_all(
 
     let mut entries = vec![];
 
-    // Convert each database row into a V8 object and collect them into a vector.
-    while let Ok(Some(row)) = rows.next() {
-        let target = v8::Object::new(scope);
-        for (i, name) in column_names.iter().enumerate() {
-            let value = row.get_ref_unwrap(i);
-            let value = to_js_value(scope, value, use_big_int.is_true());
-            set_constant_to(scope, target, name, value);
+    loop {
+        match rows.next() {
+            // No more rows, exit loop.
+            Ok(None) => break,
+            // Convert database row into a V8 object.
+            Ok(Some(row)) => {
+                let use_big_int = use_big_int.is_true();
+                let row = process_row(scope, row, &column_names, use_big_int);
+                entries.push(row.into());
+            }
+            // An error occurred, throw exception.
+            Err(e) => {
+                throw_exception(scope, &anyhow!(e));
+                return;
+            }
         }
-        entries.push(target.into());
     }
 
     rv.set(v8::Array::new_with_elements(scope, entries.as_slice()).into());
+}
+
+/// Returns the SQL text of the prepared statement.
+fn expanded_sql(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get connection and required params.
+    let connection = args.get(0).to_object(scope).unwrap();
+    let stmt_reference = args.get(1).to_rust_string_lossy(scope);
+
+    // Extract prepared statement.
+    let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
+    let stmt_reference = Uuid::from_str(&stmt_reference).unwrap();
+    let mut statements = connection.statements();
+    let statement = match statements.get_mut(&stmt_reference) {
+        Some(statement) => statement,
+        None => {
+            throw_exception(scope, &anyhow!("Invalid statement reference."));
+            return;
+        }
+    };
+
+    // Get the last executed expanded SQL query.
+    let expanded_sql = statement.expanded_sql().unwrap_or_default();
+    let expanded_sql = v8::String::new(scope, &expanded_sql).unwrap();
+
+    rv.set(expanded_sql.into());
+}
+
+/// Returns information about the prepared statement columns.
+fn columns(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get connection and required params.
+    let connection = args.get(0).to_object(scope).unwrap();
+    let stmt_reference = args.get(1).to_rust_string_lossy(scope);
+
+    // Extract prepared statement.
+    let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
+    let stmt_reference = Uuid::from_str(&stmt_reference).unwrap();
+    let mut statements = connection.statements();
+    let statement = match statements.get_mut(&stmt_reference) {
+        Some(statement) => statement,
+        None => {
+            throw_exception(scope, &anyhow!("Invalid statement reference."));
+            return;
+        }
+    };
+
+    // Get column metadata.
+    let columns = statement.columns();
+    let columns_metadata = statement.columns_with_metadata();
+
+    let metadata: Vec<v8::Local<v8::Value>> = columns
+        .iter()
+        .zip(columns_metadata)
+        .map(|(column, metadata)| {
+            // Get necessary information from SQLite.
+            let name = metadata.name();
+            let database_name = metadata.database_name().unwrap_or_default();
+            let table_name = metadata.table_name().unwrap_or_default();
+            let origin_name = metadata.origin_name().unwrap_or_default();
+
+            let dec_type = match column.decl_type() {
+                Some(dec_type) => v8::String::new(scope, dec_type).unwrap().into(),
+                None => v8::null(scope).into(),
+            };
+
+            let target = v8::Object::new(scope);
+            let name = v8::String::new(scope, name).unwrap();
+            let database_name = v8::String::new(scope, database_name).unwrap();
+            let table_name = v8::String::new(scope, table_name).unwrap();
+            let origin_name = v8::String::new(scope, origin_name).unwrap();
+
+            set_constant_to(scope, target, "column", origin_name.into());
+            set_constant_to(scope, target, "database", database_name.into());
+            set_constant_to(scope, target, "name", name.into());
+            set_constant_to(scope, target, "table", table_name.into());
+            set_constant_to(scope, target, "type", dec_type);
+
+            target.into()
+        })
+        .collect();
+
+    rv.set(v8::Array::new_with_elements(scope, &metadata).into());
 }
 
 /// Enables or disables loading extetnions to SQLite.
@@ -371,6 +470,22 @@ fn load_sqlite_extetnion_op<P: AsRef<Path>>(conn: &Connection, path: P) -> Resul
     let _guard = unsafe { LoadExtensionGuard::new(conn)? };
 
     unsafe { conn.load_extension(path, None).map_err(|e| anyhow!(e)) }
+}
+
+// Returns a SQLite row as a JavaScript object.
+fn process_row<'s>(
+    scope: &mut v8::HandleScope<'s>,
+    row: &Row<'_>,
+    column_names: &[String],
+    use_big_int: bool,
+) -> v8::Local<'s, v8::Object> {
+    let target = v8::Object::new(scope);
+    for (i, name) in column_names.iter().enumerate() {
+        let value = row.get_ref_unwrap(i);
+        let value = to_js_value(scope, value, use_big_int);
+        set_constant_to(scope, target, name, value);
+    }
+    target
 }
 
 // Converts V8 values to SQLite values. (https://www.sqlite.org/datatype3.html)
