@@ -34,6 +34,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "open", open);
     set_function_to(scope, target, "execute", execute);
     set_function_to(scope, target, "prepare", prepare);
+    set_function_to(scope, target, "run", run);
     set_function_to(scope, target, "query", query);
     set_function_to(scope, target, "columns", columns);
     set_function_to(scope, target, "expandedSql", expanded_sql);
@@ -219,7 +220,7 @@ fn prepare(
     rv.set(reference.into());
 }
 
-/// Executes a prepared statement and returns all or a single result.
+/// Executes a prepared statement and returns the results.
 fn query(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
@@ -230,6 +231,7 @@ fn query(
     let stmt_reference = args.get(1).to_rust_string_lossy(scope);
     let params = v8::Local::<v8::Array>::try_from(args.get(2)).unwrap();
     let use_big_int = args.get(3).to_boolean(scope);
+    let single_result = args.get(4).to_boolean(scope);
 
     // Extract prepared statement.
     let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
@@ -294,6 +296,77 @@ fn query(
     }
 
     rv.set(v8::Array::new_with_elements(scope, entries.as_slice()).into());
+}
+
+// Executes a prepared statement and returns the resulting changes.
+fn run(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+    // Get connection and required params.
+    let connection = args.get(0).to_object(scope).unwrap();
+    let stmt_reference = args.get(1).to_rust_string_lossy(scope);
+    let params = v8::Local::<v8::Array>::try_from(args.get(2)).unwrap();
+    let use_big_int = args.get(3).to_boolean(scope);
+
+    // Extract prepared statement.
+    let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
+    let stmt_reference = Uuid::from_str(&stmt_reference).unwrap();
+    let mut statements = connection.statements();
+    let statement = match statements.get_mut(&stmt_reference) {
+        Some(statement) => statement,
+        None => {
+            throw_exception(scope, &anyhow!("Invalid statement reference."));
+            return;
+        }
+    };
+
+    // Convert JavaScript values to SQLite values.
+    let mut params = (0..params.length()).map(|i| {
+        let value = params.get_index(scope, i).unwrap();
+        to_sql_value(scope, value)
+    });
+
+    // Check for conversion errors.
+    if let Some(Err(e)) = params.find(|value| value.is_err()) {
+        throw_exception(scope, &anyhow!(e));
+        return;
+    }
+
+    // Execute prepared statement with provided params.
+    let params: Vec<SqlValue> = params.map(|value| value.unwrap()).collect();
+    if let Err(e) = statement.query(params_from_iter(params)) {
+        throw_exception(scope, &anyhow!(e));
+        return;
+    }
+
+    // Get resulting changes and the last inserted ID.
+    let (changes, last_inserted_id) = match connection.conn.as_ref() {
+        Some(connection) => {
+            let changes = connection.changes();
+            let last_inserted_id = connection.last_insert_rowid();
+            (changes, last_inserted_id)
+        }
+        None => {
+            throw_exception(scope, &anyhow!("Connection has been dropped."));
+            return;
+        }
+    };
+
+    // Create the correct JavaScript values.
+    let (changes, last_inserted_id) = match use_big_int.is_true() {
+        true => (
+            v8::BigInt::new_from_u64(scope, changes).into(),
+            v8::BigInt::new_from_i64(scope, last_inserted_id).into(),
+        ),
+        false => (
+            v8::Number::new(scope, changes as f64).into(),
+            v8::Number::new(scope, last_inserted_id as f64).into(),
+        ),
+    };
+
+    let target = v8::Object::new(scope);
+    set_constant_to(scope, target, "changes", changes);
+    set_constant_to(scope, target, "lastInsertRowid", last_inserted_id);
+
+    rv.set(target.into());
 }
 
 /// Returns the SQL text of the prepared statement.
