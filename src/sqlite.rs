@@ -231,7 +231,6 @@ fn query(
     let stmt_reference = args.get(1).to_rust_string_lossy(scope);
     let params = v8::Local::<v8::Array>::try_from(args.get(2)).unwrap();
     let use_big_int = args.get(3).to_boolean(scope);
-    let single_result = args.get(4).to_boolean(scope);
 
     // Extract prepared statement.
     let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
@@ -245,29 +244,32 @@ fn query(
         }
     };
 
-    // Convert JavaScript values to SQLite values.
-    let mut params = (0..params.length()).map(|i| {
-        let value = params.get_index(scope, i).unwrap();
-        to_sql_value(scope, value)
-    });
+    let mut sql_params = Vec::with_capacity(params.length() as usize);
 
-    // Check for conversion errors.
-    if let Some(Err(e)) = params.find(|value| value.is_err()) {
-        throw_exception(scope, &anyhow!(e));
-        return;
+    // Convert JavaScript values to SQLite values.
+    for i in 0..params.length() {
+        let value = params.get_index(scope, i).unwrap();
+        let value = match to_sql_value(scope, value) {
+            Ok(value) => value,
+            Err(e) => {
+                throw_exception(scope, &anyhow!(e));
+                return;
+            }
+        };
+        sql_params.push(value);
     }
 
     // Note: Since this is a prepared statement we can extract the names
     // of the result columns.
-    let column_names: Vec<String> = statement
+    let column_names: Vec<_> = statement
         .column_names()
         .iter()
         .map(|name| name.to_string())
         .collect();
 
     // Execute prepared statement with provided params.
-    let params: Vec<SqlValue> = params.map(|value| value.unwrap()).collect();
-    let mut rows = match statement.query(params_from_iter(params)) {
+    let sql_params = sql_params.iter();
+    let mut rows = match statement.query(params_from_iter(sql_params)) {
         Ok(rows) => rows,
         Err(e) => {
             throw_exception(scope, &anyhow!(e));
@@ -318,21 +320,24 @@ fn run(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv:
         }
     };
 
-    // Convert JavaScript values to SQLite values.
-    let mut params = (0..params.length()).map(|i| {
-        let value = params.get_index(scope, i).unwrap();
-        to_sql_value(scope, value)
-    });
+    let mut sql_params = Vec::with_capacity(params.length() as usize);
 
-    // Check for conversion errors.
-    if let Some(Err(e)) = params.find(|value| value.is_err()) {
-        throw_exception(scope, &anyhow!(e));
-        return;
+    // Convert JavaScript values to SQLite values.
+    for i in 0..params.length() {
+        let value = params.get_index(scope, i).unwrap();
+        let value = match to_sql_value(scope, value) {
+            Ok(value) => value,
+            Err(e) => {
+                throw_exception(scope, &anyhow!(e));
+                return;
+            }
+        };
+        sql_params.push(value);
     }
 
     // Execute prepared statement with provided params.
-    let params: Vec<SqlValue> = params.map(|value| value.unwrap()).collect();
-    if let Err(e) = statement.query(params_from_iter(params)) {
+    let sql_params = sql_params.iter();
+    if let Err(e) = statement.query(params_from_iter(sql_params)) {
         throw_exception(scope, &anyhow!(e));
         return;
     }
@@ -357,8 +362,8 @@ fn run(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv:
             v8::BigInt::new_from_i64(scope, last_inserted_id).into(),
         ),
         false => (
-            v8::Number::new(scope, changes as f64).into(),
-            v8::Number::new(scope, last_inserted_id as f64).into(),
+            v8::Integer::new(scope, changes as i32).into(),
+            v8::Integer::new(scope, last_inserted_id as i32).into(),
         ),
     };
 
@@ -570,6 +575,11 @@ fn to_sql_value(scope: &mut v8::HandleScope, value: v8::Local<'_, v8::Value>) ->
     if value.is_null_or_undefined() {
         return Ok(SqlValue::Null);
     }
+    // SQLite::INTEGER
+    if value.is_int32() {
+        let value = value.integer_value(scope).unwrap();
+        return Ok(SqlValue::Integer(value));
+    }
     // SQLite::REAL
     if value.is_number() {
         let value = value.number_value(scope).unwrap();
@@ -600,6 +610,10 @@ fn to_sql_value(scope: &mut v8::HandleScope, value: v8::Local<'_, v8::Value>) ->
     bail!("JavaScript value cannot be converted to a SQLite value.");
 }
 
+// The maximum safe integer in JavaScript.
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MAX_SAFE_INTEGER
+const MAX_SAFE_INTEGER: i64 = 9007199254740991;
+
 // Converts SQLite values to JavaScript values.
 fn to_js_value<'a>(
     scope: &mut v8::HandleScope<'a>,
@@ -611,7 +625,8 @@ fn to_js_value<'a>(
         ValueRef::Real(value) => v8::Number::new(scope, value).into(),
         ValueRef::Integer(value) => match use_big_int {
             true => v8::BigInt::new_from_i64(scope, value).into(),
-            false => v8::Number::new(scope, value as f64).into(),
+            false if value > MAX_SAFE_INTEGER => v8::BigInt::new_from_i64(scope, value).into(),
+            false => v8::Integer::new(scope, value as i32).into(),
         },
         ValueRef::Text(bytes) => {
             let value = String::from_utf8(bytes.to_vec()).unwrap();
