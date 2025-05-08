@@ -337,23 +337,30 @@ fn run(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv:
 
     // Execute prepared statement with provided params.
     let sql_params = sql_params.iter();
-    if let Err(e) = statement.query(params_from_iter(sql_params)) {
-        throw_exception(scope, &anyhow!(e));
-        return;
-    }
-
-    // Get resulting changes and the last inserted ID.
-    let (changes, last_inserted_id) = match connection.conn.as_ref() {
-        Some(connection) => {
-            let changes = connection.changes();
-            let last_inserted_id = connection.last_insert_rowid();
-            (changes, last_inserted_id)
-        }
-        None => {
-            throw_exception(scope, &anyhow!("Connection has been dropped."));
+    let mut rows = match statement.query(params_from_iter(sql_params)) {
+        Ok(rows) => rows,
+        Err(e) => {
+            throw_exception(scope, &anyhow!(e));
             return;
         }
     };
+
+    loop {
+        // This will internally invoke `sqlite3_step()`, allowing us to collect
+        // statistics once the prepared statement has completed execution.
+        match rows.next() {
+            Ok(None) => break,
+            Ok(Some(_)) => {}
+            // An error occurred, throw exception.
+            Err(e) => {
+                throw_exception(scope, &anyhow!(e));
+                return;
+            }
+        }
+    }
+
+    let changes = connection.conn.as_ref().unwrap().changes();
+    let last_inserted_id = connection.conn.as_ref().unwrap().last_insert_rowid();
 
     // Create the correct JavaScript values.
     let (changes, last_inserted_id) = match use_big_int.is_true() {
