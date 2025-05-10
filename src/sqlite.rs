@@ -36,6 +36,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "prepare", prepare);
     set_function_to(scope, target, "run", run);
     set_function_to(scope, target, "query", query);
+    set_function_to(scope, target, "queryOne", query_one);
     set_function_to(scope, target, "columns", columns);
     set_function_to(scope, target, "expandedSql", expanded_sql);
     set_function_to(scope, target, "enableExtentions", enable_extentions);
@@ -298,6 +299,79 @@ fn query(
     }
 
     rv.set(v8::Array::new_with_elements(scope, entries.as_slice()).into());
+}
+
+/// Executes a prepared statement and returns the first row.
+fn query_one(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get connection and required params.
+    let connection = args.get(0).to_object(scope).unwrap();
+    let stmt_reference = args.get(1).to_rust_string_lossy(scope);
+    let params = v8::Local::<v8::Array>::try_from(args.get(2)).unwrap();
+    let use_big_int = args.get(3).to_boolean(scope);
+
+    // Extract prepared statement.
+    let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
+    let stmt_reference = Uuid::from_str(&stmt_reference).unwrap();
+    let mut statements = connection.statements();
+    let statement = match statements.get_mut(&stmt_reference) {
+        Some(statement) => statement,
+        None => {
+            throw_exception(scope, &anyhow!("Invalid statement reference."));
+            return;
+        }
+    };
+
+    let mut sql_params = Vec::with_capacity(params.length() as usize);
+
+    // Convert JavaScript values to SQLite values.
+    for i in 0..params.length() {
+        let value = params.get_index(scope, i).unwrap();
+        let value = match to_sql_value(scope, value) {
+            Ok(value) => value,
+            Err(e) => {
+                throw_exception(scope, &anyhow!(e));
+                return;
+            }
+        };
+        sql_params.push(value);
+    }
+
+    // Note: Since this is a prepared statement we can extract the names
+    // of the result columns.
+    let column_names: Vec<_> = statement
+        .column_names()
+        .iter()
+        .map(|name| name.to_string())
+        .collect();
+
+    // Execute prepared statement with provided params.
+    let sql_params = sql_params.iter();
+    let mut rows = match statement.query(params_from_iter(sql_params)) {
+        Ok(rows) => rows,
+        Err(e) => {
+            throw_exception(scope, &anyhow!(e));
+            return;
+        }
+    };
+
+    // Pull the first row and create a JavaScript value.
+    let entry = match rows.next() {
+        Ok(None) => v8::undefined(scope).into(),
+        Ok(Some(row)) => {
+            let use_big_int = use_big_int.is_true();
+            process_row(scope, row, &column_names, use_big_int).into()
+        }
+        Err(e) => {
+            throw_exception(scope, &anyhow!(e));
+            return;
+        }
+    };
+
+    rv.set(entry);
 }
 
 // Executes a prepared statement and returns the resulting changes.
