@@ -320,19 +320,19 @@ Body Mixins
 - [x] `loadExtension(path)`: Loads a shared library into the database connection.
 - [x] `enableLoadExtension(flag)`: Enables or disables the loadExtension SQL function.
 - [x] `exec(sql)`: SQL statements to be executed without returning any results.
-- [ ] `prepare(sql)`: Compiles a SQL statement into a [prepared statement](https://sqlite.org/c3ref/stmt.html).
+- [x] `prepare(sql)`: Compiles a SQL statement into a [prepared statement](https://sqlite.org/c3ref/stmt.html).
 - [x] `close()`: Closes the database connection.
 - [x] `isOpen`: Whether the database is currently open or not.
 
 #### `sqlite.Statement`
 
-- [ ] `run(...params?)`: Executes a prepared statement and returns the resulting changes.
-- [ ] `columns()`: Used to retrieve information about the columns.
-- [ ] `all(...params?)`: Executes a prepared statement and returns all results.
-- [ ] `get(...params?)`: Returns the first result.
-- [ ] `setReadBigInts(flag)`: Enables or disables the use of `BigInt`s when reading `INTEGER` fields.
-- [ ] `sourceSQL`: The source SQL text of the prepared statement.
-- [ ] `expandedSQL`: The source SQL text of the prepared statement with parameter placeholders replaced.
+- [x] `run(...params?)`: Executes a prepared statement and returns the resulting changes.
+- [x] `columns()`: Used to retrieve information about the columns.
+- [x] `all(...params?)`: Executes a prepared statement and returns all results.
+- [x] `get(...params?)`: Returns the first result.
+- [x] `setReadBigInts(flag)`: Enables or disables the use of `BigInt`s when reading `INTEGER` fields.
+- [x] `sourceSQL`: The source SQL text of the prepared statement.
+- [x] `expandedSQL`: The source SQL text of the prepared statement with parameter placeholders replaced.
 
 ### Test Runner
 
