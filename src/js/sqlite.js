@@ -152,6 +152,8 @@ export class Database {
 
   /**
    * Returns whether the database is currently open or not.
+   *
+   * @returns {Boolean}
    */
   get isOpen() {
     return !!this.#conn;
