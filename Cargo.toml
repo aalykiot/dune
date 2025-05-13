@@ -18,9 +18,9 @@ git = "https://github.com/aalykiot/dune-event-loop"
 branch = "main"
 
 [dependencies]
-v8 = { version = "136.0.0", default-features = false }
-clap = { version = "4.5.24", features = ["derive"] }
-anyhow = "1.0.95"
+v8 = { version = "137.1.0", default-features = false }
+clap = { version = "4.5.38", features = ["derive"] }
+anyhow = "1.0.98"
 colored = "3.0.0"
 rustyline = "15.0.0"
 rustyline-derive = "0.11.0"
@@ -55,18 +55,18 @@ httparse = "1.10.1"
 pest = "2.8.0"
 pest_derive = "2.8.0"
 futures = "0.3.31"
-tokio = { version = "1.42.1", features = ["full"] }
-axum = { version = "0.8.3", features = ["ws"] }
+tokio = { version = "1.45.0", features = ["full"] }
+axum = { version = "0.8.4", features = ["ws"] }
 uuid = { version = "1.16.0", features = ["v4", "fast-rng"] }
 base64 = "0.22.1"
 indicatif = "0.17.11"
 rusqlite = { version = "0.35.0", features = ["bundled", "load_extension", "column_decltype", "column_metadata"] }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.29.0", features = ["signal"] }
+nix = { version = "0.30.1", features = ["signal"] }
 
 [target.'cfg(windows)'.dependencies]
 enable-ansi-support = "0.2.1"
 
 [dev-dependencies]
-assert_fs = "1.1.2"
+assert_fs = "1.1.3"
