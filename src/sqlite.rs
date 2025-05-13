@@ -368,17 +368,14 @@ fn query_one(
         Ok(None) => Ok(v8::undefined(scope).into()),
         Ok(Some(row)) => {
             let use_big_int = use_big_int.is_true();
-            process_row(scope, row, &column_names, use_big_int).and_then(|val| Ok(val.into()))
+            process_row(scope, row, &column_names, use_big_int).map(|val| val.into())
         }
         Err(e) => Err(anyhow!(e)),
     };
 
     match entry {
         Ok(entry) => rv.set(entry),
-        Err(e) => {
-            throw_exception(scope, &anyhow!(e));
-            return;
-        }
+        Err(e) => throw_exception(scope, &anyhow!(e)),
     };
 }
 
