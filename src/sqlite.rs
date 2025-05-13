@@ -214,7 +214,10 @@ fn prepare(
         }
     };
 
-    // Save SQL prepared statement into the hash-map.
+    // Note: Technically, we should use a v8::Weak to allow the prepared statement to be dropped
+    // once the reference is garbage collected. But, managing Rust's lifetimes here has proven
+    // too difficult, so I'm leaving it as is for now.
+
     let _ = connection.statements().insert(id, statement);
     let reference = v8::String::new(scope, &id.to_string()).unwrap();
 
@@ -281,24 +284,26 @@ fn query(
     let mut entries = vec![];
 
     loop {
-        match rows.next() {
-            // No more rows, exit loop.
+        // Pull the next row and create a JavaScript value.
+        let entry = match rows.next() {
             Ok(None) => break,
-            // Convert database row into a V8 object.
             Ok(Some(row)) => {
                 let use_big_int = use_big_int.is_true();
-                let row = process_row(scope, row, &column_names, use_big_int);
-                entries.push(row.into());
+                process_row(scope, row, &column_names, use_big_int)
             }
-            // An error occurred, throw exception.
+            Err(e) => Err(anyhow!(e)),
+        };
+
+        match entry {
+            Ok(entry) => entries.push(entry.into()),
             Err(e) => {
                 throw_exception(scope, &anyhow!(e));
                 return;
             }
-        }
+        };
     }
 
-    rv.set(v8::Array::new_with_elements(scope, entries.as_slice()).into());
+    rv.set(v8::Array::new_with_elements(scope, &entries).into());
 }
 
 /// Executes a prepared statement and returns the first row.
@@ -360,18 +365,21 @@ fn query_one(
 
     // Pull the first row and create a JavaScript value.
     let entry = match rows.next() {
-        Ok(None) => v8::undefined(scope).into(),
+        Ok(None) => Ok(v8::undefined(scope).into()),
         Ok(Some(row)) => {
             let use_big_int = use_big_int.is_true();
-            process_row(scope, row, &column_names, use_big_int).into()
+            process_row(scope, row, &column_names, use_big_int).and_then(|val| Ok(val.into()))
         }
+        Err(e) => Err(anyhow!(e)),
+    };
+
+    match entry {
+        Ok(entry) => rv.set(entry),
         Err(e) => {
             throw_exception(scope, &anyhow!(e));
             return;
         }
     };
-
-    rv.set(entry);
 }
 
 // Executes a prepared statement and returns the resulting changes.
@@ -637,14 +645,14 @@ fn process_row<'s>(
     row: &Row<'_>,
     column_names: &[String],
     use_big_int: bool,
-) -> v8::Local<'s, v8::Object> {
+) -> Result<v8::Local<'s, v8::Object>> {
     let target = v8::Object::new(scope);
     for (i, name) in column_names.iter().enumerate() {
         let value = row.get_ref_unwrap(i);
-        let value = to_js_value(scope, value, use_big_int);
+        let value = to_js_value(scope, value, use_big_int)?;
         set_constant_to(scope, target, name, value);
     }
-    target
+    Ok(target)
 }
 
 // Converts V8 values to SQLite values. (https://www.sqlite.org/datatype3.html)
@@ -700,18 +708,18 @@ fn to_js_value<'a>(
     scope: &mut v8::HandleScope<'a>,
     sql_value: ValueRef<'_>,
     use_big_int: bool,
-) -> v8::Local<'a, v8::Value> {
+) -> Result<v8::Local<'a, v8::Value>> {
     match sql_value {
-        ValueRef::Null => v8::null(scope).into(),
-        ValueRef::Real(value) => v8::Number::new(scope, value).into(),
+        ValueRef::Null => Ok(v8::null(scope).into()),
+        ValueRef::Real(value) => Ok(v8::Number::new(scope, value).into()),
         ValueRef::Integer(value) => match use_big_int {
-            true => v8::BigInt::new_from_i64(scope, value).into(),
-            false if value > MAX_SAFE_INTEGER => v8::BigInt::new_from_i64(scope, value).into(),
-            false => v8::Integer::new(scope, value as i32).into(),
+            true => Ok(v8::BigInt::new_from_i64(scope, value).into()),
+            false if value > MAX_SAFE_INTEGER => bail!("Value too large for JS number: {}", value),
+            false => Ok(v8::Number::new(scope, value as f64).into()),
         },
         ValueRef::Text(bytes) => {
             let value = String::from_utf8(bytes.to_vec()).unwrap();
-            v8::String::new(scope, &value).unwrap().into()
+            Ok(v8::String::new(scope, &value).unwrap().into())
         }
         ValueRef::Blob(bytes) => {
             // Create array buffer to store the blob.
@@ -721,7 +729,7 @@ fn to_js_value<'a>(
             for (i, value) in bytes.iter().enumerate() {
                 buffer_store[i].set(*value);
             }
-            buffer.into()
+            Ok(buffer.into())
         }
     }
 }
