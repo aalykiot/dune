@@ -324,6 +324,8 @@ Body Mixins
 - [x] `close()`: Closes the database connection.
 - [x] `isOpen`: Whether the database is currently open or not.
 
+> To use an in-memory database, the path should be the special name `:memory:`.
+
 #### `sqlite.Statement`
 
 - [x] `run(...params?)`: Executes a prepared statement and returns the resulting changes.
