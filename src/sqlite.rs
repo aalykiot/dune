@@ -448,8 +448,8 @@ fn run(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv:
             v8::BigInt::new_from_i64(scope, last_inserted_id).into(),
         ),
         false => (
-            v8::Integer::new(scope, changes as i32).into(),
-            v8::Integer::new(scope, last_inserted_id as i32).into(),
+            v8::Number::new(scope, changes as f64).into(),
+            v8::Number::new(scope, last_inserted_id as f64).into(),
         ),
     };
 
