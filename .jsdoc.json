@@ -12,7 +12,8 @@
       "src/js/fs.js",
       "src/js/net.js",
       "src/js/http.js",
-      "src/js/test.js"
+      "src/js/test.js",
+      "src/js/sqlite.js"
     ]
   },
   "tags": {

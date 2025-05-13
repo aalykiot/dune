@@ -19,6 +19,16 @@ export class Database {
   #allowExtention;
   #path;
 
+  /**
+   * Creates a new SQLite database instance.
+   *
+   * @param {String} path - The path of the database.
+   * @param {Object} [options] - Configuration options for the database connection.
+   * @param {boolean} [options.open] - If true, the database is opened by the constructor.
+   * @param {boolean} [options.readOnly] - If true, the database is opened in read-only mode.
+   * @param {boolean} [options.allowExtention] -  If true, loading extentions is enabled.
+   * @returns {Database}
+   */
   constructor(path, options) {
     // Check if the path argument is a valid type.
     if (typeof path !== 'string') {
@@ -49,6 +59,8 @@ export class Database {
 
   /**
    * Executes SQL statements without returning any results.
+   *
+   * @param {String} sql - A SQL string to execute.
    */
   exec(sql) {
     // Check if the sql argument is a valid type.
@@ -66,6 +78,8 @@ export class Database {
 
   /**
    * Compiles a SQL statement into a prepared statement.
+   *
+   * @param {String} - A SQL string to execute.
    */
   prepare(sql) {
     // Check if the sql argument is a valid type.
@@ -87,6 +101,8 @@ export class Database {
 
   /**
    * Loads a shared library into the database connection.
+   *
+   * @param {String} path - The path to the shared library to load.
    */
   loadExtension(path) {
     // Check if the path argument is a valid type.
@@ -109,6 +125,8 @@ export class Database {
 
   /**
    * Enables or disables the loadExtension SQL function.
+   *
+   * @param {boolean} allow - Whether to allow loading extensions.
    */
   enableLoadExtension(allow = true) {
     // Check if allow param is boolean.
@@ -177,6 +195,9 @@ class Statement {
 
   /**
    * Executes a prepared statement and returns all results.
+   *
+   * @param {...*} params - Zero or more values to bind to positional parameters.
+   * @returns {Array<Object>} - An array of objects.
    */
   all(...params) {
     // Check if connection is closed.
@@ -189,6 +210,9 @@ class Statement {
 
   /**
    * Returns the first result.
+   *
+   * @param {...*} params - Zero or more values to bind to positional parameters.
+   * @returns {Object|undefined} - An object corresponding to the first row.
    */
   get(...params) {
     // Check if connection is closed.
@@ -205,7 +229,18 @@ class Statement {
   }
 
   /**
+   * Information about the executed query.
+   *
+   * @typedef Changes
+   * @property {number|BigInt} changes - The number of rows modified.
+   * @property {number|BigInt} lastInsertRowid - The most recently inserted rowid.
+   */
+
+  /**
    * Executes a prepared statement and returns the resulting changes.
+   *
+   * @param {...*} params - Zero or more values to bind to positional parameters.
+   * @returns {Changes}
    */
   run(...params) {
     // Check if connection is closed.
@@ -217,7 +252,20 @@ class Statement {
   }
 
   /**
+   * Column information for the prepared statement.
+   *
+   * @typedef Column
+   * @property {String|null} column - The unaliased name of the column in the origin table.
+   * @property {String|null} database - The unaliased name of the origin database.
+   * @property {String|mull} name - The name assigned to the column in the result set of a SELECT statement.
+   * @property {String|null} table - The unaliased name of the origin table.
+   * @property {String|null} type - The declared data type of the column.
+   */
+
+  /**
    * Returns information about the columns used by the prepared statement.
+   *
+   * @returns {Array<Column>}
    */
   columns() {
     // Check if connection is closed.
@@ -230,6 +278,8 @@ class Statement {
 
   /**
    * Enables or disables the use of BigInts when reading INTEGER fields.
+   *
+   * @param {boolean} enable - Flag to enable or disable BigInts.
    */
   setReadBigInts(enable = false) {
     // Check if flag is a boolean value.
