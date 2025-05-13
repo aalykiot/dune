@@ -154,6 +154,12 @@ export class Database {
 }
 
 /**
+ * Alias for the Database class.
+ * https://nodejs.org/api/sqlite.html#class-databasesync
+ */
+export const DatabaseSync = Database;
+
+/**
  * This class represents a single prepared statement.
  */
 class Statement {
