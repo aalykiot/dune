@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Socket - Documentation</title>
+    <title>sqlite.js - Documentation</title>
 
     <script src="scripts/prettify/prettify.js"></script>
     <script src="scripts/prettify/lang-css.js"></script>
@@ -29,1460 +29,332 @@
 
 <div id="main">
     
-    <h1 class="page-title">Socket</h1>
-    
-
-    
-
-
-
-
-<section>
-
-<header>
-    
-        <h2>
-            <span class="ancestors"><a href="module-Net.html">Net</a>.</span>
-        
-        Socket
-        </h2>
-        
-            <div class="class-description"><p>A Socket object is a JS wrapper around a low-level TCP socket.</p></div>
-        
-    
-</header>
-
-<article>
-    <div class="container-overview">
-    
-        
-<div class="section-method">
-
-    
-    <h2>Constructor</h2>
-    
-
-    <h4 class="name" id="Socket"><span class="type-signature"></span>new Socket<span class="signature">()</span><span class="type-signature"> &rarr; {Socket}</span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Creates a new Socket instance.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line198">line 198</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Fires:</h5>
-<ul>
-    <li>event:connect - Emitted when a socket connection is successfully established.</li>
-
-    <li>event:data - Emitted when data is received.</li>
-
-    <li>event:end - Emitted when the other end of the socket sends a FIN packet.</li>
-
-    <li>event:error - Emitted when an error occurs.</li>
-
-    <li>event:close - Emitted once the socket is fully closed.</li>
-
-    <li>event:timeout - Emitted if the socket times out from (read) inactivity.</li>
-</ul>
-
-
-
-
-
-
-
-
-
-<div class="section-returns">
-<h5>Returns:</h5>
-
-        
-
-<dl class="param-type">
-    <dt>
-        Type:
-    </dt>
-    <dd>
-        
-<span class="param-type"><code>Socket</code></span>
-
-
-    </dd>
-</dl>
-
-
-    
-</div>
-
-
-
-</div>
-    
-    </div>
-
-    
-
-    
-
-    
-
-     
-
-    
-
-    
-
-    
-        <h3 class="subsection-title">Methods</h3>
-
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="address"><span class="type-signature"></span>address<span class="signature">()</span><span class="type-signature"> &rarr; {SocketHost}</span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Returns the bound address, the address family name and port of the socket.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line434">line 434</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div class="section-returns">
-<h5>Returns:</h5>
-
-        
-
-<dl class="param-type">
-    <dt>
-        Type:
-    </dt>
-    <dd>
-        
-<span class="param-type"><code>SocketHost</code></span>
-
-
-    </dd>
-</dl>
-
-
-<div class="param-desc">
-    <ul>
-<li>Information about the local endpoint of the socket.</li>
-</ul>
-</div>
-
-    
-</div>
-
-
-
-</div>
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="connect"><span class="type-signature">(async) </span>connect<span class="signature">(options)</span><span class="type-signature"> &rarr; {Promise.&lt;socketInfo>}</span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Initiates a connection on a given remote host.</p>
-<p>Additional signatures:</p>
-<ul>
-<li>connect(port: number | string, host?: string)</li>
-</ul>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line237">line 237</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>options</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>Object</code></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">
-                <p>Configuration options for the connection.</p>
-                
-                    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>host</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>string</code></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">
-                <p>The hostname or IP address of the remote server to connect to.</p>
-                
-            </td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>port</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>string</code></span>
-|
-
-<span class="param-type"><code>number</code></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">
-                <p>The port number on the remote host to connect to.</p>
-                
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-                
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div class="section-returns">
-<h5>Returns:</h5>
-
-        
-
-<dl class="param-type">
-    <dt>
-        Type:
-    </dt>
-    <dd>
-        
-<span class="param-type"><code>Promise.&lt;socketInfo></code></span>
-
-
-    </dd>
-</dl>
-
-
-<div class="param-desc">
-    <p>Information about the connected TCP socket.</p>
-</div>
-
-    
-</div>
-
-
-
-</div>
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="destroy"><span class="type-signature">(async) </span>destroy<span class="signature">()</span><span class="type-signature"></span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Closes both sides of the TCP sockets.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line413">line 413</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</div>
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="end"><span class="type-signature">(async) </span>end<span class="signature">(data, encoding<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Half-closes the TCP stream.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line398">line 398</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-        <th>Default</th>
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>data</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>String</code></span>
-|
-
-<span class="param-type"><code>Uint8Array</code></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                </td>
-            
-
-            <td class="description last">
-                <p>The (last) data to be written to the socket.</p>
-                
-            </td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>encoding</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>String</code></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                    utf-8
-                
-                </td>
-            
-
-            <td class="description last">
-                <p>The character encoding to use.</p>
-                
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div class="section-returns">
-<h5>Returns:</h5>
-
-        
-
-<dl class="param-type">
-    <dt>
-        Type:
-    </dt>
-    <dd>
-        
-<span class="param-type"><code>Promise.&lt;void></code></span>
-
-
-    </dd>
-</dl>
-
-
-    
-</div>
-
-
-
-</div>
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="read"><span class="type-signature"></span>read<span class="signature">()</span><span class="type-signature"> &rarr; {Promise.&lt;(Uint8Array|string)>}</span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Returns a promise which is fulfilled when the TCP stream can return a chunk.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line336">line 336</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div class="section-returns">
-<h5>Returns:</h5>
-
-        
-
-<dl class="param-type">
-    <dt>
-        Type:
-    </dt>
-    <dd>
-        
-<span class="param-type"><code>Promise.&lt;(Uint8Array|string)></code></span>
-
-
-    </dd>
-</dl>
-
-
-<div class="param-desc">
-    <p>The chunk read from the socket.</p>
-</div>
-
-    
-</div>
-
-
-
-</div>
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="setEncoding"><span class="type-signature"></span>setEncoding<span class="signature">(encoding<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Sets the encoding for the current socket.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line301">line 301</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-        <th>Default</th>
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>encoding</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>String</code></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                    utf-8
-                
-                </td>
-            
-
-            <td class="description last">
-                <p>The character encoding to use.</p>
-                
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</div>
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="setTimeout"><span class="type-signature"></span>setTimeout<span class="signature">(timeout)</span><span class="type-signature"></span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Sets the socket to timeout after timeout milliseconds of (read) inactivity on the socket.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line314">line 314</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-        <th>Default</th>
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>timeout</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>Number</code></span>
-
-
-            
-            </td>
-
-            
-
-            
-                <td class="default">
-                
-                    0
-                
-                </td>
-            
-
-            <td class="description last">
-                <p>The duration after which the socket should timeout due to inactivity.</p>
-                
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</div>
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="write"><span class="type-signature">(async) </span>write<span class="signature">(data, encoding<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;Number>}</span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Writes contents to a TCP socket stream.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line364">line 364</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-        <th>Default</th>
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>data</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>String</code></span>
-|
-
-<span class="param-type"><code>Uint8Array</code></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                </td>
-            
-
-            <td class="description last">
-                <p>The data to be written to the socket.</p>
-                
-            </td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>encoding</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>String</code></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                    utf-8
-                
-                </td>
-            
-
-            <td class="description last">
-                <p>The character encoding to use.</p>
-                
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div class="section-returns">
-<h5>Returns:</h5>
-
-        
-
-<dl class="param-type">
-    <dt>
-        Type:
-    </dt>
-    <dd>
-        
-<span class="param-type"><code>Promise.&lt;Number></code></span>
-
-
-    </dd>
-</dl>
-
-
-<div class="param-desc">
-    <p>The number of bytes written.</p>
-</div>
-
-    
-</div>
-
-
-
-</div>
-        
-    
-
-    
-
-    
-</article>
-
-</section>
+    <h1 class="page-title">sqlite.js</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * SQLite APIs
+ *
+ * The sqlite module facilitates working with SQLite databases.
+ *
+ * @see {@link https://nodejs.org/api/sqlite.html}
+ *
+ * @module SQLite
+ */
+
+const binding = process.binding('sqlite');
+
+/**
+ * This class represents a single connection to a SQLite database.
+ */
+export class Database {
+  #conn;
+  #readOnly;
+  #allowExtention;
+  #path;
+
+  /**
+   * Creates a new SQLite database instance.
+   *
+   * @param {String} path - The path of the database.
+   * @param {Object} [options] - Configuration options for the database connection.
+   * @param {boolean} [options.open] - If true, the database is opened by the constructor.
+   * @param {boolean} [options.readOnly] - If true, the database is opened in read-only mode.
+   * @param {boolean} [options.allowExtention] -  If true, loading extentions is enabled.
+   * @returns {Database}
+   */
+  constructor(path, options) {
+    // Check if the path argument is a valid type.
+    if (typeof path !== 'string') {
+      throw new TypeError(`The "path" argument must be of type string.`);
+    }
+
+    this.#conn = null;
+    this.#readOnly = options?.readOnly || false;
+    this.#allowExtention = options?.allowExtention || false;
+    this.#path;
+
+    if (options?.open ?? true) {
+      this.#conn = binding.open(path, this.#readOnly, this.#allowExtention);
+    }
+  }
+
+  /**
+   * Opens the database specified in the path argument.
+   */
+  open() {
+    // Check if connection is open.
+    if (this.#conn) {
+      throw new Error('Connection is already open.');
+    }
+
+    this.#conn = binding.open(this.#path, this.#readOnly, this.#allowExtention);
+  }
+
+  /**
+   * Executes SQL statements without returning any results.
+   *
+   * @param {String} sql - A SQL string to execute.
+   */
+  exec(sql) {
+    // Check if the sql argument is a valid type.
+    if (typeof sql !== 'string') {
+      throw new TypeError(`The "sql" argument must be of type string.`);
+    }
+
+    // Check if the connection is open.
+    if (!this.#conn) {
+      throw new Error('Connection is closed.');
+    }
+
+    binding.execute(this.#conn, sql);
+  }
+
+  /**
+   * Compiles a SQL statement into a prepared statement.
+   *
+   * @param {String} - A SQL string to execute.
+   */
+  prepare(sql) {
+    // Check if the sql argument is a valid type.
+    if (typeof sql !== 'string') {
+      throw new TypeError(`The "sql" argument must be of type string.`);
+    }
+
+    // Check if the connection is open.
+    if (!this.#conn) {
+      throw new Error('Connection is closed.');
+    }
+
+    // Get an internal reference for the compiled SQL statement.
+    const id = binding.prepare(this.#conn, sql);
+    const statement = new Statement(this.#conn, id, sql);
+
+    return statement;
+  }
+
+  /**
+   * Loads a shared library into the database connection.
+   *
+   * @param {String} path - The path to the shared library to load.
+   */
+  loadExtension(path) {
+    // Check if the path argument is a valid type.
+    if (typeof path !== 'string') {
+      throw new TypeError(`The "path" argument must be of type string.`);
+    }
+
+    // Check if the connection is open.
+    if (!this.#conn) {
+      throw new Error('Connection is closed.');
+    }
+
+    // Check if loading extentions is enabled.
+    if (!this.#allowExtention) {
+      throw new Error('Loading extentions is disabled for this DB connection.');
+    }
+
+    binding.loadExtension(this.#conn, path);
+  }
+
+  /**
+   * Enables or disables the loadExtension SQL function.
+   *
+   * @param {boolean} allow - Whether to allow loading extensions.
+   */
+  enableLoadExtension(allow = true) {
+    // Check if allow param is boolean.
+    if (typeof allow !== 'boolean') {
+      throw new Error(`The "allow" argument must be of type boolean.`);
+    }
+
+    // Check if the connection is open.
+    if (!this.#conn) {
+      throw new Error('Connection is closed.');
+    }
+
+    // Note: When allowExtension is false when constructing, you cannot enable
+    // loading extensions for security reasons.
+    if (!this.#allowExtention) {
+      throw new Error(
+        'Cannot enable extensions: allowExtension was set to false during construction.'
+      );
+    }
+
+    binding.enableExtentions(this.#conn, allow);
+  }
+
+  /**
+   * Returns whether the database is currently open or not.
+   *
+   * @returns {Boolean}
+   */
+  get isOpen() {
+    return !!this.#conn;
+  }
+
+  /**
+   * Closes the database connection.
+   */
+  close() {
+    // Check if connection is closed.
+    if (!this.#conn) {
+      throw new Error('Connection is already closed.');
+    }
+
+    binding.close(this.#conn);
+    this.#conn = null;
+  }
+}
+
+/**
+ * Alias for the Database class.
+ * https://nodejs.org/api/sqlite.html#class-databasesync
+ */
+export const DatabaseSync = Database;
+
+/**
+ * This class represents a single prepared statement.
+ */
+class Statement {
+  #conn;
+  #reference;
+  #sql;
+  #useBigInt;
+
+  constructor(conn, reference, sql) {
+    this.#conn = conn;
+    this.#reference = reference;
+    this.#sql = sql;
+    this.#useBigInt = false;
+  }
+
+  /**
+   * Executes a prepared statement and returns all results.
+   *
+   * @param {...*} params - Zero or more values to bind to positional parameters.
+   * @returns {Array&lt;Object>} - An array of objects.
+   */
+  all(...params) {
+    // Check if connection is closed.
+    if (!this.#conn) {
+      throw new Error('Connection is already closed.');
+    }
+
+    return binding.query(this.#conn, this.#reference, params, this.#useBigInt);
+  }
+
+  /**
+   * Returns the first result.
+   *
+   * @param {...*} params - Zero or more values to bind to positional parameters.
+   * @returns {Object|undefined} - An object corresponding to the first row.
+   */
+  get(...params) {
+    // Check if connection is closed.
+    if (!this.#conn) {
+      throw new Error('Connection is already closed.');
+    }
+
+    return binding.queryOne(
+      this.#conn,
+      this.#reference,
+      params,
+      this.#useBigInt
+    );
+  }
+
+  /**
+   * Information about the executed query.
+   *
+   * @typedef Changes
+   * @property {number|BigInt} changes - The number of rows modified.
+   * @property {number|BigInt} lastInsertRowid - The most recently inserted rowid.
+   */
+
+  /**
+   * Executes a prepared statement and returns the resulting changes.
+   *
+   * @param {...*} params - Zero or more values to bind to positional parameters.
+   * @returns {Changes}
+   */
+  run(...params) {
+    // Check if connection is closed.
+    if (!this.#conn) {
+      throw new Error('Connection is already closed.');
+    }
+
+    return binding.run(this.#conn, this.#reference, params, this.#useBigInt);
+  }
+
+  /**
+   * Column information for the prepared statement.
+   *
+   * @typedef Column
+   * @property {String|null} column - The unaliased name of the column in the origin table.
+   * @property {String|null} database - The unaliased name of the origin database.
+   * @property {String|mull} name - The name assigned to the column in the result set of a SELECT statement.
+   * @property {String|null} table - The unaliased name of the origin table.
+   * @property {String|null} type - The declared data type of the column.
+   */
+
+  /**
+   * Returns information about the columns used by the prepared statement.
+   *
+   * @returns {Array&lt;Column>}
+   */
+  columns() {
+    // Check if connection is closed.
+    if (!this.#conn) {
+      throw new Error('Connection is already closed.');
+    }
+
+    return binding.columns(this.#conn, this.#reference);
+  }
+
+  /**
+   * Enables or disables the use of BigInts when reading INTEGER fields.
+   *
+   * @param {boolean} enable - Flag to enable or disable BigInts.
+   */
+  setReadBigInts(enable = false) {
+    // Check if flag is a boolean value.
+    if (typeof enable !== 'boolean') {
+      throw new TypeError(`The "enable" argument must be of type boolean.`);
+    }
+
+    this.#useBigInt = enable;
+  }
+
+  /**
+   * The source SQL text with parameter placeholders replaced.
+   */
+  get expandedSQL() {
+    // Check if connection is closed.
+    if (!this.#conn) {
+      throw new Error('Connection is already closed.');
+    }
+
+    return binding.expandedSql(this.#conn, this.#reference);
+  }
+
+  /**
+   * The source SQL text of the prepared statement.
+   */
+  get sourceSQL() {
+    return this.#sql;
+  }
+}
+</code></pre>
+        </article>
+    </section>
 
 
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Socket - Documentation</title>
+    <title>Statement - Documentation</title>
 
     <script src="scripts/prettify/prettify.js"></script>
     <script src="scripts/prettify/lang-css.js"></script>
@@ -29,7 +29,7 @@
 
 <div id="main">
     
-    <h1 class="page-title">Socket</h1>
+    <h1 class="page-title">Statement</h1>
     
 
     
@@ -42,12 +42,12 @@
 <header>
     
         <h2>
-            <span class="ancestors"><a href="module-Net.html">Net</a>.</span>
+            <span class="ancestors"><a href="module-SQLite.html">SQLite</a>~</span>
         
-        Socket
+        Statement
         </h2>
         
-            <div class="class-description"><p>A Socket object is a JS wrapper around a low-level TCP socket.</p></div>
+            <div class="class-description"><p>This class represents a single prepared statement.</p></div>
         
     
 </header>
@@ -62,15 +62,11 @@
     <h2>Constructor</h2>
     
 
-    <h4 class="name" id="Socket"><span class="type-signature"></span>new Socket<span class="signature">()</span><span class="type-signature"> &rarr; {Socket}</span></h4>
+    <h4 class="name" id="Statement"><span class="type-signature"></span>new Statement<span class="signature">()</span><span class="type-signature"></span></h4>
 
     
 
 
-
-<div class="description">
-    <p>Creates a new Socket instance.</p>
-</div>
 
 
 
@@ -105,7 +101,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line198">line 198</a>
+        <a href="sqlite.js.html">sqlite.js</a>, <a href="sqlite.js.html#line185">line 185</a>
     </li></ul></dd>
     
 
@@ -128,20 +124,6 @@
 
 
 
-<h5>Fires:</h5>
-<ul>
-    <li>event:connect - Emitted when a socket connection is successfully established.</li>
-
-    <li>event:data - Emitted when data is received.</li>
-
-    <li>event:end - Emitted when the other end of the socket sends a FIN packet.</li>
-
-    <li>event:error - Emitted when an error occurs.</li>
-
-    <li>event:close - Emitted once the socket is fully closed.</li>
-
-    <li>event:timeout - Emitted if the socket times out from (read) inactivity.</li>
-</ul>
 
 
 
@@ -149,28 +131,6 @@
 
 
 
-
-
-<div class="section-returns">
-<h5>Returns:</h5>
-
-        
-
-<dl class="param-type">
-    <dt>
-        Type:
-    </dt>
-    <dd>
-        
-<span class="param-type"><code>Socket</code></span>
-
-
-    </dd>
-</dl>
-
-
-    
-</div>
 
 
 
@@ -189,6 +149,138 @@
     
 
     
+        <h3 class="subsection-title">Members</h3>
+
+        
+            
+<div class="section-members">
+<h4 class="name" id="expandedSQL"><span class="type-signature"></span>expandedSQL<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    <p>The source SQL text with parameter placeholders replaced.</p>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="sqlite.js.html">sqlite.js</a>, <a href="sqlite.js.html#line298">line 298</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+</div>
+
+        
+            
+<div class="section-members">
+<h4 class="name" id="sourceSQL"><span class="type-signature"></span>sourceSQL<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    <p>The source SQL text of the prepared statement.</p>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="sqlite.js.html">sqlite.js</a>, <a href="sqlite.js.html#line310">line 310</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+</div>
+
+        
+    
 
     
         <h3 class="subsection-title">Methods</h3>
@@ -199,14 +291,14 @@
 
     
 
-    <h4 class="name" id="address"><span class="type-signature"></span>address<span class="signature">()</span><span class="type-signature"> &rarr; {SocketHost}</span></h4>
+    <h4 class="name" id="all"><span class="type-signature"></span>all<span class="signature">(&hellip;params)</span><span class="type-signature"> &rarr; {Array.&lt;Object>}</span></h4>
 
     
 
 
 
 <div class="description">
-    <p>Returns the bound address, the address family name and port of the socket.</p>
+    <p>Executes a prepared statement and returns all results.</p>
 </div>
 
 
@@ -242,7 +334,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line434">line 434</a>
+        <a href="sqlite.js.html">sqlite.js</a>, <a href="sqlite.js.html#line204">line 204</a>
     </li></ul></dd>
     
 
@@ -259,6 +351,70 @@
 
 
 
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>params</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>*</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                    &lt;repeatable><br>
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>Zero or more values to bind to positional parameters.</p>
+                
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
 
 
 
@@ -284,7 +440,7 @@
     </dt>
     <dd>
         
-<span class="param-type"><code>SocketHost</code></span>
+<span class="param-type"><code>Array.&lt;Object></code></span>
 
 
     </dd>
@@ -293,7 +449,7 @@
 
 <div class="param-desc">
     <ul>
-<li>Information about the local endpoint of the socket.</li>
+<li>An array of objects.</li>
 </ul>
 </div>
 
@@ -309,18 +465,14 @@
 
     
 
-    <h4 class="name" id="connect"><span class="type-signature">(async) </span>connect<span class="signature">(options)</span><span class="type-signature"> &rarr; {Promise.&lt;socketInfo>}</span></h4>
+    <h4 class="name" id="columns"><span class="type-signature"></span>columns<span class="signature">()</span><span class="type-signature"> &rarr; {Array.&lt;Column>}</span></h4>
 
     
 
 
 
 <div class="description">
-    <p>Initiates a connection on a given remote host.</p>
-<p>Additional signatures:</p>
-<ul>
-<li>connect(port: number | string, host?: string)</li>
-</ul>
+    <p>Returns information about the columns used by the prepared statement.</p>
 </div>
 
 
@@ -356,7 +508,111 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line237">line 237</a>
+        <a href="sqlite.js.html">sqlite.js</a>, <a href="sqlite.js.html#line272">line 272</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="section-returns">
+<h5>Returns:</h5>
+
+        
+
+<dl class="param-type">
+    <dt>
+        Type:
+    </dt>
+    <dd>
+        
+<span class="param-type"><code>Array.&lt;Column></code></span>
+
+
+    </dd>
+</dl>
+
+
+    
+</div>
+
+
+
+</div>
+        
+            
+<div class="section-method">
+
+    
+
+    <h4 class="name" id="get"><span class="type-signature"></span>get<span class="signature">(&hellip;params)</span><span class="type-signature"> &rarr; {Object|undefined}</span></h4>
+
+    
+
+
+
+<div class="description">
+    <p>Returns the first result.</p>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="sqlite.js.html">sqlite.js</a>, <a href="sqlite.js.html#line219">line 219</a>
     </li></ul></dd>
     
 
@@ -388,6 +644,8 @@
         <th>Type</th>
 
         
+        <th>Attributes</th>
+        
 
         
 
@@ -400,137 +658,70 @@
 
         <tr>
             
-                <td class="name"><code>options</code></td>
+                <td class="name"><code>params</code></td>
             
 
             <td class="type">
             
                 
+<span class="param-type"><code>*</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                    &lt;repeatable><br>
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>Zero or more values to bind to positional parameters.</p>
+                
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="section-returns">
+<h5>Returns:</h5>
+
+        
+
+<dl class="param-type">
+    <dt>
+        Type:
+    </dt>
+    <dd>
+        
 <span class="param-type"><code>Object</code></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">
-                <p>Configuration options for the connection.</p>
-                
-                    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>host</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>string</code></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">
-                <p>The hostname or IP address of the remote server to connect to.</p>
-                
-            </td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>port</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>string</code></span>
 |
 
-<span class="param-type"><code>number</code></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">
-                <p>The port number on the remote host to connect to.</p>
-                
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-                
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div class="section-returns">
-<h5>Returns:</h5>
-
-        
-
-<dl class="param-type">
-    <dt>
-        Type:
-    </dt>
-    <dd>
-        
-<span class="param-type"><code>Promise.&lt;socketInfo></code></span>
+<span class="param-type"><code>undefined</code></span>
 
 
     </dd>
@@ -538,7 +729,9 @@
 
 
 <div class="param-desc">
-    <p>Information about the connected TCP socket.</p>
+    <ul>
+<li>An object corresponding to the first row.</li>
+</ul>
 </div>
 
     
@@ -553,14 +746,14 @@
 
     
 
-    <h4 class="name" id="destroy"><span class="type-signature">(async) </span>destroy<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="run"><span class="type-signature"></span>run<span class="signature">(&hellip;params)</span><span class="type-signature"> &rarr; {Changes}</span></h4>
 
     
 
 
 
 <div class="description">
-    <p>Closes both sides of the TCP sockets.</p>
+    <p>Executes a prepared statement and returns the resulting changes.</p>
 </div>
 
 
@@ -596,90 +789,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line413">line 413</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</div>
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="end"><span class="type-signature">(async) </span>end<span class="signature">(data, encoding<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Half-closes the TCP stream.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line398">line 398</a>
+        <a href="sqlite.js.html">sqlite.js</a>, <a href="sqlite.js.html#line247">line 247</a>
     </li></ul></dd>
     
 
@@ -715,8 +825,6 @@
         
 
         
-        <th>Default</th>
-        
 
         <th class="last">Description</th>
     </tr>
@@ -727,16 +835,13 @@
 
         <tr>
             
-                <td class="name"><code>data</code></td>
+                <td class="name"><code>params</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><code>String</code></span>
-|
-
-<span class="param-type"><code>Uint8Array</code></span>
+<span class="param-type"><code>*</code></span>
 
 
             
@@ -749,59 +854,15 @@
                 
 
                 
+                    &lt;repeatable><br>
+                
                 </td>
             
 
-            
-                <td class="default">
-                
-                </td>
             
 
             <td class="description last">
-                <p>The (last) data to be written to the socket.</p>
-                
-            </td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>encoding</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>String</code></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                    utf-8
-                
-                </td>
-            
-
-            <td class="description last">
-                <p>The character encoding to use.</p>
+                <p>Zero or more values to bind to positional parameters.</p>
                 
             </td>
         </tr>
@@ -834,7 +895,7 @@
     </dt>
     <dd>
         
-<span class="param-type"><code>Promise.&lt;void></code></span>
+<span class="param-type"><code>Changes</code></span>
 
 
     </dd>
@@ -853,14 +914,14 @@
 
     
 
-    <h4 class="name" id="read"><span class="type-signature"></span>read<span class="signature">()</span><span class="type-signature"> &rarr; {Promise.&lt;(Uint8Array|string)>}</span></h4>
+    <h4 class="name" id="setReadBigInts"><span class="type-signature"></span>setReadBigInts<span class="signature">(enable)</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    <p>Returns a promise which is fulfilled when the TCP stream can return a chunk.</p>
+    <p>Enables or disables the use of BigInts when reading INTEGER fields.</p>
 </div>
 
 
@@ -896,270 +957,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line336">line 336</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div class="section-returns">
-<h5>Returns:</h5>
-
-        
-
-<dl class="param-type">
-    <dt>
-        Type:
-    </dt>
-    <dd>
-        
-<span class="param-type"><code>Promise.&lt;(Uint8Array|string)></code></span>
-
-
-    </dd>
-</dl>
-
-
-<div class="param-desc">
-    <p>The chunk read from the socket.</p>
-</div>
-
-    
-</div>
-
-
-
-</div>
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="setEncoding"><span class="type-signature"></span>setEncoding<span class="signature">(encoding<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Sets the encoding for the current socket.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line301">line 301</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-        <th>Default</th>
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>encoding</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>String</code></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                    utf-8
-                
-                </td>
-            
-
-            <td class="description last">
-                <p>The character encoding to use.</p>
-                
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</div>
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="setTimeout"><span class="type-signature"></span>setTimeout<span class="signature">(timeout)</span><span class="type-signature"></span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Sets the socket to timeout after timeout milliseconds of (read) inactivity on the socket.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line314">line 314</a>
+        <a href="sqlite.js.html">sqlite.js</a>, <a href="sqlite.js.html#line286">line 286</a>
     </li></ul></dd>
     
 
@@ -1205,13 +1003,13 @@
 
         <tr>
             
-                <td class="name"><code>timeout</code></td>
+                <td class="name"><code>enable</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><code>Number</code></span>
+<span class="param-type"><code>boolean</code></span>
 
 
             
@@ -1222,13 +1020,13 @@
             
                 <td class="default">
                 
-                    0
+                    false
                 
                 </td>
             
 
             <td class="description last">
-                <p>The duration after which the socket should timeout due to inactivity.</p>
+                <p>Flag to enable or disable BigInts.</p>
                 
             </td>
         </tr>
@@ -1249,227 +1047,6 @@
 
 
 
-
-
-
-</div>
-        
-            
-<div class="section-method">
-
-    
-
-    <h4 class="name" id="write"><span class="type-signature">(async) </span>write<span class="signature">(data, encoding<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;Number>}</span></h4>
-
-    
-
-
-
-<div class="description">
-    <p>Writes contents to a TCP socket stream.</p>
-</div>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="net.js.html">net.js</a>, <a href="net.js.html#line364">line 364</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-        <th>Default</th>
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>data</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>String</code></span>
-|
-
-<span class="param-type"><code>Uint8Array</code></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                </td>
-            
-
-            <td class="description last">
-                <p>The data to be written to the socket.</p>
-                
-            </td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>encoding</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><code>String</code></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                    utf-8
-                
-                </td>
-            
-
-            <td class="description last">
-                <p>The character encoding to use.</p>
-                
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div class="section-returns">
-<h5>Returns:</h5>
-
-        
-
-<dl class="param-type">
-    <dt>
-        Type:
-    </dt>
-    <dd>
-        
-<span class="param-type"><code>Promise.&lt;Number></code></span>
-
-
-    </dd>
-</dl>
-
-
-<div class="param-desc">
-    <p>The number of bytes written.</p>
-</div>
-
-    
-</div>
 
 
 
