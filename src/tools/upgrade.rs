@@ -4,8 +4,10 @@ use indicatif::ProgressStyle;
 use std::fs;
 use std::process::Command;
 use tempdir::TempDir;
+use ureq::ResponseExt;
 
 const RELEASE_URL: &str = "https://github.com/aalykiot/dune/releases/latest/";
+const RELEASE_TAG_PREFIX: &str = "https://github.com/aalykiot/dune/releases/tag/v";
 
 pub fn run_upgrade() -> Result<()> {
     // Start the upgrade.
@@ -14,8 +16,9 @@ pub fn run_upgrade() -> Result<()> {
     // Find dune's latest version.
     let response = ureq::get(RELEASE_URL).call()?;
     let version = response
-        .get_url()
-        .replace("https://github.com/aalykiot/dune/releases/tag/v", "");
+        .get_uri()
+        .to_string()
+        .replace(RELEASE_TAG_PREFIX, "");
 
     // Check if latest version is already installed.
     if env!("CARGO_PKG_VERSION") == version {
@@ -31,15 +34,14 @@ pub fn run_upgrade() -> Result<()> {
 
     println!("Downloading {download_url}");
 
-    // Download the new binary.
-    let response = ureq::get(&download_url).call()?;
+    let mut response = ureq::get(&download_url).call()?;
 
     let total_bytes = response
-        .header("content-length")
+        .headers()
+        .get("content-length")
+        .and_then(|len| len.to_str().ok())
         .and_then(|len| len.parse::<u64>().ok())
         .unwrap_or(0);
-
-    let reader = response.into_reader();
 
     // Display a progress bar when downloading for better UX.
     let pb = ProgressBar::new(total_bytes);
@@ -58,6 +60,7 @@ pub fn run_upgrade() -> Result<()> {
     let archive = format!("dune-{}.zip", env!("TARGET"));
 
     // Download new binary.
+    let reader = response.body_mut().as_reader();
     let mut binary = fs::File::create_new(temp_dir.path().join(&archive))?;
     std::io::copy(&mut pb.wrap_read(reader), &mut binary)?;
 

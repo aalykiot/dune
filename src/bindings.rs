@@ -12,6 +12,7 @@ use crate::promise;
 use crate::runtime::check_exceptions;
 use crate::runtime::JsRuntime;
 use crate::signals;
+use crate::sqlite;
 use crate::stdio;
 use crate::timers;
 use anyhow::Error;
@@ -35,6 +36,7 @@ lazy_static! {
             ("http_parser", http_parser::initialize),
             ("signals", signals::initialize),
             ("exceptions", exceptions::initialize),
+            ("sqlite", sqlite::initialize),
         ];
         HashMap::from_iter(bindings.into_iter())
     };
@@ -159,12 +161,13 @@ pub fn set_internal_ref<T>(
     target: v8::Local<v8::Object>,
     index: usize,
     data: T,
-) {
+) -> *mut T {
     let boxed_ref = Box::new(data);
-    let addr = Box::leak(boxed_ref) as *mut T as *mut c_void;
-    let v8_ext = v8::External::new(scope, addr);
+    let address = Box::leak(boxed_ref) as *mut T;
+    let v8_ext = v8::External::new(scope, address as *mut c_void);
 
     target.set_internal_field(index, v8_ext.into());
+    address
 }
 
 /// Gets a previously stored Rust type from a v8 object.

@@ -134,8 +134,7 @@ fn memory_usage(
     mut rv: v8::ReturnValue,
 ) {
     // Get HeapStatistics from v8.
-    let mut stats = v8::HeapStatistics::default();
-    scope.get_heap_statistics(&mut stats);
+    let stats = scope.get_heap_statistics();
 
     let total_heap = v8::Number::new(scope, stats.total_heap_size() as f64);
     let used_heap = v8::Number::new(scope, stats.used_heap_size() as f64);

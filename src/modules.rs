@@ -41,6 +41,7 @@ lazy_static! {
             ("test", include_str!("./js/test.js")),
             ("stream", include_str!("./js/stream.js")),
             ("http", include_str!("./js/http.js")),
+            ("sqlite", include_str!("./js/sqlite.js")),
             ("@web/abort", include_str!("./js/abort-controller.js")),
             ("@web/text_encoding", include_str!("./js/text-encoding.js")),
             ("@web/clone", include_str!("./js/structured-clone.js")),
@@ -538,10 +539,7 @@ pub fn fetch_module_tree<'a>(
     let source = v8::String::new(scope, &source).unwrap();
     let mut source = v8::script_compiler::Source::new(source, Some(&origin));
 
-    let module = match v8::script_compiler::compile_module(scope, &mut source) {
-        Some(module) => module,
-        None => return None,
-    };
+    let module = v8::script_compiler::compile_module(scope, &mut source)?;
 
     // Subscribe module to the module-map.
     let module_ref = v8::Global::new(scope, module);
