@@ -268,7 +268,7 @@ fn remove_timeout(
 }
 ```
 
-The state should be available in all shorts of different places that's why we wrap it into a `Rc<RefCell<T>>` structure.
+The state should be available in all sorts of different places that's why we wrap it into a `Rc<RefCell<T>>` structure.
 
 **Important**: It is crucial to be cautious because only one "accessor" should borrow the state at any given moment. Otherwise, Rust will panic, leading to a crash in Dune.
 
@@ -276,7 +276,7 @@ The state should be available in all shorts of different places that's why we wr
 
 Given JavaScript's asynchronous nature, heavily reliant on promises, it's vital to comprehend how this interface is exposed by V8 and how Dune utilizes it.
 
-There is two kind of objects exposed by V8:
+There are two kinds of objects exposed by V8:
 
 - **`v8::Promise`**: An instance of the built-in Promise constructor.
 
