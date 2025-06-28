@@ -23,6 +23,7 @@ use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::path::Path;
+use std::cell::Cell;
 use std::rc::Rc;
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
@@ -117,13 +118,34 @@ impl JsFuture for FsOpenFuture {
         let file_wrapper = v8::ObjectTemplate::new(scope);
 
         // Allocate space for the wrapped Rust type.
-        file_wrapper.set_internal_field_count(1);
+        file_wrapper.set_internal_field_count(2);
 
         let file_wrapper = file_wrapper.new_instance(scope).unwrap();
         let fd = v8::Number::new(scope, file_ptr as f64);
 
         set_constant_to(scope, file_wrapper, "fd", fd.into());
-        set_internal_ref(scope, file_wrapper, 0, Some(file));
+
+        let file_ptr = set_internal_ref(scope, file_wrapper, 0, Some(file));
+        let weak_rc = Rc::new(Cell::new(None));
+
+        // Note: To automatically close the file (i.e., drop the instance) when
+        // V8 garbage collects the object that internally holds the Rust file,
+        // we use a Weak reference with a finalizer callback.
+        let file_weak = v8::Weak::with_finalizer(
+            scope,
+            file_wrapper,
+            Box::new({
+                let weak_rc = weak_rc.clone();
+                move |isolate| unsafe {
+                    drop(Box::from_raw(file_ptr));
+                    drop(v8::Weak::from_raw(isolate, weak_rc.get()));
+                }
+            }),
+        );
+
+        // Store the weak ref pointer into the "shared" cell.
+        weak_rc.set(file_weak.into_raw());
+        set_internal_ref(scope, file_wrapper, 1, weak_rc);
 
         self.promise
             .open(scope)
@@ -192,13 +214,34 @@ fn open_sync(
             let file_wrapper = v8::ObjectTemplate::new(scope);
 
             // Allocate space for the wrapped Rust type.
-            file_wrapper.set_internal_field_count(1);
+            file_wrapper.set_internal_field_count(2);
 
             let file_wrapper = file_wrapper.new_instance(scope).unwrap();
             let fd = v8::Number::new(scope, file_ptr as f64);
 
             set_constant_to(scope, file_wrapper, "fd", fd.into());
-            set_internal_ref(scope, file_wrapper, 0, Some(file));
+
+            let file_ptr = set_internal_ref(scope, file_wrapper, 0, Some(file));
+            let weak_rc = Rc::new(Cell::new(None));
+
+            // Note: To automatically close the file (i.e., drop the instance) when
+            // V8 garbage collects the object that internally holds the Rust file,
+            // we use a Weak reference with a finalizer callback.
+            let file_weak = v8::Weak::with_finalizer(
+                scope,
+                file_wrapper,
+                Box::new({
+                    let weak_rc = weak_rc.clone();
+                    move |isolate| unsafe {
+                        drop(Box::from_raw(file_ptr));
+                        drop(v8::Weak::from_raw(isolate, weak_rc.get()));
+                    }
+                }),
+            );
+
+            // Store the weak ref pointer into the "shared" cell.
+            weak_rc.set(file_weak.into_raw());
+            set_internal_ref(scope, file_wrapper, 1, weak_rc);
 
             rv.set(file_wrapper.into());
         }
@@ -1191,8 +1234,8 @@ fn open_file_op<P: AsRef<Path>>(path: P, flags: String) -> Result<usize> {
     let truncate = flags == "w+";
     let append = flags == "a" || flags == "a+";
 
-    // Note: The reason we leak the wrapped file handle is to prevent rust
-    // from dropping the handle (a.k.a close the file) when current scope ends.
+    // Note: The reason we forget the file handle is to prevent rust from
+    // dropping it (a.k.a closing the file) when the current scope ends.
     match OpenOptions::new()
         .read(read)
         .write(write)
@@ -1202,9 +1245,17 @@ fn open_file_op<P: AsRef<Path>>(path: P, flags: String) -> Result<usize> {
         .open(path)
     {
         #[cfg(target_family = "unix")]
-        Ok(file) => Ok(Box::leak(Box::new(file)).as_raw_fd() as usize),
+        Ok(file) => {
+            let fd = file.as_raw_fd();
+            std::mem::forget(file);
+            Ok(fd as usize)
+        }
         #[cfg(target_family = "windows")]
-        Ok(file) => Ok(Box::leak(Box::new(file)).as_raw_handle() as usize),
+        Ok(file) => {
+            let handle = file.as_raw_handle();
+            std::mem::forget(file);
+            Ok(handle as usize)
+        }
         Err(e) => bail!(e),
     }
 }
