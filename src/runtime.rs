@@ -594,7 +594,7 @@ impl JsRuntime {
 
     /// Returns a v8 handle scope for the runtime.
     /// https://v8docs.nodesource.com/node-0.8/d3/d95/classv8_1_1_handle_scope.html.
-    pub fn handle_scope(&mut self) -> v8::HandleScope {
+    pub fn handle_scope(&mut self) -> v8::HandleScope<'_> {
         let context = self.context();
         v8::HandleScope::with_context(&mut self.isolate, context)
     }

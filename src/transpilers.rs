@@ -3,10 +3,10 @@ use anyhow::Result;
 use base64::prelude::*;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::rc::Rc;
 use swc_common::comments::SingleThreadedComments;
 use swc_common::errors::ColorConfig;
 use swc_common::errors::Handler;
+use swc_common::source_map::DefaultSourceMapGenConfig;
 use swc_common::sync::Lrc;
 use swc_common::BytePos;
 use swc_common::FileName;
@@ -49,7 +49,7 @@ impl TypeScript {
             None => FileName::Anon,
         };
 
-        let fm = cm.new_source_file(filename.into(), source.into());
+        let fm = cm.new_source_file(filename.into(), source.to_string());
 
         // Initialize the TypeScript lexer.
         let lexer = Lexer::new(
@@ -137,7 +137,7 @@ impl Jsx {
             None => FileName::Anon,
         };
 
-        let fm = cm.new_source_file(filename.into(), source.into());
+        let fm = cm.new_source_file(filename.into(), source.to_string());
 
         // NOTE: We're using a TypeScript lexer to parse JSX because it's a super-set
         // of JavaScript and we also want to support .tsx files.
@@ -174,7 +174,7 @@ impl Jsx {
         let pragma = PRAGMA_REGEX
             .find_iter(source)
             .next()
-            .map(|m| Rc::new(m.as_str().to_string().replace("@jsx ", "")));
+            .map(|m| m.as_str().to_string().replace("@jsx ", "").into());
 
         GLOBALS.set(&globals, || {
             // We're gonna apply the following transformations.
@@ -245,7 +245,7 @@ impl Wasm {
 /// Returns the string (JSON) representation of the source-map.
 fn source_map_to_string(cm: Lrc<SourceMap>, mappings: &[(BytePos, LineCol)]) -> String {
     let mut buffer = Vec::new();
-    let source_map = cm.build_source_map(mappings);
+    let source_map = cm.build_source_map(mappings, None, DefaultSourceMapGenConfig);
     source_map.to_writer(&mut buffer).unwrap();
     String::from_utf8_lossy(&buffer).to_string()
 }

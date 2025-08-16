@@ -164,7 +164,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 
 - [x] `fd`: The numeric file descriptor.
 - [x] `close()`: Closes the file.
-- [x] `read(size?, offset?)`: Reads data from the file.
+- [x] `read(buffer, offset?)`: Reads data from the file.
 - [x] `stat()`: Retrieves statistics for the file.
 - [x] `write(data, offset?)`: Writes data to the file.
 
