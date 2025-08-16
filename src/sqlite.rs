@@ -67,7 +67,7 @@ impl<'s> SQLiteConnection<'s> {
     }
 
     // Returns a mut reference to statements.
-    pub fn statements(&self) -> RefMut<'s, StatementMap> {
+    pub fn statements(&self) -> RefMut<'s, StatementMap<'_>> {
         self.statements.borrow_mut()
     }
 }
