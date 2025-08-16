@@ -114,7 +114,6 @@ fn dns_lookup(
 /// Pure rust implementation of a DNS lookup.
 fn dns_lookup_op(hostname: &str) -> Result<Vec<(String, String)>> {
     Ok(lookup_host(hostname)?
-        .iter()
         .map(|ip| match ip {
             IpAddr::V4(address) => (address.to_string(), "IPv4".into()),
             IpAddr::V6(address) => (address.to_string(), "IPv6".into()),

@@ -633,7 +633,10 @@ fn load_sqlite_extetnion_op<P: AsRef<Path>>(conn: &Connection, path: P) -> Resul
     // extension loading is enabled.
     let _guard = unsafe { LoadExtensionGuard::new(conn)? };
 
-    unsafe { conn.load_extension(path, None).map_err(|e| anyhow!(e)) }
+    unsafe {
+        conn.load_extension(path, None::<&str>)
+            .map_err(|e| anyhow!(e))
+    }
 }
 
 // Returns a SQLite row as a JavaScript object.
