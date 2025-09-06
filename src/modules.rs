@@ -81,6 +81,7 @@ pub type ModuleSource = String;
 pub struct ModuleMap {
     pub main: Option<ModulePath>,
     pub index: HashMap<ModulePath, v8::Global<v8::Module>>,
+    pub path_index: HashMap<i32, ModulePath>,
     pub seen: HashMap<ModulePath, ModuleStatus>,
     pub pending: Vec<Rc<RefCell<ModuleGraph>>>,
 }
@@ -91,18 +92,20 @@ impl ModuleMap {
         Self {
             main: None,
             index: HashMap::new(),
+            path_index: HashMap::new(),
             seen: HashMap::new(),
             pending: vec![],
         }
     }
 
     // Inserts a compiled ES module to the map.
-    pub fn insert(&mut self, path: &str, module: v8::Global<v8::Module>) {
+    pub fn insert(&mut self, path: &str, module_id: i32, module: v8::Global<v8::Module>) {
         // No main module has been set, so let's update the value.
         if self.main.is_none() && (fs::metadata(path).is_ok() || path.starts_with("http")) {
             self.main = Some(path.into());
         }
         self.index.insert(path.into(), module);
+        self.path_index.insert(module_id, path.into());
     }
 
     // Returns if there are still pending imports to be loaded.
@@ -116,11 +119,8 @@ impl ModuleMap {
     }
 
     // Returns a specifier given a v8 module.
-    pub fn get_path(&self, module: v8::Global<v8::Module>) -> Option<ModulePath> {
-        self.index
-            .iter()
-            .find(|(_, m)| **m == module)
-            .map(|(p, _)| p.clone())
+    pub fn get_path(&self, module_id: &i32) -> Option<ModulePath> {
+        self.path_index.get(module_id).cloned()
     }
 
     // Returns the main entry point.
@@ -313,9 +313,12 @@ impl JsFuture for EsModuleFuture {
         };
 
         let new_status = ModuleStatus::Resolving;
+        let module_id = module.get_identity_hash().get();
         let module_ref = v8::Global::new(tc_scope, module);
 
-        state.module_map.insert(self.path.as_str(), module_ref);
+        state
+            .module_map
+            .insert(self.path.as_str(), module_id, module_ref);
         state.module_map.seen.insert(self.path.clone(), new_status);
 
         let import_map = state.options.import_map.clone();
@@ -542,8 +545,12 @@ pub fn fetch_module_tree<'a>(
     let module = v8::script_compiler::compile_module(scope, &mut source)?;
 
     // Subscribe module to the module-map.
+    let module_id = module.get_identity_hash().get();
     let module_ref = v8::Global::new(scope, module);
-    state.borrow_mut().module_map.insert(filename, module_ref);
+    state
+        .borrow_mut()
+        .module_map
+        .insert(filename, module_id, module_ref);
 
     let requests = module.get_module_requests();
 
