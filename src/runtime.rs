@@ -474,6 +474,7 @@ impl JsRuntime {
                     }
                 }
 
+                counter.increase_failed(&graph_root.path);
                 return false;
             }
 
@@ -484,6 +485,7 @@ impl JsRuntime {
             }
 
             ready_imports.push(Rc::clone(graph_rc));
+            counter.increase_resolved(&graph_root.path);
             false
         });
 
