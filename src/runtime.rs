@@ -322,6 +322,7 @@ impl JsRuntime {
 
         state.module_map.pending.push(Rc::clone(&graph_rc));
         state.module_map.seen.insert(path.clone(), status);
+        state.module_map.counter.increase_seen(&path);
 
         // If we have a source, create the es-module future.
         if let Some(source) = source {
@@ -450,6 +451,7 @@ impl JsRuntime {
         let state_ref = &mut *state;
         let pending_graphs = &mut state_ref.module_map.pending;
         let seen_modules = &mut state_ref.module_map.seen;
+        let counter = &mut state_ref.module_map.counter;
 
         pending_graphs.retain(|graph_rc| {
             // Get a usable ref to graph's root module.
@@ -477,7 +479,7 @@ impl JsRuntime {
 
             // If the graph is still loading, fast-forward the dependencies.
             if graph_root.status != ModuleStatus::Ready {
-                graph_root.fast_forward(seen_modules);
+                graph_root.fast_forward(seen_modules, counter);
                 return true;
             }
 
@@ -511,6 +513,11 @@ impl JsRuntime {
             }
 
             let _ = module.evaluate(tc_scope);
+            state_rc
+                .borrow_mut()
+                .module_map
+                .counter
+                .increase_evaluated(&path);
             let is_root_module = !graph.root_rc.borrow().is_dynamic_import;
 
             // Note: Due to the architecture, when a module errors, the `promise_reject_cb`

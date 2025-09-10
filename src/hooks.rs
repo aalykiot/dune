@@ -218,6 +218,7 @@ pub fn host_import_module_dynamically_cb<'s>(
 
     state.module_map.pending.push(Rc::clone(&graph_rc));
     state.module_map.seen.insert(specifier.clone(), status);
+    state.module_map.counter.increase_seen(&specifier);
 
     /*  Use the event-loop to asynchronously load the requested module. */
 

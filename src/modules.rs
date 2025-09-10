@@ -135,6 +135,7 @@ impl ModuleMap {
 
 #[derive(Debug, Default, Clone)]
 pub struct ModuleMapCounter {
+    pub seen: HashMap<ModulePath, u32>,
     pub pending: HashMap<ModulePath, u32>,
     pub resolved: HashMap<ModulePath, u32>,
     pub failed: HashMap<ModulePath, u32>,
@@ -142,6 +143,11 @@ pub struct ModuleMapCounter {
 }
 
 impl ModuleMapCounter {
+    pub fn increase_seen(&mut self, specifier: &str) {
+        let old = self.seen.get(specifier).unwrap_or(&0);
+        self.seen.insert(specifier.into(), old + 1);
+    }
+
     pub fn increase_pending(&mut self, specifier: &str) {
         let old = self.pending.get(specifier).unwrap_or(&0);
         self.pending.insert(specifier.into(), old + 1);
@@ -194,7 +200,11 @@ pub struct EsModule {
 
 impl EsModule {
     // Traverses the dependency tree to check if the module is ready.
-    pub fn fast_forward(&mut self, seen_modules: &mut HashMap<ModulePath, ModuleStatus>) {
+    pub fn fast_forward(
+        &mut self,
+        seen_modules: &mut HashMap<ModulePath, ModuleStatus>,
+        seen_counter: &mut ModuleMapCounter,
+    ) {
         // If the module is ready, no need to check the sub-tree.
         if self.status == ModuleStatus::Ready {
             return;
@@ -212,12 +222,13 @@ impl EsModule {
         // Fast-forward all dependencies.
         self.dependencies
             .iter_mut()
-            .for_each(|dep| dep.borrow_mut().fast_forward(seen_modules));
+            .for_each(|dep| dep.borrow_mut().fast_forward(seen_modules, seen_counter));
 
         // The module is compiled and has 0 dependencies.
         if self.dependencies.is_empty() && self.status == ModuleStatus::Resolving {
             self.status = ModuleStatus::Ready;
             seen_modules.insert(self.path.clone(), self.status);
+            seen_counter.increase_seen(&self.path);
             return;
         }
 
@@ -351,6 +362,7 @@ impl JsFuture for EsModuleFuture {
 
         state.module_map.insert(self.path.as_str(), module_ref);
         state.module_map.seen.insert(self.path.clone(), new_status);
+        state.module_map.counter.increase_seen(&self.path);
 
         let import_map = state.options.import_map.clone();
 
@@ -424,7 +436,8 @@ impl JsFuture for EsModuleFuture {
                     }
                 };
 
-                state.module_map.seen.insert(specifier, status);
+                state.module_map.seen.insert(specifier.clone(), status);
+                state.module_map.counter.increase_seen(&specifier);
                 state.handle.spawn(task, Some(task_cb));
             }
         }
