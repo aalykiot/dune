@@ -83,6 +83,9 @@ pub struct ModuleMap {
     pub index: HashMap<ModulePath, v8::Global<v8::Module>>,
     pub seen: HashMap<ModulePath, ModuleStatus>,
     pub pending: Vec<Rc<RefCell<ModuleGraph>>>,
+
+    // Only for testing
+    pub counter: ModuleMapCounter,
 }
 
 impl ModuleMap {
@@ -93,6 +96,7 @@ impl ModuleMap {
             index: HashMap::new(),
             seen: HashMap::new(),
             pending: vec![],
+            counter: ModuleMapCounter::default(),
         }
     }
 
@@ -126,6 +130,36 @@ impl ModuleMap {
     // Returns the main entry point.
     pub fn main(&self) -> Option<ModulePath> {
         self.main.clone()
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ModuleMapCounter {
+    pub pending: HashMap<ModulePath, u32>,
+    pub resolved: HashMap<ModulePath, u32>,
+    pub failed: HashMap<ModulePath, u32>,
+    pub evaluated: HashMap<ModulePath, u32>,
+}
+
+impl ModuleMapCounter {
+    pub fn increase_pending(&mut self, specifier: &str) {
+        let old = self.pending.get(specifier).unwrap_or(&0);
+        self.pending.insert(specifier.into(), old + 1);
+    }
+
+    pub fn increase_resolved(&mut self, specifier: &str) {
+        let old = self.resolved.get(specifier).unwrap_or(&0);
+        self.resolved.insert(specifier.into(), old + 1);
+    }
+
+    pub fn increase_failed(&mut self, specifier: &str) {
+        let old = self.failed.get(specifier).unwrap_or(&0);
+        self.failed.insert(specifier.into(), old + 1);
+    }
+
+    pub fn increase_evaluated(&mut self, specifier: &str) {
+        let old = self.evaluated.get(specifier).unwrap_or(&0);
+        self.evaluated.insert(specifier.into(), old + 1);
     }
 }
 
