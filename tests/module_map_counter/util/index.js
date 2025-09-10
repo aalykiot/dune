@@ -1,5 +1,10 @@
-import { add } from './adder.js';
-import { echo } from './echo.js';
+function add(a, b) {
+  return a + b;
+}
+
+function echo(value) {
+  console.log(value);
+}
 
 export default {
   add,
