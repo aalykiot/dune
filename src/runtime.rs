@@ -321,6 +321,7 @@ impl JsRuntime {
         let status = ModuleStatus::Fetching;
 
         state.module_map.pending.push(Rc::clone(&graph_rc));
+        state.module_map.counter.increase_pending(&path);
         state.module_map.seen.insert(path.clone(), status);
         state.module_map.counter.increase_seen(&path);
 
