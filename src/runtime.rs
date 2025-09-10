@@ -408,6 +408,11 @@ impl JsRuntime {
             let scope = &mut self.handle_scope();
             inspector.borrow_mut().context_destroyed(scope, context);
         }
+
+        println!(
+            "Module map counter/monitor:{:?}",
+            self.get_state().borrow().module_map.counter
+        );
     }
 
     /// Runs all the pending javascript tasks.
