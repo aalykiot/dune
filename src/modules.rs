@@ -300,6 +300,7 @@ impl ModuleGraph {
     }
 }
 
+#[derive(Debug)]
 pub struct EsModuleFuture {
     pub path: ModulePath,
     pub module: Rc<RefCell<EsModule>>,

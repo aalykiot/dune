@@ -1,0 +1,67 @@
+pending_graphs [
+  RefCell {
+    value: ModuleGraph {
+      kind: Static,
+      root_rc: RefCell {
+        value: EsModule {
+          path: "/Users/rlin/github/linrongbin16/dune/tests/module_map_counter4/index.js",
+          status: Ready,
+          dependencies: [
+            RefCell {
+              value: EsModule {
+                path: "/Users/rlin/github/linrongbin16/dune/tests/module_map_counter4/utils/a.js",
+                status: Ready,
+                dependencies: [
+                  RefCell {
+                    value: EsModule {
+                      path: "/Users/rlin/github/linrongbin16/dune/tests/module_map_counter4/utils/b.js",
+                      status: Ready,
+                      dependencies: [
+                        RefCell {
+                          value: EsModule {
+                            path: "/Users/rlin/github/linrongbin16/dune/tests/module_map_counter4/utils/c.js",
+                            status: Ready,
+                            dependencies: [
+                              RefCell {
+                                value: EsModule {
+                                  path: "/Users/rlin/github/linrongbin16/dune/tests/module_map_counter4/utils/d.js",
+                                  status: Ready,
+                                  dependencies: [],
+                                  exception: RefCell {
+                                    value: None
+                                  },
+                                  is_dynamic_import: false
+                                }
+                              }
+                            ],
+                            exception: RefCell {
+                              value: None
+                            },
+                            is_dynamic_import: false
+                          }
+                        }
+                      ],
+                      exception: RefCell {
+                        value: None
+                      },
+                      is_dynamic_import: false
+                    }
+                  }
+                ],
+                exception: RefCell {
+                  value: None
+                },
+                is_dynamic_import: false
+              }
+            }
+          ],
+          exception: RefCell {
+            value: None
+          },
+          is_dynamic_import: false
+        }
+      },
+      same_origin: []
+    }
+  }
+]

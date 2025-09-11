@@ -391,6 +391,7 @@ impl JsRuntime {
             || self.has_pending_imports()
             || self.has_next_tick_callbacks()
         {
+            println!("has_pending_events:{:?}, has_promise_rejections:{:?}, has_pending_background_tasks:{:?}, has_pending_imports:{:?}, has_next_tick_callbacks:{:?}", self.event_loop.has_pending_events(), self.has_promise_rejections(), self.isolate.has_pending_background_tasks(), self.has_pending_imports(), self.has_next_tick_callbacks());
             // Check for pending devtools messages.
             self.poll_inspect_session();
             // Tick the event-loop one cycle.
@@ -433,6 +434,9 @@ impl JsRuntime {
         // the MicroTask and NextTick Queue.
 
         for mut fut in futures {
+            println!("Run a future");
+
+            // println!("run futures {:?}", fut);
             fut.run(scope);
             if let Some(error) = check_exceptions(scope) {
                 report_and_exit(error);
@@ -458,6 +462,7 @@ impl JsRuntime {
         let pending_graphs = &mut state_ref.module_map.pending;
         let seen_modules = &mut state_ref.module_map.seen;
         let counter = &mut state_ref.module_map.counter;
+        println!("pending_graphs {:?}", pending_graphs);
 
         pending_graphs.retain(|graph_rc| {
             // Get a usable ref to graph's root module.
@@ -492,6 +497,7 @@ impl JsRuntime {
 
             ready_imports.push(Rc::clone(graph_rc));
             counter.increase_resolved(&graph_root.path);
+            println!("module_graph {:?} is ready", &graph_root.path);
             false
         });
 

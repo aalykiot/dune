@@ -29,8 +29,12 @@ pub fn module_resolve_cb<'a>(
     let referrer = v8::Global::new(scope, referrer);
 
     let dependant = state.module_map.get_path(referrer);
-
     let specifier = specifier.to_rust_string_lossy(scope);
+    println!(
+        "module_resolve_cb referrer:{:?}, specifier:{:?}",
+        dependant, specifier
+    );
+
     let specifier = unwrap_or_exit(resolve_import(
         dependant.as_deref(),
         &specifier,
@@ -154,6 +158,10 @@ pub fn host_import_module_dynamically_cb<'s>(
     // Get module base and specifier as strings.
     let base = base.to_rust_string_lossy(scope);
     let specifier = specifier.to_rust_string_lossy(scope);
+    println!(
+        "host_import_module_dynamically_cb base:{:?}, specifier:{:?}",
+        base, specifier
+    );
 
     // Create the import promise.
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
