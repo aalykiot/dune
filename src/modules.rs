@@ -139,6 +139,7 @@ pub struct ModuleMapCounter {
     pub pending: HashMap<ModulePath, u32>,
     pub resolved: HashMap<ModulePath, u32>,
     pub failed: HashMap<ModulePath, u32>,
+    pub instantiated: HashMap<ModulePath, u32>,
     pub evaluated: HashMap<ModulePath, u32>,
 }
 
@@ -161,6 +162,11 @@ impl ModuleMapCounter {
     pub fn increase_failed(&mut self, specifier: &str) {
         let old = self.failed.get(specifier).unwrap_or(&0);
         self.failed.insert(specifier.into(), old + 1);
+    }
+
+    pub fn increase_instantiated(&mut self, specifier: &str) {
+        let old = self.instantiated.get(specifier).unwrap_or(&0);
+        self.instantiated.insert(specifier.into(), old + 1);
     }
 
     pub fn increase_evaluated(&mut self, specifier: &str) {
