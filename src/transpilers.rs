@@ -110,13 +110,10 @@ impl TypeScript {
         // Prepare the inline source map comment.
         let source_map = source_map_to_string(cm, &source_map);
         let source_map = BASE64_STANDARD.encode(source_map.as_bytes());
-        let source_map = format!(
-            "//# sourceMappingURL=data:application/json;base64,{}",
-            source_map
-        );
+        let source_map = format!("//# sourceMappingURL=data:application/json;base64,{source_map}");
 
         let code = String::from_utf8_lossy(&output).to_string();
-        let output = format!("{}\n{}", code, source_map);
+        let output = format!("{code}\n{source_map}");
 
         Ok(output)
     }
@@ -213,13 +210,10 @@ impl Jsx {
         // Prepare the inline source map comment.
         let source_map = source_map_to_string(cm, &source_map);
         let source_map = BASE64_STANDARD.encode(source_map.as_bytes());
-        let source_map = format!(
-            "//# sourceMappingURL=data:application/json;base64,{}",
-            source_map
-        );
+        let source_map = format!("//# sourceMappingURL=data:application/json;base64,{source_map}");
 
         let code = String::from_utf8_lossy(&output).to_string();
-        let output = format!("{}\n{}", code, source_map);
+        let output = format!("{code}\n{source_map}");
 
         Ok(output)
     }

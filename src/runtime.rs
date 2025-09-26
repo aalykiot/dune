@@ -497,7 +497,7 @@ impl JsRuntime {
             let graph = graph_rc.borrow();
             let path = graph.root_rc.borrow().path.clone();
 
-            let module = state_rc.borrow().module_map.get(&path).unwrap();
+            let module = state_rc.borrow().module_map.get_module(&path).unwrap();
             let module = v8::Local::new(tc_scope, module);
 
             if module

@@ -210,7 +210,7 @@ fn parse_inspect_address(s: &str) -> Result<SocketAddrV4> {
     // Check if only the port is defined.
     match s.parse::<usize>() {
         Ok(port) if PORT_RANGE.contains(&port) => {
-            let address = format!("127.0.0.1:{}", port);
+            let address = format!("127.0.0.1:{port}");
             let address = address.parse::<SocketAddrV4>().unwrap();
             return Ok(address);
         }
@@ -325,7 +325,7 @@ fn test_command(args: &TestArgs, globals: &GlobalArgs) {
     }
 
     let filter = match args.filter.as_ref() {
-        Some(value) => format!("new RegExp({})", value),
+        Some(value) => format!("new RegExp({value})"),
         None => "undefined".into(),
     };
 

@@ -16,6 +16,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;
 use std::cell::RefCell;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::collections::LinkedList;
 use std::env;
@@ -77,10 +78,12 @@ pub fn create_origin<'s>(
 
 pub type ModulePath = String;
 pub type ModuleSource = String;
+pub type ModuleRef = v8::Global<v8::Module>;
 
 pub struct ModuleMap {
     pub main: Option<ModulePath>,
-    pub index: HashMap<ModulePath, v8::Global<v8::Module>>,
+    pub by_path: HashMap<ModulePath, ModuleRef>,
+    pub by_id: HashMap<i32, Vec<(ModulePath, ModuleRef)>>,
     pub seen: HashMap<ModulePath, ModuleStatus>,
     pub pending: Vec<Rc<RefCell<ModuleGraph>>>,
 }
@@ -90,19 +93,29 @@ impl ModuleMap {
     pub fn new() -> ModuleMap {
         Self {
             main: None,
-            index: HashMap::new(),
+            by_id: HashMap::new(),
+            by_path: HashMap::new(),
             seen: HashMap::new(),
             pending: vec![],
         }
     }
 
     // Inserts a compiled ES module to the map.
-    pub fn insert(&mut self, path: &str, module: v8::Global<v8::Module>) {
+    pub fn insert(&mut self, path: &str, id: i32, module: v8::Global<v8::Module>) {
         // No main module has been set, so let's update the value.
         if self.main.is_none() && (fs::metadata(path).is_ok() || path.starts_with("http")) {
             self.main = Some(path.into());
         }
-        self.index.insert(path.into(), module);
+        self.by_path.insert(path.into(), module.clone());
+        let module_entry = (path.into(), module.clone());
+        match self.by_id.entry(id) {
+            Entry::Vacant(value) => {
+                value.insert(vec![module_entry]);
+            }
+            Entry::Occupied(mut value) => {
+                value.get_mut().push(module_entry);
+            }
+        };
     }
 
     // Returns if there are still pending imports to be loaded.
@@ -110,17 +123,24 @@ impl ModuleMap {
         !self.pending.is_empty()
     }
 
-    // Returns a v8 module reference from me module-map.
-    pub fn get(&self, key: &str) -> Option<v8::Global<v8::Module>> {
-        self.index.get(key).cloned()
+    // Returns a v8 module reference from the module-map.
+    pub fn get_module(&self, path: &str) -> Option<ModuleRef> {
+        self.by_path.get(path).cloned()
     }
 
     // Returns a specifier given a v8 module.
-    pub fn get_path(&self, module: v8::Global<v8::Module>) -> Option<ModulePath> {
-        self.index
-            .iter()
-            .find(|(_, m)| **m == module)
-            .map(|(p, _)| p.clone())
+    pub fn get_module_path(&self, id: i32, module: ModuleRef) -> Option<ModulePath> {
+        // Note: V8 does not guarantee unique module IDs. If a collision occurs, we
+        // must perform a linear search among modules with the same ID to find the
+        // correct path. In the common case, the lookup is more efficient.
+        match self.by_id.get(&id).map(|v| v.as_slice()) {
+            None => None,
+            Some([module]) => Some(module.0.clone()),
+            Some(entries) => entries
+                .iter()
+                .find(|(_, m)| *m == module)
+                .map(|(p, _)| p.clone()),
+        }
     }
 
     // Returns the main entry point.
@@ -313,9 +333,10 @@ impl JsFuture for EsModuleFuture {
         };
 
         let new_status = ModuleStatus::Resolving;
+        let module_id = module.get_identity_hash().get();
         let module_ref = v8::Global::new(tc_scope, module);
 
-        state.module_map.insert(self.path.as_str(), module_ref);
+        state.module_map.insert(self.path.as_str(), module_id, module_ref);
         state.module_map.seen.insert(self.path.clone(), new_status);
 
         let import_map = state.options.import_map.clone();
@@ -485,7 +506,6 @@ impl ImportMap {
         // via trailing slashes, so the lengthier mapping should always be selected.
         //
         // https://github.com/WICG/import-maps#packages-via-trailing-slashes
-
         map.sort_by(|a, b| b.0.cmp(&a.0));
 
         Ok(ImportMap { map })
@@ -542,8 +562,9 @@ pub fn fetch_module_tree<'a>(
     let module = v8::script_compiler::compile_module(scope, &mut source)?;
 
     // Subscribe module to the module-map.
+    let module_id = module.get_identity_hash().get();
     let module_ref = v8::Global::new(scope, module);
-    state.borrow_mut().module_map.insert(filename, module_ref);
+    state.borrow_mut().module_map.insert(filename, module_id, module_ref);
 
     let requests = module.get_module_requests();
 
@@ -557,7 +578,7 @@ pub fn fetch_module_tree<'a>(
         let specifier = unwrap_or_exit(resolve_import(Some(filename), &specifier, false, None));
 
         // Resolve subtree of modules.
-        if !state.borrow().module_map.index.contains_key(&specifier) {
+        if !state.borrow().module_map.by_path.contains_key(&specifier) {
             fetch_module_tree(scope, &specifier, None)?;
         }
     }

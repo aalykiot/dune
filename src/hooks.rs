@@ -26,9 +26,10 @@ pub fn module_resolve_cb<'a>(
     let state = state.borrow();
 
     let import_map = state.options.import_map.clone();
+    let referrer_id = referrer.get_identity_hash().get();
     let referrer = v8::Global::new(scope, referrer);
 
-    let dependant = state.module_map.get_path(referrer);
+    let dependant = state.module_map.get_module_path(referrer_id, referrer);
 
     let specifier = specifier.to_rust_string_lossy(scope);
     let specifier = unwrap_or_exit(resolve_import(
@@ -39,7 +40,7 @@ pub fn module_resolve_cb<'a>(
     ));
 
     // This call should always give us back the module.
-    let module = state.module_map.get(&specifier).unwrap();
+    let module = state.module_map.get_module(&specifier).unwrap();
 
     Some(v8::Local::new(scope, module))
 }
@@ -59,9 +60,10 @@ pub extern "C" fn host_initialize_import_meta_object_cb(
     let state = state.borrow();
 
     // Make the module global.
+    let module_id = module.get_identity_hash().get();
     let module = v8::Global::new(scope, module);
 
-    let url = state.module_map.get_path(module).unwrap();
+    let url = state.module_map.get_module_path(module_id, module).unwrap();
     let is_main = state.module_map.main() == Some(url.to_owned());
 
     // Setup import.url property.
@@ -183,9 +185,9 @@ pub fn host_import_module_dynamically_cb<'s>(
         .any(|graph_rc| graph_rc.borrow().root_rc.borrow().path == specifier);
 
     // Check if the requested dynamic module is already resolved.
-    if state.module_map.index.contains_key(&specifier) && !dynamic_import_being_fetched {
+    if state.module_map.by_path.contains_key(&specifier) && !dynamic_import_being_fetched {
         // Create a local handle for the module.
-        let module = state.module_map.get(&specifier).unwrap();
+        let module = state.module_map.get_module(&specifier).unwrap();
         let module = module.open(scope);
 
         // Note: Since this is a dynamic import will resolve the promise
