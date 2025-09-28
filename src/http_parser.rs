@@ -4,7 +4,7 @@ use crate::bindings::set_function_to;
 use anyhow::bail;
 use anyhow::Result;
 
-pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
+pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
@@ -18,7 +18,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 
 /// Parses an HTTP request received from a client.
 fn parse_incoming_request(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -90,7 +90,7 @@ fn parse_incoming_request(
 
 /// Parses an HTTP response received from a server.
 fn parse_incoming_response(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -154,7 +154,7 @@ fn parse_incoming_response(
 
 /// Gets available chunks from a streaming HTTP message.
 fn parse_body_chunks(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {

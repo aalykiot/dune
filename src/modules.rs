@@ -54,7 +54,7 @@ lazy_static! {
 
 /// Creates v8 script origins.
 pub fn create_origin<'s>(
-    scope: &mut v8::HandleScope<'s, ()>,
+    scope: &mut v8::PinScope<'s, '_>,
     name: &str,
     is_module: bool,
 ) -> v8::ScriptOrigin<'s> {
@@ -292,7 +292,7 @@ impl EsModuleFuture {
 
 impl JsFuture for EsModuleFuture {
     /// Drives the future to completion.
-    fn run(&mut self, scope: &mut v8::HandleScope) {
+    fn run(&mut self, scope: &mut v8::PinScope) {
         let state_rc = JsRuntime::state(scope);
         let mut state = state_rc.borrow_mut();
 
@@ -312,7 +312,7 @@ impl JsFuture for EsModuleFuture {
             }
         };
 
-        let tc_scope = &mut v8::TryCatch::new(scope);
+        v8::tc_scope!(let tc_scope, scope);
         let origin = create_origin(tc_scope, &self.path, true);
 
         // Compile source and get it's dependencies.
@@ -543,7 +543,7 @@ impl ImportMap {
 /// Resolves module imports synchronously.
 /// https://source.chromium.org/chromium/v8/v8.git/+/51e736ca62bd5c7bfd82488a5587fed31dbf45d5:src/d8.cc;l=741
 pub fn fetch_module_tree<'a>(
-    scope: &mut v8::HandleScope<'a>,
+    scope: &mut v8::PinScope<'a, '_>,
     filename: &str,
     source: Option<&str>,
 ) -> Option<v8::Local<'a, v8::Module>> {

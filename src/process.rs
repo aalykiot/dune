@@ -25,7 +25,7 @@ lazy_static! {
 }
 
 pub fn initialize<'s>(
-    scope: &mut v8::ContextScope<'s, v8::EscapableHandleScope>,
+    scope: &mut v8::PinScope<'s, '_>,
     global: v8::Local<v8::Object>,
 ) -> v8::Local<'s, v8::Object> {
     // This represents the global `process` object.
@@ -43,7 +43,7 @@ pub fn initialize<'s>(
 }
 
 /// Refreshes the static values of the process object.
-pub fn refresh(scope: &mut v8::HandleScope) {
+pub fn refresh(scope: &mut v8::PinScope) {
     // Get access to the process object.
     let context = scope.get_current_context();
     let global = context.global(scope);
@@ -103,7 +103,7 @@ pub fn refresh(scope: &mut v8::HandleScope) {
 }
 
 /// Current working directory.
-fn cwd(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+fn cwd(scope: &mut v8::PinScope, _: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     match env::current_dir() {
         Ok(path) => {
             let path = path.into_os_string().into_string().unwrap();
@@ -119,7 +119,7 @@ fn cwd(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, mut rv: v8
 }
 
 /// Exits the program with the given code.
-fn exit(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+fn exit(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Exit the program when value is not valid i32.
     match args.get(0).to_int32(scope) {
         Some(code) => std::process::exit(code.value()),
@@ -129,7 +129,7 @@ fn exit(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8:
 
 /// Returns an object describing the memory usage.
 fn memory_usage(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     _: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -150,7 +150,7 @@ fn memory_usage(
 }
 
 /// Adds callback to the "next tick queue".
-fn next_tick(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+fn next_tick(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Make a global handle out the the function.
     let callback = v8::Local::<v8::Function>::try_from(args.get(0)).unwrap();
     let callback = v8::Global::new(scope, callback);
@@ -176,7 +176,7 @@ fn next_tick(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _
 }
 
 /// A number describing the amount of time (in seconds) the process is running.
-fn uptime(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+fn uptime(scope: &mut v8::PinScope, _: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get access to runtime's state.
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
@@ -189,7 +189,7 @@ fn uptime(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, mut rv:
 }
 
 #[cfg(target_family = "unix")]
-fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+fn kill(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get PID and SIGNAL arguments
     let pid = args.get(0).to_rust_string_lossy(scope);
     let signal = args.get(1).to_rust_string_lossy(scope);
@@ -215,7 +215,7 @@ fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8:
 }
 
 #[cfg(target_family = "windows")]
-fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+fn kill(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get PID argument.
     let pid = args.get(0).to_rust_string_lossy(scope);
     // Try to kill the process.
@@ -225,7 +225,7 @@ fn kill(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8:
 }
 
 /// Exposes native modules to JavaScript.
-fn bind(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+fn bind(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get requested native binding.
     let request = args.get(0).to_rust_string_lossy(scope);
 

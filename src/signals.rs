@@ -51,7 +51,7 @@ const SIGNALS: [(&str, i32); 29] = [
     ("SIGXFSZ", Signal::SIGXFSZ),
 ];
 
-pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
+pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
     let signals = v8::Array::new(scope, SIGNALS.len() as i32);
@@ -75,10 +75,10 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 struct SignalFuture(Rc<v8::Global<v8::Function>>);
 
 impl JsFuture for SignalFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
+    fn run(&mut self, scope: &mut v8::PinScope) {
         let undefined = v8::undefined(scope).into();
         let callback = v8::Local::new(scope, (*self.0).clone());
-        let tc_scope = &mut v8::TryCatch::new(scope);
+        v8::tc_scope!(let tc_scope, scope);
 
         callback.call(tc_scope, undefined, &[]);
 
@@ -94,7 +94,7 @@ impl JsFuture for SignalFuture {
 
 /// Registers a signal listener to the event-loop.
 fn start_signal(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -137,7 +137,7 @@ fn start_signal(
 
 /// Removes a signal listener to the event-loop.
 fn cancel_signal(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {

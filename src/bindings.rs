@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::ffi::c_void;
 
 /// Function pointer for the bindings initializers.
-type BindingInitFn = fn(&mut v8::HandleScope<'_>) -> v8::Global<v8::Object>;
+type BindingInitFn = fn(&mut v8::PinScope) -> v8::Global<v8::Object>;
 
 lazy_static! {
     pub static ref BINDINGS: HashMap<&'static str, BindingInitFn> = {
@@ -43,11 +43,7 @@ lazy_static! {
 }
 
 /// Populates a new JavaScript context with low-level Rust bindings.
-pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<'s, v8::Context> {
-    // Here we need an EscapableHandleScope so V8 doesn't drop the
-    // newly created HandleScope on return. (https://v8.dev/docs/embed#handles-and-garbage-collection)
-    let scope = &mut v8::EscapableHandleScope::new(scope);
-
+pub fn create_new_context<'s, 'i>(scope: &mut v8::PinScope<'s, 'i, ()>) -> v8::Local<'s, v8::Context> {
     // Create and enter a new JavaScript context.
     let context = v8::Context::new(scope, Default::default());
     let global = context.global(scope);
@@ -59,12 +55,12 @@ pub fn create_new_context<'s>(scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<
 
     // Expose low-level functions to JavaScript.
     process::initialize(scope, global);
-    scope.escape(context)
+    context
 }
 
 // Simple print function bound to Rust's println! macro.
 fn global_print(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
@@ -75,7 +71,7 @@ fn global_print(
 // This method may be used to report errors to global event handlers.
 // https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception
 fn global_report_error(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
@@ -93,7 +89,7 @@ fn global_report_error(
 
 // This method queues a microtask to invoke callback.
 fn global_queue_micro(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
@@ -107,7 +103,7 @@ fn global_queue_micro(
 
 /// Adds a property with the given name and value, into the given object.
 pub fn set_property_to(
-    scope: &mut v8::HandleScope<'_>,
+    scope: &mut v8::PinScope,
     target: v8::Local<v8::Object>,
     name: &'static str,
     value: v8::Local<v8::Value>,
@@ -118,7 +114,7 @@ pub fn set_property_to(
 
 /// Adds a read-only property with the given name and value, into the given object.
 pub fn set_constant_to(
-    scope: &mut v8::HandleScope<'_>,
+    scope: &mut v8::PinScope,
     target: v8::Local<v8::Object>,
     name: &str,
     value: v8::Local<v8::Value>,
@@ -129,7 +125,7 @@ pub fn set_constant_to(
 
 /// Adds a `Function` object which calls the given Rust function
 pub fn set_function_to(
-    scope: &mut v8::HandleScope<'_>,
+    scope: &mut v8::PinScope,
     target: v8::Local<v8::Object>,
     name: &'static str,
     callback: impl v8::MapFnTo<v8::FunctionCallback>,
@@ -143,7 +139,7 @@ pub fn set_function_to(
 
 /// Creates an object with a given name under a `target` object.
 pub fn create_object_under<'s>(
-    scope: &mut v8::HandleScope<'s>,
+    scope: &mut v8::PinScope<'s, '_>,
     target: v8::Local<v8::Object>,
     name: &'static str,
 ) -> v8::Local<'s, v8::Object> {
@@ -157,7 +153,7 @@ pub fn create_object_under<'s>(
 
 /// Stores a Rust type inside a v8 object.
 pub fn set_internal_ref<T>(
-    scope: &mut v8::HandleScope<'_>,
+    scope: &mut v8::PinScope,
     target: v8::Local<v8::Object>,
     index: usize,
     data: T,
@@ -172,7 +168,7 @@ pub fn set_internal_ref<T>(
 
 /// Gets a previously stored Rust type from a v8 object.
 pub fn get_internal_ref<'s, T>(
-    scope: &mut v8::HandleScope<'s>,
+    scope: &mut v8::PinScope<'s, '_>,
     source: v8::Local<v8::Object>,
     index: usize,
 ) -> &'s mut T {
@@ -185,7 +181,7 @@ pub fn get_internal_ref<'s, T>(
 
 /// Sets error code to exception if possible.
 pub fn set_exception_code(
-    scope: &mut v8::HandleScope<'_>,
+    scope: &mut v8::PinScope,
     exception: v8::Local<v8::Value>,
     error: &Error,
 ) {
@@ -200,7 +196,7 @@ pub fn set_exception_code(
 }
 
 /// Useful utility to throw v8 exceptions.
-pub fn throw_exception(scope: &mut v8::HandleScope, error: &Error) {
+pub fn throw_exception(scope: &mut v8::PinScope, error: &Error) {
     let message = error.to_string().to_owned();
     let message = v8::String::new(scope, &message).unwrap();
     let exception = v8::Exception::error(scope, message);
@@ -209,7 +205,7 @@ pub fn throw_exception(scope: &mut v8::HandleScope, error: &Error) {
 }
 
 /// Useful utility to throw v8 type errors.
-pub fn throw_type_error(scope: &mut v8::HandleScope, message: &str) {
+pub fn throw_type_error(scope: &mut v8::PinScope, message: &str) {
     let message = v8::String::new(scope, message).unwrap();
     let exception = v8::Exception::type_error(scope, message);
     scope.throw_exception(exception);

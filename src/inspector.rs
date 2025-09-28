@@ -117,7 +117,7 @@ impl JsRuntimeInspector {
             root,
         }));
 
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = &mut v8::PinScope::new(isolate);
         let context = v8::Local::new(scope, context);
 
         let mut this = inspector.borrow_mut();
@@ -177,7 +177,7 @@ impl JsRuntimeInspector {
     }
 
     // Notify the inspector that the context is about to destroyed.
-    pub fn context_destroyed(&mut self, scope: &mut v8::HandleScope, ctx: v8::Global<v8::Context>) {
+    pub fn context_destroyed(&mut self, scope: &mut v8::PinScope, ctx: v8::Global<v8::Context>) {
         // Get a local context reference.
         let context = v8::Local::new(scope, ctx);
 

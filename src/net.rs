@@ -10,7 +10,7 @@ use dune_event_loop::TcpSocketInfo;
 use std::net::IpAddr;
 use std::rc::Rc;
 
-pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
+pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
@@ -31,7 +31,7 @@ struct TcpConnectFuture {
 }
 
 impl JsFuture for TcpConnectFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
+    fn run(&mut self, scope: &mut v8::PinScope) {
         match self.sock.as_ref() {
             Ok(sock) => {
                 // Extract info from the TcpSocketInfo.
@@ -92,7 +92,7 @@ impl JsFuture for TcpConnectFuture {
 
 /// Creates a new TCP stream and issue a non-blocking connect.
 fn connect(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -147,7 +147,7 @@ struct ReadStartFuture {
 }
 
 impl JsFuture for ReadStartFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
+    fn run(&mut self, scope: &mut v8::PinScope) {
         // Create the v8 value for the data parameter.
         let data_value: v8::Local<v8::Value> = match self.data.as_mut() {
             Ok(data) => {
@@ -184,7 +184,7 @@ impl JsFuture for ReadStartFuture {
 
 /// Starts reading from an open TCP socket.
 fn read_start(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
@@ -218,7 +218,7 @@ struct TcpWriteFuture {
 }
 
 impl JsFuture for TcpWriteFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
+    fn run(&mut self, scope: &mut v8::PinScope) {
         match self.result.as_ref() {
             Ok(bytes) => {
                 // Create a v8 value from the usize.
@@ -242,7 +242,7 @@ impl JsFuture for TcpWriteFuture {
 }
 
 fn write(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -280,7 +280,7 @@ struct TcpListenFuture {
 }
 
 impl JsFuture for TcpListenFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
+    fn run(&mut self, scope: &mut v8::PinScope) {
         // Create the v8 value for the data parameter.
         let socket_value: v8::Local<v8::Value> = match self.socket.as_mut() {
             Ok(sock) => {
@@ -313,7 +313,7 @@ impl JsFuture for TcpListenFuture {
             Ok(_) => v8::null(scope).into(),
         };
 
-        let tc_scope = &mut v8::TryCatch::new(scope);
+        v8::tc_scope!(let tc_scope, scope);
 
         // Get access to the on_connection callback.
         let on_connection = v8::Local::new(tc_scope, (*self.on_connection).clone());
@@ -332,7 +332,7 @@ impl JsFuture for TcpListenFuture {
 
 /// Starts listening for incoming connections.
 fn listen(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -398,7 +398,7 @@ struct TcpShutdownFuture {
 }
 
 impl JsFuture for TcpShutdownFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
+    fn run(&mut self, scope: &mut v8::PinScope) {
         let undefined = v8::undefined(scope);
         self.promise
             .open(scope)
@@ -409,7 +409,7 @@ impl JsFuture for TcpShutdownFuture {
 
 // Half-closes the TCP stream.
 fn shutdown(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -442,7 +442,7 @@ struct TcpCloseFuture {
 }
 
 impl JsFuture for TcpCloseFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
+    fn run(&mut self, scope: &mut v8::PinScope) {
         let undefined = v8::undefined(scope);
         self.promise
             .open(scope)
@@ -453,7 +453,7 @@ impl JsFuture for TcpCloseFuture {
 
 /// Closes the TCP socket.
 fn close(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {

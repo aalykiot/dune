@@ -66,7 +66,7 @@ impl ExceptionState {
     }
 }
 
-pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
+pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
@@ -90,7 +90,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 
 /// Setting the `uncaught_exception_callback` from JavaScript.
 fn set_uncaught_exception_callback(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
@@ -108,7 +108,7 @@ fn set_uncaught_exception_callback(
 
 /// Setting the `unhandled_rejection_callback` from JavaScript.
 fn set_unhandled_rejection_callback(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {

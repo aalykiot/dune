@@ -27,7 +27,7 @@ use std::str::FromStr;
 use std::vec;
 use uuid::Uuid;
 
-pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
+pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
@@ -96,7 +96,7 @@ impl DerefMut for SQLiteConnection<'_> {
 }
 
 /// Opens a new connection to an SQLite database.
-fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+fn open(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get database path.
     let path = args.get(0).to_rust_string_lossy(scope);
 
@@ -169,7 +169,7 @@ fn open(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv
 }
 
 /// Run multiple SQL statements (that cannot take any parameters).
-fn execute(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+fn execute(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get connection and SQL query.
     let connection = args.get(0).to_object(scope).unwrap();
     let sql = args.get(1).to_rust_string_lossy(scope);
@@ -191,7 +191,7 @@ fn execute(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: 
 
 /// Compiles a SQL statement into a prepared statement.
 fn prepare(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -226,7 +226,7 @@ fn prepare(
 
 /// Executes a prepared statement and returns the results.
 fn query(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -308,7 +308,7 @@ fn query(
 
 /// Executes a prepared statement and returns the first row.
 fn query_one(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -380,7 +380,7 @@ fn query_one(
 }
 
 // Executes a prepared statement and returns the resulting changes.
-fn run(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+fn run(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get connection and required params.
     let connection = args.get(0).to_object(scope).unwrap();
     let stmt_reference = args.get(1).to_rust_string_lossy(scope);
@@ -462,7 +462,7 @@ fn run(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv:
 
 /// Returns the SQL text of the prepared statement.
 fn expanded_sql(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -491,7 +491,7 @@ fn expanded_sql(
 
 /// Returns information about the prepared statement columns.
 fn columns(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -551,7 +551,7 @@ fn columns(
 
 /// Enables or disables loading extetnions to SQLite.
 fn enable_extentions(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
@@ -585,7 +585,7 @@ fn enable_extentions(
 
 /// Loads a shared library into an SQLite database.
 fn load_extension(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
@@ -608,7 +608,7 @@ fn load_extension(
 }
 
 /// Closes the database connection.
-fn close(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+fn close(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get the connection wrap object.
     let connection = args.get(0).to_object(scope).unwrap();
     let connection = get_internal_ref::<SQLiteConnection>(scope, connection, 0);
@@ -641,7 +641,7 @@ fn load_sqlite_extetnion_op<P: AsRef<Path>>(conn: &Connection, path: P) -> Resul
 
 // Returns a SQLite row as a JavaScript object.
 fn process_row<'s>(
-    scope: &mut v8::HandleScope<'s>,
+    scope: &mut v8::PinScope<'s, '_>,
     row: &Row<'_>,
     column_names: &[String],
     use_big_int: bool,
@@ -656,7 +656,7 @@ fn process_row<'s>(
 }
 
 // Converts V8 values to SQLite values. (https://www.sqlite.org/datatype3.html)
-fn to_sql_value(scope: &mut v8::HandleScope, value: v8::Local<'_, v8::Value>) -> Result<SqlValue> {
+fn to_sql_value(scope: &mut v8::PinScope, value: v8::Local<'_, v8::Value>) -> Result<SqlValue> {
     // Note: This approach is a bit messy, but it's the only reliable way
     // to map JavaScript values to SQLite-supported types.
     //
@@ -705,7 +705,7 @@ const MAX_SAFE_INTEGER: i64 = 9007199254740991;
 
 // Converts SQLite values to JavaScript values.
 fn to_js_value<'a>(
-    scope: &mut v8::HandleScope<'a>,
+    scope: &mut v8::PinScope<'a, '_>,
     sql_value: ValueRef<'_>,
     use_big_int: bool,
 ) -> Result<v8::Local<'a, v8::Value>> {

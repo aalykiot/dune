@@ -3,7 +3,7 @@ use crate::bindings::set_property_to;
 use crate::bindings::throw_exception;
 use anyhow::anyhow;
 
-pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
+pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
@@ -14,7 +14,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 }
 
 /// Inspects the status and contents of a Promise object.
-fn peek(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+fn peek(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Cast provided argument into a Promise.
     let promise: v8::Local<v8::Promise> = match args.get(0).try_into() {
         Ok(value) => value,

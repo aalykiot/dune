@@ -8,7 +8,7 @@ use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
 use crate::JsRuntime;
 
-pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
+pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
     let performance = create_object_under(scope, target, "performance");
@@ -28,7 +28,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
     v8::Global::new(scope, target)
 }
 
-fn now(scope: &mut v8::HandleScope, _args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+fn now(scope: &mut v8::PinScope, _args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get a reference to runtime's state.
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
