@@ -8,7 +8,7 @@ use crate::hooks::host_import_module_dynamically_cb;
 use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
 use crate::hooks::promise_reject_cb;
-// use crate::inspector::JsRuntimeInspector;
+use crate::inspector::JsRuntimeInspector;
 use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
 use crate::modules::load_import;
@@ -98,7 +98,7 @@ pub struct JsRuntime {
     /// https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html
     isolate: v8::OwnedIsolate,
     /// A structure responsible for providing inspector interface to the runtime.
-    // pub inspector: Option<Rc<RefCell<JsRuntimeInspector>>>,
+    pub inspector: Option<Rc<JsRuntimeInspector>>,
     /// The event-loop instance that takes care of polling for I/O.
     pub event_loop: EventLoop,
     /// The state of the runtime.
@@ -170,16 +170,16 @@ impl JsRuntime {
             .as_millis();
 
         // Initialize the v8 inspector.
-        // let address = options.inspect.map(|(address, _)| (address));
-        // let inspector = options.inspect.map(|(_, waiting_for_session)| {
-        //     JsRuntimeInspector::new(
-        //         &mut isolate,
-        //         context.clone(),
-        //         event_loop.interrupt_handle(),
-        //         waiting_for_session,
-        //         options.root.clone(),
-        //     )
-        // });
+        let address = options.inspect.map(|(address, _)| (address));
+        let inspector = options.inspect.map(|(_, waiting_for_session)| {
+            JsRuntimeInspector::new(
+                &mut isolate,
+                context.clone(),
+                event_loop.interrupt_handle(),
+                waiting_for_session,
+                options.root.clone(),
+            )
+        });
 
         // Store state inside the v8 isolate slot.
         // https://v8docs.nodesource.com/node-4.8/d5/dda/classv8_1_1_isolate.html#a7acadfe7965997e9c386a05f098fbe36
@@ -203,16 +203,16 @@ impl JsRuntime {
             isolate,
             event_loop,
             state,
-            // inspector,
+            inspector,
         };
 
         runtime.load_main_environment();
 
         // Start inspector agent is requested.
-        // if let Some(inspector) = runtime.inspector().as_mut() {
-        //     let address = address.unwrap();
-        //     inspector.borrow_mut().start_agent(address);
-        // }
+        if let Some(inspector) = runtime.inspector().as_ref() {
+            let address = address.unwrap();
+            inspector.start_agent(address);
+        }
 
         runtime
     }
@@ -379,9 +379,9 @@ impl JsRuntime {
 
     /// Polls the inspector for new devtools messages.
     pub fn poll_inspect_session(&mut self) {
-        // if let Some(inspector) = self.inspector.as_mut() {
-        //     inspector.borrow_mut().poll_session();
-        // }
+        if let Some(inspector) = self.inspector.as_ref() {
+            inspector.state.poll_session();
+        }
     }
 
     /// Runs the event-loop until no more pending events exists.
@@ -412,13 +412,13 @@ impl JsRuntime {
 
         // We can now notify debugger that the program has finished running
         // and we're ready to exit the process.
-        // if let Some(inspector) = self.inspector() {
-        //     self.with_scope(|scope| {
-        //         let context = scope.get_current_context();
-        //         let context = v8::Global::new(scope, context);
-        //         inspector.borrow_mut().context_destroyed(scope, context);
-        //     });
-        // }
+        if let Some(inspector) = self.inspector() {
+            self.with_scope(|scope| {
+                let context = scope.get_current_context();
+                let context = v8::Global::new(scope, context);
+                inspector.context_destroyed(scope, context);
+            });
+        }
     }
 
     /// Runs all the pending javascript tasks.
@@ -583,7 +583,7 @@ impl std::ops::Drop for JsRuntime {
         // is discarded. The exact cause is unclear, but avoiding manual memory cleanup
         // and allowing the the OS to handle memory purging at the program's
         // termination resolves the issue.
-        // std::mem::forget(self.inspector.take());
+        std::mem::forget(self.inspector.take());
     }
 }
 
@@ -618,14 +618,13 @@ impl JsRuntime {
     {
         let context = self.context();
         v8::scope_with_context!(scope, &mut self.isolate, context);
-        let mut scope = scope;
-        func(&mut scope);
+        func(scope);
     }
 
-    // Returns the inspector created for the runtime.
-    // pub fn inspector(&mut self) -> Option<Rc<RefCell<JsRuntimeInspector>>> {
-    //     self.inspector.as_ref().cloned()
-    // }
+    /// Returns the inspector created for the runtime.
+    pub fn inspector(&mut self) -> Option<Rc<JsRuntimeInspector>> {
+        self.inspector.as_ref().cloned()
+    }
 }
 
 /// Runs callbacks stored in the next-tick queue.

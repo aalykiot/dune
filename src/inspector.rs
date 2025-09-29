@@ -17,8 +17,8 @@ use dune_event_loop::LoopInterruptHandle;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use serde::Serialize;
+use std::cell::Cell;
 use std::cell::RefCell;
-use std::mem::MaybeUninit;
 use std::net::SocketAddrV4;
 use std::rc::Rc;
 use std::sync::mpsc;
@@ -28,6 +28,8 @@ use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::sync::broadcast;
 use uuid::Uuid;
+use v8::inspector::ChannelImpl;
+use v8::inspector::V8InspectorClientImpl;
 
 // Dune supports only a single context in `JsRuntime`.
 const CONTEXT_GROUP_ID: i32 = 1;
@@ -69,73 +71,106 @@ enum FrontendMessage {
     Command(String),
 }
 
-/// This structure is used responsible for providing inspector
+/// This structure is responsible for providing inspector
 /// interface to the `JsRuntime`.
 pub struct JsRuntimeInspector {
-    v8_inspector_client: v8::inspector::V8InspectorClientBase,
-    v8_inspector: Rc<RefCell<v8::UniquePtr<v8::inspector::V8Inspector>>>,
-    session: Option<Box<InspectorSession>>,
-    inbound_rx: mpsc::Receiver<FrontendMessage>,
-    inbound_tx: mpsc::Sender<FrontendMessage>,
-    handle: LoopInterruptHandle,
-    handshake_tx: mpsc::Sender<()>,
+    v8_inspector: Rc<v8::inspector::V8Inspector>,
     handshake_rx: mpsc::Receiver<()>,
-    outbound_tx: broadcast::Sender<InspectorMessage>,
-    on_pause: bool,
+    pub state: Rc<InspectorState>,
     break_on_start: bool,
-    waiting_for_session: bool,
+    handle: LoopInterruptHandle,
     root: Option<String>,
+    outbound_tx: broadcast::Sender<InspectorMessage>,
+    inbound_tx: mpsc::Sender<FrontendMessage>,
+    handshake_tx: mpsc::Sender<()>,
 }
 
 impl JsRuntimeInspector {
+    // Creates a JsRuntimeInspector instance.
     pub fn new(
         isolate: &mut v8::Isolate,
         context: v8::Global<v8::Context>,
         handle: LoopInterruptHandle,
         should_wait: bool,
         root: Option<String>,
-    ) -> Rc<RefCell<Self>> {
-        // Create a JsRuntimeInspector instance.
-        let v8_inspector_client = v8::inspector::V8InspectorClientBase::new::<Self>();
+    ) -> Rc<Self> {
         let (inbound_tx, inbound_rx) = mpsc::channel::<FrontendMessage>();
         let (handshake_tx, handshake_rx) = mpsc::channel::<()>();
         let (outbound_tx, _outbound_rx) = broadcast::channel::<InspectorMessage>(64);
-
-        let inspector = Rc::new(RefCell::new(Self {
-            v8_inspector_client,
-            v8_inspector: Default::default(),
-            session: None,
-            inbound_tx,
+        let state = Rc::new(InspectorState {
+            v8_inspector: RefCell::new(None),
             inbound_rx,
-            handle,
-            handshake_tx,
-            handshake_rx,
-            outbound_tx,
-            on_pause: false,
-            waiting_for_session: should_wait,
-            break_on_start: should_wait,
-            root,
-        }));
+            outbound_tx: outbound_tx.clone(),
+            on_pause: Cell::new(false),
+            waiting_for_session: Cell::new(should_wait),
+            session: RefCell::new(None),
+        });
 
-        let scope = &mut v8::PinScope::new(isolate);
-        let context = v8::Local::new(scope, context);
+        v8::scope_with_context!(scope, isolate, context.clone());
 
-        let mut this = inspector.borrow_mut();
-        this.v8_inspector = Rc::new(RefCell::new(
-            v8::inspector::V8Inspector::create(scope, &mut *this).into(),
+        let client = Box::new(InspectorClient(state.clone()));
+        let v8_inspector_client = v8::inspector::V8InspectorClient::new(client);
+        let v8_inspector = Rc::new(v8::inspector::V8Inspector::create(
+            scope,
+            v8_inspector_client,
         ));
 
-        // Tell the inspector about the global context.
-        let context_name = "global context";
-        let aux_data = r#"{"isDefault": true}"#;
-        this.context_created(context, context_name, aux_data);
-        drop(this);
+        *state.v8_inspector.borrow_mut() = Some(v8_inspector.clone());
 
-        inspector
+        // Tell the inspector about the global context.
+        let context_name = v8::inspector::StringView::from("global context".as_bytes());
+        let aux_data = v8::inspector::StringView::from(r#"{"isDefault": true}"#.as_bytes());
+        let context = v8::Local::new(scope, context);
+
+        v8_inspector.context_created(context, CONTEXT_GROUP_ID, context_name, aux_data);
+
+        Rc::new(Self {
+            v8_inspector,
+            handshake_rx,
+            state,
+            break_on_start: should_wait,
+            inbound_tx,
+            handshake_tx,
+            outbound_tx,
+            handle,
+            root,
+        })
+    }
+
+    /// This function "blocks" the thread until at least one inspector client has
+    /// established a handshake with the inspector. After that, it instructs V8
+    /// to pause at the next statement.
+    pub fn wait_for_session_and_break_on_next_statement(&self) {
+        // We need to periodically wake up to allow V8 to respond
+        // to incoming messages (before the handshake).
+        let timeout = Duration::from_millis(200);
+
+        loop {
+            // We don't want a busy loop thus the timeout on channel recv.
+            match self.handshake_rx.recv_timeout(timeout) {
+                // Handshake established, pause execution.
+                Ok(_) => {
+                    self.state.poll_session();
+                    self.state.break_on_next_statement();
+                    break;
+                }
+                Err(_) => {
+                    // Continue polling session for CDP messages.
+                    self.state.poll_session();
+                }
+            }
+        }
+    }
+
+    // Notify the inspector that the context is about to destroyed.
+    pub fn context_destroyed(&self, scope: &mut v8::PinScope, ctx: v8::Global<v8::Context>) {
+        // Get a local context reference.
+        let context = v8::Local::new(scope, ctx);
+        self.v8_inspector.context_destroyed(context);
     }
 
     // Starts listening for ws connections.
-    pub fn start_agent(&mut self, address: SocketAddrV4) {
+    pub fn start_agent(&self, address: SocketAddrV4) {
         // Build the shared state for axum.
         let state = AppState {
             id: Uuid::new_v4(),
@@ -162,37 +197,22 @@ impl JsRuntimeInspector {
             self.wait_for_session_and_break_on_next_statement();
         }
     }
+}
 
-    // Notify the inspector about the newly created context.
-    fn context_created(&mut self, context: v8::Local<v8::Context>, name: &str, aux_data: &str) {
-        // Build v8 compatible values.
-        let context_name = v8::inspector::StringView::from(name.as_bytes());
-        let aux_data_view = v8::inspector::StringView::from(aux_data.as_bytes());
+pub struct InspectorState {
+    v8_inspector: RefCell<Option<Rc<v8::inspector::V8Inspector>>>,
+    inbound_rx: mpsc::Receiver<FrontendMessage>,
+    outbound_tx: broadcast::Sender<InspectorMessage>,
+    on_pause: Cell<bool>,
+    waiting_for_session: Cell<bool>,
+    session: RefCell<Option<InspectorSession>>,
+}
 
-        // Get a mut reference to v8 inspector.
-        let mut inspector_rc = self.v8_inspector.borrow_mut();
-        let inspector = inspector_rc.as_mut().unwrap();
-
-        inspector.context_created(context, CONTEXT_GROUP_ID, context_name, aux_data_view);
-    }
-
-    // Notify the inspector that the context is about to destroyed.
-    pub fn context_destroyed(&mut self, scope: &mut v8::PinScope, ctx: v8::Global<v8::Context>) {
-        // Get a local context reference.
-        let context = v8::Local::new(scope, ctx);
-
-        // Get a mut reference to v8 inspector.
-        let mut inspector_rc = self.v8_inspector.borrow_mut();
-        let inspector = inspector_rc.as_mut().unwrap();
-
-        // Tell the inspector about the deleted context.
-        inspector.context_destroyed(context);
-    }
-
+impl InspectorState {
     /// Polls the debugger session for incoming messages from the frontend (devtools).
-    pub fn poll_session(&mut self) {
+    pub fn poll_session(&self) {
         // Block the thread until a devtools message is received.
-        if self.on_pause || self.waiting_for_session {
+        if self.on_pause.get() || self.waiting_for_session.get() {
             let message = self.inbound_rx.recv().unwrap();
             self.process_incoming_message(message);
             return;
@@ -203,186 +223,124 @@ impl JsRuntimeInspector {
         }
     }
 
-    /// This function "blocks" the thread until at least one inspector client has
-    /// established a handshake with the inspector. After that, it instructs V8
-    /// to pause at the next statement.
-    pub fn wait_for_session_and_break_on_next_statement(&mut self) {
-        // We need to periodically wake up to allow V8 to respond
-        // to incoming messages (before the handshake).
-        let timeout = Duration::from_millis(200);
-
-        loop {
-            // We don't want a busy loop thus the timeout on channel recv.
-            match self.handshake_rx.recv_timeout(timeout) {
-                // Handshake established, pause execution.
-                Ok(_) => {
-                    self.poll_session();
-                    self.break_on_next_statement();
-                    break;
-                }
-                Err(_) => {
-                    // Continue polling session for CDP messages.
-                    self.poll_session();
-                }
-            }
-        }
-    }
-
     /// Processes the received messages, such as establishing or disconnecting a session
     /// and dispatching commands to the active session.
-    fn process_incoming_message(&mut self, message: FrontendMessage) {
+    fn process_incoming_message(&self, message: FrontendMessage) {
         match message {
             // Establish a new InspectorSession upon frontend connection.
             FrontendMessage::Connected => {
-                self.waiting_for_session = false;
-                self.session = Some(InspectorSession::new(
-                    self.v8_inspector.clone(),
+                self.waiting_for_session.set(false);
+                *self.session.borrow_mut() = Some(InspectorSession::new(
+                    self.v8_inspector.borrow().as_ref().unwrap().clone(),
                     self.outbound_tx.clone(),
                 ));
             }
             // Drop the current session and perform clean-ups.
             FrontendMessage::Disconnected => {
-                self.session.take();
+                self.session.borrow_mut().take();
             }
             // Dispatch the received command to the active session.
             FrontendMessage::Command(data) => {
-                self.session.as_mut().unwrap().dispatch_message(data);
+                if let Some(session) = self.session.borrow().as_ref() {
+                    session.dispatch_message(data);
+                }
             }
-        };
+        }
     }
 
     /// Instructs V8 to pause at the next statement.
-    fn break_on_next_statement(&mut self) {
-        if let Some(session) = self.session.as_mut() {
+    fn break_on_next_statement(&self) {
+        if let Some(session) = self.session.borrow_mut().as_ref() {
             session.break_on_next_statement();
         }
     }
 }
 
-impl v8::inspector::V8InspectorClientImpl for JsRuntimeInspector {
-    fn base(&self) -> &v8::inspector::V8InspectorClientBase {
-        &self.v8_inspector_client
-    }
+struct InspectorClient(Rc<InspectorState>);
 
-    fn base_mut(&mut self) -> &mut v8::inspector::V8InspectorClientBase {
-        &mut self.v8_inspector_client
-    }
-
-    unsafe fn base_ptr(this: *const Self) -> *const v8::inspector::V8InspectorClientBase
-    where
-        Self: Sized,
-    {
-        // SAFETY: this pointer is valid for the whole lifetime of inspector
-        unsafe { std::ptr::addr_of!((*this).v8_inspector_client) }
-    }
-
-    fn run_message_loop_on_pause(&mut self, context_group_id: i32) {
+impl V8InspectorClientImpl for InspectorClient {
+    fn run_message_loop_on_pause(&self, context_group_id: i32) {
         // Context id should always be the same.
         assert_eq!(context_group_id, CONTEXT_GROUP_ID);
-        self.on_pause = true;
+        self.0.on_pause.set(true);
         // Poll session while we're on the "pause" state.
-        while self.on_pause {
-            self.poll_session();
+        while self.0.on_pause.get() {
+            self.0.poll_session();
         }
     }
 
-    fn quit_message_loop_on_pause(&mut self) {
-        self.on_pause = false;
+    fn quit_message_loop_on_pause(&self) {
+        self.0.on_pause.set(false);
     }
 
-    fn run_if_waiting_for_debugger(&mut self, context_group_id: i32) {
+    fn run_if_waiting_for_debugger(&self, context_group_id: i32) {
         assert_eq!(context_group_id, CONTEXT_GROUP_ID);
-        self.waiting_for_session = false;
+        self.0.waiting_for_session.set(false);
     }
 }
 
 /// An inspector session that proxies messages to concrete "transport layer",
 /// like a websocket connection.
 struct InspectorSession {
-    v8_channel: v8::inspector::ChannelBase,
-    v8_session: v8::UniqueRef<v8::inspector::V8InspectorSession>,
-    outbound_tx: broadcast::Sender<InspectorMessage>,
+    v8_session: v8::inspector::V8InspectorSession,
 }
 
 impl InspectorSession {
     pub fn new(
-        v8_inspector: Rc<RefCell<v8::UniquePtr<v8::inspector::V8Inspector>>>,
+        v8_inspector: Rc<v8::inspector::V8Inspector>,
         outbound_tx: broadcast::Sender<InspectorMessage>,
-    ) -> Box<InspectorSession> {
-        new_box_with(move |self_ptr| {
-            let v8_channel = v8::inspector::ChannelBase::new::<Self>();
-            let mut v8_inspector = v8_inspector.borrow_mut();
-            let v8_inspector_ptr = v8_inspector.as_mut().unwrap();
+    ) -> Self {
+        let state = InspectorSessionState {
+            outbound_tx: outbound_tx.clone(),
+        };
+        let v8_session = v8_inspector.connect(
+            CONTEXT_GROUP_ID,
+            v8::inspector::Channel::new(Box::new(state)),
+            v8::inspector::StringView::empty(),
+            v8::inspector::V8InspectorClientTrustLevel::FullyTrusted,
+        );
 
-            #[allow(clippy::undocumented_unsafe_blocks)]
-            let v8_session = v8_inspector_ptr.connect(
-                CONTEXT_GROUP_ID,
-                // Note: V8Inspector::connect() should require that the 'v8_channel'
-                // argument cannot move.
-                unsafe { &mut *self_ptr },
-                v8::inspector::StringView::empty(),
-                v8::inspector::V8InspectorClientTrustLevel::FullyTrusted,
-            );
+        Self { v8_session }
+    }
 
-            Self {
-                v8_channel,
-                v8_session,
-                outbound_tx,
-            }
-        })
+    // Schedule a v8 break on next statement.
+    pub fn break_on_next_statement(&self) {
+        let reason = v8::inspector::StringView::from(&b"debugCommand"[..]);
+        let details = v8::inspector::StringView::empty();
+        self.v8_session
+            .schedule_pause_on_next_statement(reason, details);
     }
 
     // Dispatch message to V8 session.
-    fn dispatch_message(&mut self, msg: String) {
+    pub fn dispatch_message(&self, msg: String) {
         let bytes = msg.as_bytes();
         let v8_message = v8::inspector::StringView::from(bytes);
         self.v8_session.dispatch_protocol_message(v8_message);
     }
+}
 
+struct InspectorSessionState {
+    outbound_tx: broadcast::Sender<InspectorMessage>,
+}
+
+impl InspectorSessionState {
     // Dispatch message to outbound channel.
     fn send_message(&self, msg: v8::UniquePtr<v8::inspector::StringBuffer>) {
         let message = msg.unwrap().string().to_string();
         self.outbound_tx.send(message).unwrap();
     }
-
-    // Schedule a v8 break on next statement.
-    pub fn break_on_next_statement(&mut self) {
-        let reason = v8::inspector::StringView::from(&b"debugCommand"[..]);
-        let details = v8::inspector::StringView::empty();
-        (*self.v8_session).schedule_pause_on_next_statement(reason, details);
-    }
 }
 
-impl v8::inspector::ChannelImpl for InspectorSession {
-    fn base(&self) -> &v8::inspector::ChannelBase {
-        &self.v8_channel
-    }
-
-    fn base_mut(&mut self) -> &mut v8::inspector::ChannelBase {
-        &mut self.v8_channel
-    }
-
-    unsafe fn base_ptr(this: *const Self) -> *const v8::inspector::ChannelBase
-    where
-        Self: Sized,
-    {
-        // SAFETY: This pointer is valid for the whole lifetime of inspector.
-        unsafe { std::ptr::addr_of!((*this).v8_channel) }
-    }
-
-    fn send_response(
-        &mut self,
-        _call_id: i32,
-        message: v8::UniquePtr<v8::inspector::StringBuffer>,
-    ) {
+impl ChannelImpl for InspectorSessionState {
+    fn send_response(&self, _call_id: i32, message: v8::UniquePtr<v8::inspector::StringBuffer>) {
         self.send_message(message);
     }
 
-    fn send_notification(&mut self, message: v8::UniquePtr<v8::inspector::StringBuffer>) {
+    fn send_notification(&self, message: v8::UniquePtr<v8::inspector::StringBuffer>) {
         self.send_message(message);
     }
 
-    fn flush_protocol_notifications(&mut self) {}
+    fn flush_protocol_notifications(&self) {}
 }
 
 #[derive(Clone)]
@@ -506,14 +464,4 @@ async fn websocket(socket: WebSocket, state: AppState) {
     // Notify that the debugger detached.
     let _ = state.inbound_tx.send(FrontendMessage::Disconnected);
     state.handle.interrupt();
-}
-
-fn new_box_with<T>(new_fn: impl FnOnce(*mut T) -> T) -> Box<T> {
-    let b = Box::new(MaybeUninit::<T>::uninit());
-    let p = Box::into_raw(b) as *mut T;
-    // SAFETY: memory layout for `T` is ensured on first line of this function
-    unsafe {
-        std::ptr::write(p, new_fn(p));
-        Box::from_raw(p)
-    }
 }

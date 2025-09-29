@@ -7,7 +7,7 @@ mod exceptions;
 mod file;
 mod hooks;
 mod http_parser;
-// mod inspector;
+mod inspector;
 mod loaders;
 mod modules;
 mod net;
