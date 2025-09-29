@@ -190,11 +190,7 @@ fn execute(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8:
 }
 
 /// Compiles a SQL statement into a prepared statement.
-fn prepare(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn prepare(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get connection and SQL query.
     let connection = args.get(0).to_object(scope).unwrap();
     let sql = args.get(1).to_rust_string_lossy(scope);
@@ -225,11 +221,7 @@ fn prepare(
 }
 
 /// Executes a prepared statement and returns the results.
-fn query(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn query(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get connection and required params.
     let connection = args.get(0).to_object(scope).unwrap();
     let stmt_reference = args.get(1).to_rust_string_lossy(scope);
@@ -490,11 +482,7 @@ fn expanded_sql(
 }
 
 /// Returns information about the prepared statement columns.
-fn columns(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn columns(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get connection and required params.
     let connection = args.get(0).to_object(scope).unwrap();
     let stmt_reference = args.get(1).to_rust_string_lossy(scope);

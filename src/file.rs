@@ -430,11 +430,7 @@ impl JsFuture for FsWriteFuture {
 }
 
 // Writes asynchronously contents to a file.
-fn write(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
 
@@ -492,11 +488,7 @@ fn write(
 }
 
 /// Writes contents to a file.
-fn write_sync(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
-) {
+fn write_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
 
@@ -642,11 +634,7 @@ impl JsFuture for FsMkdirFuture {
 }
 
 /// Creates a directory asynchronously.
-fn mkdir(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn mkdir(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get desired folder location.
     let path = args.get(0).to_rust_string_lossy(scope);
     let recursive = args.get(1).to_rust_string_lossy(scope) == "true";
@@ -684,11 +672,7 @@ fn mkdir(
 }
 
 /// Creates a directory synchronously.
-fn mkdir_sync(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
-) {
+fn mkdir_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get desired folder location.
     let path = args.get(0).to_rust_string_lossy(scope);
     let recursive = args.get(1).to_rust_string_lossy(scope) == "true";
@@ -734,11 +718,7 @@ impl JsFuture for FsRmdirFuture {
 }
 
 /// Removes empty directories asynchronously.
-fn rmdir(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn rmdir(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get to be removed folder location.
     let path = args.get(0).to_rust_string_lossy(scope);
 
@@ -775,11 +755,7 @@ fn rmdir(
 }
 
 /// Removes empty directories.
-fn rmdir_sync(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
-) {
+fn rmdir_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get to be removed folder location.
     let path = args.get(0).to_rust_string_lossy(scope);
 
@@ -830,11 +806,7 @@ impl JsFuture for ReadDirFuture {
 }
 
 /// Reads the contents of a directory asynchronously.
-fn readdir(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn readdir(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get desired folder location.
     let path = args.get(0).to_rust_string_lossy(scope);
 
@@ -979,11 +951,7 @@ fn rm_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8:
 }
 
 /// Closes a file asynchronously.
-fn close(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn close(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
 
@@ -1011,11 +979,7 @@ fn close(
 }
 
 /// Closes a file synchronously.
-fn close_sync(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
-) {
+fn close_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
 
@@ -1064,11 +1028,7 @@ impl JsFuture for FsRenameFuture {
 }
 
 /// Renames a file asynchronously.
-fn rename(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn rename(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get `from` and `to` values.
     let from = args.get(0).to_rust_string_lossy(scope);
     let to = args.get(1).to_rust_string_lossy(scope);
@@ -1108,11 +1068,7 @@ fn rename(
 }
 
 /// Renames a file synchronously.
-fn rename_sync(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
-) {
+fn rename_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get `from` and `to` values.
     let from = args.get(0).to_rust_string_lossy(scope);
     let to = args.get(1).to_rust_string_lossy(scope);
@@ -1164,11 +1120,7 @@ impl JsFuture for WatchFuture {
 }
 
 /// Starts a watcher for a requested path.
-fn watch(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn watch(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get path and recursive option.
     let path = args.get(0).to_rust_string_lossy(scope);
     let recursive = args.get(1).boolean_value(scope);

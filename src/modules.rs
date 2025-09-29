@@ -336,7 +336,9 @@ impl JsFuture for EsModuleFuture {
         let module_id = module.get_identity_hash().get();
         let module_ref = v8::Global::new(tc_scope, module);
 
-        state.module_map.insert(self.path.as_str(), module_id, module_ref);
+        state
+            .module_map
+            .insert(self.path.as_str(), module_id, module_ref);
         state.module_map.seen.insert(self.path.clone(), new_status);
 
         let import_map = state.options.import_map.clone();
@@ -564,7 +566,10 @@ pub fn fetch_module_tree<'a>(
     // Subscribe module to the module-map.
     let module_id = module.get_identity_hash().get();
     let module_ref = v8::Global::new(scope, module);
-    state.borrow_mut().module_map.insert(filename, module_id, module_ref);
+    state
+        .borrow_mut()
+        .module_map
+        .insert(filename, module_id, module_ref);
 
     let requests = module.get_module_requests();
 

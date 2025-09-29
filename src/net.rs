@@ -91,11 +91,7 @@ impl JsFuture for TcpConnectFuture {
 }
 
 /// Creates a new TCP stream and issue a non-blocking connect.
-fn connect(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn connect(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get IP and PORT from arguments.
     let ip = args.get(0).to_rust_string_lossy(scope);
     let port = args.get(1).to_rust_string_lossy(scope);
@@ -183,11 +179,7 @@ impl JsFuture for ReadStartFuture {
 }
 
 /// Starts reading from an open TCP socket.
-fn read_start(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
-) {
+fn read_start(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get socket's ID.
     let index = args.get(0).int32_value(scope).unwrap() as u32;
 
@@ -241,11 +233,7 @@ impl JsFuture for TcpWriteFuture {
     }
 }
 
-fn write(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     let index = args.get(0).int32_value(scope).unwrap() as u32;
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
 
@@ -331,11 +319,7 @@ impl JsFuture for TcpListenFuture {
 }
 
 /// Starts listening for incoming connections.
-fn listen(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn listen(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get INTERFACE and PORT from arguments.
     let interface = args.get(0).to_rust_string_lossy(scope);
     let port = args.get(1).to_rust_string_lossy(scope);
@@ -452,11 +436,7 @@ impl JsFuture for TcpCloseFuture {
 }
 
 /// Closes the TCP socket.
-fn close(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
+fn close(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get socket's ID.
     let index = args.get(0).int32_value(scope).unwrap() as u32;
 
