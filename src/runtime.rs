@@ -170,7 +170,7 @@ impl JsRuntime {
             .as_millis();
 
         // Initialize the v8 inspector.
-        let address = options.inspect.map(|(address, _)| (address));
+        let address = options.inspect.map(|(address, _)| address);
         let inspector = options.inspect.map(|(_, waiting_for_session)| {
             JsRuntimeInspector::new(
                 &mut isolate,
