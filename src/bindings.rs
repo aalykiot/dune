@@ -43,7 +43,9 @@ lazy_static! {
 }
 
 /// Populates a new JavaScript context with low-level Rust bindings.
-pub fn create_new_context<'s, 'i>(scope: &mut v8::PinScope<'s, 'i, ()>) -> v8::Local<'s, v8::Context> {
+pub fn create_new_context<'s, 'i>(
+    scope: &mut v8::PinScope<'s, 'i, ()>,
+) -> v8::Local<'s, v8::Context> {
     // Create and enter a new JavaScript context.
     let context = v8::Context::new(scope, Default::default());
     let global = context.global(scope);
@@ -59,11 +61,7 @@ pub fn create_new_context<'s, 'i>(scope: &mut v8::PinScope<'s, 'i, ()>) -> v8::L
 }
 
 // Simple print function bound to Rust's println! macro.
-fn global_print(
-    scope: &mut v8::PinScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
-) {
+fn global_print(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     let value = args.get(0).to_rust_string_lossy(scope);
     println!("{value}");
 }
