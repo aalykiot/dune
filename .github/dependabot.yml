@@ -1,12 +1,12 @@
 version: 2
 updates:
-  - package-ecosystem: "cargo"
-    directory: "/"
+  - package-ecosystem: 'cargo'
+    directory: '/'
+    open-pull-requests-limit: 5
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     ignore:
-      - dependency-name: "swc*"
-      - dependency-name: "v8*"
-      - dependency-name: "sourcemap*"
-      - dependency-name: "bincode*"
-
+      - dependency-name: 'swc*'
+      - dependency-name: 'v8*'
+      - dependency-name: 'sourcemap*'
+      - dependency-name: 'bincode*'
