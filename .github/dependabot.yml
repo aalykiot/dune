@@ -1,0 +1,12 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "swc*"
+      - dependency-name: "v8*"
+      - dependency-name: "sourcemap*"
+      - dependency-name: "bincode*"
+
