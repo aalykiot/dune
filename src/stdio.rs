@@ -3,7 +3,7 @@ use crate::bindings::throw_exception;
 use std::io;
 use std::io::Write;
 
-pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
+pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
@@ -18,7 +18,7 @@ pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
 }
 
 /// Writes data to the stdout stream.
-fn write(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Convert string to bytes.
     let content = args.get(0).to_rust_string_lossy(scope);
     let content = content.as_bytes();
@@ -28,11 +28,7 @@ fn write(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8
 }
 
 /// Writes data to the stderr stream.
-fn write_error(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
-) {
+fn write_error(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Convert string to bytes.
     let content = args.get(0).to_rust_string_lossy(scope);
     let content = content.as_bytes();
@@ -42,7 +38,7 @@ fn write_error(
 }
 
 /// Reads (synchronously) a string from the stdin.
-fn read(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, mut ret: v8::ReturnValue) {
+fn read(scope: &mut v8::PinScope, _: v8::FunctionCallbackArguments, mut ret: v8::ReturnValue) {
     // Read input from system's stdin stream.
     let mut input = String::new();
     let stdin = io::stdin();
@@ -54,7 +50,7 @@ fn read(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, mut ret: 
 }
 
 /// Clears the terminal if the environment allows it.
-fn clear(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+fn clear(scope: &mut v8::PinScope, _: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     if let Err(e) = clearscreen::clear() {
         throw_exception(scope, &e.into());
     }
@@ -62,11 +58,7 @@ fn clear(scope: &mut v8::HandleScope, _: v8::FunctionCallbackArguments, _: v8::R
 
 /// Native wrapper that will preserve the original stack.
 /// https://github.com/denoland/deno_core/blob/main/core/runtime/bindings.rs#L504-L529
-fn call_console(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    _: v8::ReturnValue,
-) {
+fn call_console(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     assert!(args.length() >= 2);
     assert!(args.get(0).is_function());
     assert!(args.get(1).is_function());

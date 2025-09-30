@@ -4,7 +4,7 @@ use crate::runtime::JsRuntime;
 use dune_event_loop::LoopHandle;
 use std::rc::Rc;
 
-pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
+pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
@@ -23,7 +23,7 @@ struct TimeoutFuture {
 }
 
 impl JsFuture for TimeoutFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
+    fn run(&mut self, scope: &mut v8::PinScope) {
         let undefined = v8::undefined(scope).into();
         let callback = v8::Local::new(scope, (*self.cb).clone());
         let args: Vec<v8::Local<v8::Value>> = self
@@ -32,8 +32,7 @@ impl JsFuture for TimeoutFuture {
             .map(|arg| v8::Local::new(scope, arg))
             .collect();
 
-        let tc_scope = &mut v8::TryCatch::new(scope);
-
+        v8::tc_scope!(let tc_scope, scope);
         callback.call(tc_scope, undefined, &args);
 
         // Report if callback threw an exception.
@@ -48,7 +47,7 @@ impl JsFuture for TimeoutFuture {
 
 /// Schedules a new timeout to the event-loop.
 fn create_timeout(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -107,7 +106,7 @@ fn create_timeout(
 
 /// Removes a scheduled timeout from the event-loop.
 fn remove_timeout(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
@@ -124,7 +123,7 @@ struct ImmediateFuture {
 }
 
 impl JsFuture for ImmediateFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
+    fn run(&mut self, scope: &mut v8::PinScope) {
         let undefined = v8::undefined(scope).into();
         let callback = v8::Local::new(scope, (*self.cb).clone());
         let args: Vec<v8::Local<v8::Value>> = self
@@ -133,8 +132,7 @@ impl JsFuture for ImmediateFuture {
             .map(|arg| v8::Local::new(scope, arg))
             .collect();
 
-        let tc_scope = &mut v8::TryCatch::new(scope);
-
+        v8::tc_scope!(let tc_scope, scope);
         callback.call(tc_scope, undefined, &args);
 
         // On exception, report it and exit.
@@ -149,7 +147,7 @@ impl JsFuture for ImmediateFuture {
 
 /// Schedules a new immediate timer (aka check callback).
 fn create_immediate(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -194,7 +192,7 @@ fn create_immediate(
 
 /// Removes a scheduled immediate timer.
 fn remove_immediate(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {

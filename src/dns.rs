@@ -9,7 +9,7 @@ use dune_event_loop::LoopHandle;
 use dune_event_loop::TaskResult;
 use std::net::IpAddr;
 
-pub fn initialize(scope: &mut v8::HandleScope) -> v8::Global<v8::Object> {
+pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
@@ -26,7 +26,7 @@ struct DnsLookupFuture {
 }
 
 impl JsFuture for DnsLookupFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope) {
+    fn run(&mut self, scope: &mut v8::PinScope) {
         // Extract the result.
         let result = self.maybe_result.take().unwrap();
 
@@ -71,7 +71,7 @@ impl JsFuture for DnsLookupFuture {
 
 /// Resolves a host name into the first found A (IPv4) or AAAA (IPv6) record.
 fn dns_lookup(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {

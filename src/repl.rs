@@ -259,8 +259,6 @@ pub fn start(mut runtime: JsRuntime) {
         editor.save_history(history_file_path).unwrap()
     });
 
-    let context = runtime.context();
-
     loop {
         // Check for REPL messages.
         let maybe_message = receiver.try_recv();
@@ -270,10 +268,11 @@ pub fn start(mut runtime: JsRuntime) {
             // Tick the event loop and report exceptions.
             runtime.tick_event_loop();
             // Check for exceptions.
-            let scope = &mut runtime.handle_scope();
-            if let Some(error) = check_exceptions(scope) {
-                eprintln!("{error}");
-            }
+            runtime.with_scope(|scope| {
+                if let Some(error) = check_exceptions(scope) {
+                    eprintln!("{error}");
+                }
+            });
             continue;
         }
 
@@ -283,18 +282,19 @@ pub fn start(mut runtime: JsRuntime) {
                 match runtime.execute_script("<anonymous>", &expression) {
                     // Format the expression using console.log.
                     Ok(Some(value)) => {
-                        let scope = &mut runtime.handle_scope();
-                        let context = v8::Local::new(scope, context.clone());
-                        let scope = &mut v8::ContextScope::new(scope, context);
-                        let global = context.global(scope);
-                        let console_name = v8::String::new(scope, "console").unwrap();
-                        let console = global.get(scope, console_name.into()).unwrap();
-                        let console = v8::Local::<v8::Object>::try_from(console).unwrap();
-                        let log_name = v8::String::new(scope, "log").unwrap();
-                        let log = console.get(scope, log_name.into()).unwrap();
-                        let log = v8::Local::<v8::Function>::try_from(log).unwrap();
-                        let value = v8::Local::new(scope, value);
-                        log.call(scope, global.into(), &[value]);
+                        runtime.with_scope(|scope| {
+                            let context = scope.get_current_context();
+                            let scope = &mut v8::ContextScope::new(scope, context);
+                            let global = context.global(scope);
+                            let console_name = v8::String::new(scope, "console").unwrap();
+                            let console = global.get(scope, console_name.into()).unwrap();
+                            let console = v8::Local::<v8::Object>::try_from(console).unwrap();
+                            let log_name = v8::String::new(scope, "log").unwrap();
+                            let log = console.get(scope, log_name.into()).unwrap();
+                            let log = v8::Local::<v8::Function>::try_from(log).unwrap();
+                            let value = v8::Local::new(scope, value);
+                            log.call(scope, global.into(), &[value]);
+                        });
                     }
                     Ok(None) => {}
                     Err(e) => eprintln!("{e}"),

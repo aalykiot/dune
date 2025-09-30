@@ -30,6 +30,7 @@ use dune_event_loop::TaskResult;
 use std::cell::RefCell;
 use std::cmp;
 use std::net::SocketAddrV4;
+use std::pin::pin;
 use std::rc::Rc;
 use std::sync::Once;
 use std::time::Instant;
@@ -42,7 +43,7 @@ type NextTickQueue = Vec<(v8::Global<v8::Function>, Vec<v8::Global<v8::Value>>)>
 /// An abstract interface for something that should run in respond to an
 /// async task, scheduled previously and is now completed.
 pub trait JsFuture {
-    fn run(&mut self, scope: &mut v8::HandleScope);
+    fn run(&mut self, scope: &mut v8::PinScope);
 }
 
 /// The state to be stored per v8 isolate.
@@ -97,7 +98,7 @@ pub struct JsRuntime {
     /// https://v8docs.nodesource.com/node-0.8/d5/dda/classv8_1_1_isolate.html
     isolate: v8::OwnedIsolate,
     /// A structure responsible for providing inspector interface to the runtime.
-    pub inspector: Option<Rc<RefCell<JsRuntimeInspector>>>,
+    pub inspector: Option<Rc<JsRuntimeInspector>>,
     /// The event-loop instance that takes care of polling for I/O.
     pub event_loop: EventLoop,
     /// The state of the runtime.
@@ -150,7 +151,8 @@ impl JsRuntime {
             .set_host_initialize_import_meta_object_callback(host_initialize_import_meta_object_cb);
 
         let context = {
-            let scope = &mut v8::HandleScope::new(&mut *isolate);
+            let scope = pin!(v8::HandleScope::new(&mut *isolate));
+            let scope = &mut scope.init();
             let context = bindings::create_new_context(scope);
             v8::Global::new(scope, context)
         };
@@ -168,7 +170,7 @@ impl JsRuntime {
             .as_millis();
 
         // Initialize the v8 inspector.
-        let address = options.inspect.map(|(address, _)| (address));
+        let address = options.inspect.map(|(address, _)| address);
         let inspector = options.inspect.map(|(_, waiting_for_session)| {
             JsRuntimeInspector::new(
                 &mut isolate,
@@ -207,9 +209,9 @@ impl JsRuntime {
         runtime.load_main_environment();
 
         // Start inspector agent is requested.
-        if let Some(inspector) = runtime.inspector().as_mut() {
+        if let Some(inspector) = runtime.inspector().as_ref() {
             let address = address.unwrap();
-            inspector.borrow_mut().start_agent(address);
+            inspector.start_agent(address);
         }
 
         runtime
@@ -220,8 +222,9 @@ impl JsRuntime {
         let name = "dune:environment/main";
         let source = include_str!("./js/main.js");
 
-        let scope = &mut self.handle_scope();
-        let tc_scope = &mut v8::TryCatch::new(scope);
+        let context = self.context();
+        v8::scope_with_context!(scope, &mut self.isolate, context);
+        v8::tc_scope!(let tc_scope, scope);
 
         let module = match fetch_module_tree(tc_scope, name, Some(source)) {
             Some(module) => module,
@@ -263,32 +266,36 @@ impl JsRuntime {
         source: &str,
     ) -> Result<Option<v8::Global<v8::Value>>, Error> {
         // Get the handle-scope.
-        let scope = &mut self.handle_scope();
+        let context = self.context();
+        v8::scope_with_context!(scope, &mut self.isolate, context);
         let state_rc = JsRuntime::state(scope);
 
         let origin = create_origin(scope, filename, false);
         let source = v8::String::new(scope, source).unwrap();
 
         // The `TryCatch` scope allows us to catch runtime errors rather than panicking.
-        let tc_scope = &mut v8::TryCatch::new(scope);
+        v8::tc_scope!(let tc_scope, scope);
         type ExecuteScriptResult = Result<Option<v8::Global<v8::Value>>, Error>;
 
-        let handle_exception =
-            |scope: &mut v8::TryCatch<'_, v8::HandleScope<'_>>| -> ExecuteScriptResult {
-                // Extract the exception during compilation.
-                assert!(scope.has_caught());
-                let exception = scope.exception().unwrap();
-                let exception = v8::Global::new(scope, exception);
-                let mut state = state_rc.borrow_mut();
-                // Capture the exception internally.
-                state.exceptions.capture_exception(exception);
-                drop(state);
-                // Force an exception check.
-                if let Some(error) = check_exceptions(scope) {
-                    bail!(error)
-                }
-                Ok(None)
-            };
+        let handle_exception = |scope: &mut v8::PinnedRef<
+            '_,
+            v8::TryCatch<'_, '_, v8::HandleScope<'_>>,
+        >|
+         -> ExecuteScriptResult {
+            // Extract the exception during compilation.
+            assert!(scope.has_caught());
+            let exception = scope.exception().unwrap();
+            let exception = v8::Global::new(scope, exception);
+            let mut state = state_rc.borrow_mut();
+            // Capture the exception internally.
+            state.exceptions.capture_exception(exception);
+            drop(state);
+            // Force an exception check.
+            if let Some(error) = check_exceptions(scope) {
+                bail!(error)
+            }
+            Ok(None)
+        };
 
         let script = match v8::Script::compile(tc_scope, source, Some(&origin)) {
             Some(script) => script,
@@ -304,7 +311,8 @@ impl JsRuntime {
     /// Executes JavaScript code as ES module.
     pub fn execute_module(&mut self, filename: &str, source: Option<&str>) -> Result<(), Error> {
         // Get a reference to v8's scope.
-        let scope = &mut self.handle_scope();
+        let context = self.context();
+        v8::scope_with_context!(scope, &mut self.isolate, context);
         let state_rc = JsRuntime::state(scope);
         let mut state = state_rc.borrow_mut();
 
@@ -363,7 +371,7 @@ impl JsRuntime {
 
     /// Runs a single tick of the event-loop.
     pub fn tick_event_loop(&mut self) {
-        run_next_tick_callbacks(&mut self.handle_scope());
+        self.with_scope(run_next_tick_callbacks);
         self.fast_forward_imports();
         self.event_loop.tick();
         self.run_pending_futures();
@@ -371,8 +379,8 @@ impl JsRuntime {
 
     /// Polls the inspector for new devtools messages.
     pub fn poll_inspect_session(&mut self) {
-        if let Some(inspector) = self.inspector.as_mut() {
-            inspector.borrow_mut().poll_session();
+        if let Some(inspector) = self.inspector.as_ref() {
+            inspector.state.poll_session();
         }
     }
 
@@ -381,7 +389,7 @@ impl JsRuntime {
         // Check for pending devtools messages.
         self.poll_inspect_session();
         // Run callbacks/promises from next-tick and micro-task queues.
-        run_next_tick_callbacks(&mut self.handle_scope());
+        self.with_scope(run_next_tick_callbacks);
 
         while self.event_loop.has_pending_events()
             || self.has_promise_rejections()
@@ -395,24 +403,29 @@ impl JsRuntime {
             self.tick_event_loop();
 
             // Report any unhandled promise rejections.
-            if let Some(error) = check_exceptions(&mut self.handle_scope()) {
-                report_and_exit(error);
-            }
+            self.with_scope(|scope| {
+                if let Some(error) = check_exceptions(scope) {
+                    report_and_exit(error);
+                }
+            });
         }
 
         // We can now notify debugger that the program has finished running
         // and we're ready to exit the process.
         if let Some(inspector) = self.inspector() {
-            let context = self.context();
-            let scope = &mut self.handle_scope();
-            inspector.borrow_mut().context_destroyed(scope, context);
+            self.with_scope(|scope| {
+                let context = scope.get_current_context();
+                let context = v8::Global::new(scope, context);
+                inspector.context_destroyed(scope, context);
+            });
         }
     }
 
     /// Runs all the pending javascript tasks.
     fn run_pending_futures(&mut self) {
         // Get a handle-scope and a reference to the runtime's state.
-        let scope = &mut self.handle_scope();
+        let context = self.context();
+        v8::scope_with_context!(scope, &mut self.isolate, context);
         let state_rc = Self::state(scope);
 
         // NOTE: The reason we move all the js futures to a separate vec is because
@@ -439,7 +452,8 @@ impl JsRuntime {
     /// Checks for imports (static/dynamic) ready for execution.
     fn fast_forward_imports(&mut self) {
         // Get a v8 handle-scope.
-        let scope = &mut self.handle_scope();
+        let context = self.context();
+        v8::scope_with_context!(scope, &mut self.isolate, context);
         let state_rc = JsRuntime::state(scope);
         let mut state = state_rc.borrow_mut();
 
@@ -491,13 +505,11 @@ impl JsRuntime {
 
         // Execute the root module from the graph.
         for graph_rc in ready_imports {
-            // Create a tc scope.
-            let tc_scope = &mut v8::TryCatch::new(scope);
-
+            v8::tc_scope!(let tc_scope, scope);
             let graph = graph_rc.borrow();
             let path = graph.root_rc.borrow().path.clone();
 
-            let module = state_rc.borrow().module_map.get(&path).unwrap();
+            let module = state_rc.borrow().module_map.get_module(&path).unwrap();
             let module = v8::Local::new(tc_scope, module);
 
             if module
@@ -592,13 +604,6 @@ impl JsRuntime {
         Self::state(&self.isolate)
     }
 
-    /// Returns a v8 handle scope for the runtime.
-    /// https://v8docs.nodesource.com/node-0.8/d3/d95/classv8_1_1_handle_scope.html.
-    pub fn handle_scope(&mut self) -> v8::HandleScope<'_> {
-        let context = self.context();
-        v8::HandleScope::with_context(&mut self.isolate, context)
-    }
-
     /// Returns a context created for the runtime.
     /// https://v8docs.nodesource.com/node-0.8/df/d69/classv8_1_1_context.html
     pub fn context(&mut self) -> v8::Global<v8::Context> {
@@ -607,19 +612,28 @@ impl JsRuntime {
         state.context.clone()
     }
 
+    pub fn with_scope<F>(&mut self, func: F)
+    where
+        F: FnOnce(&mut v8::PinScope),
+    {
+        let context = self.context();
+        v8::scope_with_context!(scope, &mut self.isolate, context);
+        func(scope);
+    }
+
     /// Returns the inspector created for the runtime.
-    pub fn inspector(&mut self) -> Option<Rc<RefCell<JsRuntimeInspector>>> {
+    pub fn inspector(&mut self) -> Option<Rc<JsRuntimeInspector>> {
         self.inspector.as_ref().cloned()
     }
 }
 
 /// Runs callbacks stored in the next-tick queue.
-fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
+fn run_next_tick_callbacks(scope: &mut v8::PinScope) {
     let state_rc = JsRuntime::state(scope);
     let callbacks: NextTickQueue = state_rc.borrow_mut().next_tick_queue.drain(..).collect();
 
     let undefined = v8::undefined(scope);
-    let tc_scope = &mut v8::TryCatch::new(scope);
+    v8::tc_scope!(let tc_scope, scope);
 
     for (cb, params) in callbacks {
         // Create a local handle for the callback and its parameters.
@@ -651,7 +665,7 @@ fn run_next_tick_callbacks(scope: &mut v8::HandleScope) {
 }
 
 // Returns an error if an uncaught exception or unhandled rejection has been captured.
-pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
+pub fn check_exceptions(scope: &mut v8::PinScope) -> Option<JsError> {
     let state_rc = JsRuntime::state(scope);
     let maybe_exception = state_rc.borrow_mut().exceptions.exception.take();
 
@@ -663,7 +677,7 @@ pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
             let callback = v8::Local::new(scope, callback);
             let undefined = v8::undefined(scope).into();
             let origin = v8::String::new(scope, "uncaughtException").unwrap();
-            let tc_scope = &mut v8::TryCatch::new(scope);
+            v8::tc_scope!(let tc_scope, scope);
             drop(state);
 
             callback.call(tc_scope, undefined, &[exception, origin.into()]);
@@ -701,7 +715,7 @@ pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
         if let Some(callback) = state.exceptions.unhandled_rejection_cb.as_ref() {
             let callback = v8::Local::new(scope, callback);
             let undefined = v8::undefined(scope).into();
-            let tc_scope = &mut v8::TryCatch::new(scope);
+            v8::tc_scope!(let tc_scope, scope);
             drop(state);
 
             callback.call(tc_scope, undefined, &[exception, promise.into()]);
@@ -723,7 +737,7 @@ pub fn check_exceptions(scope: &mut v8::HandleScope) -> Option<JsError> {
             let callback = v8::Local::new(scope, callback);
             let undefined = v8::undefined(scope).into();
             let origin = v8::String::new(scope, "unhandledRejection").unwrap();
-            let tc_scope = &mut v8::TryCatch::new(scope);
+            v8::tc_scope!(let tc_scope, scope);
             drop(state);
 
             callback.call(tc_scope, undefined, &[exception, origin.into()]);

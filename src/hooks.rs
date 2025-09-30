@@ -21,14 +21,15 @@ pub fn module_resolve_cb<'a>(
     referrer: v8::Local<'a, v8::Module>,
 ) -> Option<v8::Local<'a, v8::Module>> {
     // Get `CallbackScope` from context.
-    let scope = &mut unsafe { v8::CallbackScope::new(context) };
+    v8::callback_scope!(unsafe scope, context);
     let state = JsRuntime::state(scope);
     let state = state.borrow();
 
     let import_map = state.options.import_map.clone();
+    let referrer_id = referrer.get_identity_hash().get();
     let referrer = v8::Global::new(scope, referrer);
 
-    let dependant = state.module_map.get_path(referrer);
+    let dependant = state.module_map.get_module_path(referrer_id, referrer);
 
     let specifier = specifier.to_rust_string_lossy(scope);
     let specifier = unwrap_or_exit(resolve_import(
@@ -39,7 +40,7 @@ pub fn module_resolve_cb<'a>(
     ));
 
     // This call should always give us back the module.
-    let module = state.module_map.get(&specifier).unwrap();
+    let module = state.module_map.get_module(&specifier).unwrap();
 
     Some(v8::Local::new(scope, module))
 }
@@ -52,16 +53,15 @@ pub extern "C" fn host_initialize_import_meta_object_cb(
     meta: v8::Local<v8::Object>,
 ) {
     // Get `CallbackScope` from context.
-    let scope = &mut unsafe { v8::CallbackScope::new(context) };
-    let scope = &mut v8::HandleScope::new(scope);
-
+    v8::callback_scope!(unsafe scope, context);
     let state = JsRuntime::state(scope);
     let state = state.borrow();
 
     // Make the module global.
+    let module_id = module.get_identity_hash().get();
     let module = v8::Global::new(scope, module);
 
-    let url = state.module_map.get_path(module).unwrap();
+    let url = state.module_map.get_module_path(module_id, module).unwrap();
     let is_main = state.module_map.main() == Some(url.to_owned());
 
     // Setup import.url property.
@@ -84,7 +84,7 @@ pub extern "C" fn host_initialize_import_meta_object_cb(
 }
 
 fn import_meta_resolve(
-    scope: &mut v8::HandleScope,
+    scope: &mut v8::PinScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -108,7 +108,7 @@ fn import_meta_resolve(
 /// https://docs.rs/v8/0.49.0/v8/type.PromiseRejectCallback.html
 pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
     // Create a v8 callback-scope.
-    let scope = &mut unsafe { v8::CallbackScope::new(&message) };
+    v8::callback_scope!(unsafe scope, &message);
     let undefined = v8::undefined(scope).into();
     let event = message.get_event();
 
@@ -145,7 +145,7 @@ pub extern "C" fn promise_reject_cb(message: v8::PromiseRejectMessage) {
 // Called when we require the embedder to load a module.
 // https://docs.rs/v8/0.56.1/v8/trait.HostImportModuleDynamicallyCallback.html
 pub fn host_import_module_dynamically_cb<'s>(
-    scope: &mut v8::HandleScope<'s>,
+    scope: &mut v8::PinScope<'s, '_>,
     _: v8::Local<'s, v8::Data>,
     base: v8::Local<'s, v8::Value>,
     specifier: v8::Local<'s, v8::String>,
@@ -183,9 +183,9 @@ pub fn host_import_module_dynamically_cb<'s>(
         .any(|graph_rc| graph_rc.borrow().root_rc.borrow().path == specifier);
 
     // Check if the requested dynamic module is already resolved.
-    if state.module_map.index.contains_key(&specifier) && !dynamic_import_being_fetched {
+    if state.module_map.by_path.contains_key(&specifier) && !dynamic_import_being_fetched {
         // Create a local handle for the module.
-        let module = state.module_map.get(&specifier).unwrap();
+        let module = state.module_map.get_module(&specifier).unwrap();
         let module = module.open(scope);
 
         // Note: Since this is a dynamic import will resolve the promise
