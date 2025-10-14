@@ -569,8 +569,10 @@ export class Server extends EventEmitter {
 
       // Try parsing the HTTP headers.
       let metadata;
+
       try {
         metadata = binding.parseRequest(buffer);
+        // eslint-disable-next-line no-unused-vars
       } catch (_) {
         const message = 'HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n';
         await socket.write(message);
