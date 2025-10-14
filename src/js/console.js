@@ -420,7 +420,7 @@ export class Console {
     try {
       process.binding('stdio').clear();
     } catch (e) {
-      this.warn('This environment does not support console clearing');
+      this.warn('This environment does not support console clearing', e);
     }
   }
 
