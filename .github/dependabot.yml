@@ -10,3 +10,5 @@ updates:
       - dependency-name: 'v8*'
       - dependency-name: 'sourcemap*'
       - dependency-name: 'bincode*'
+      - dependency-name: '*'
+        update-types: ['version-update:semver-patch']
