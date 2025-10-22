@@ -215,19 +215,20 @@ pub fn start(mut runtime: JsRuntime) {
     thread::spawn(move || {
         let mut editor = Editor::new().unwrap();
         let history_file_path = &dirs::home_dir().unwrap().join(CLI_ROOT).join(CLI_HISTORY);
+        let prompt = "> ";
 
         editor.set_helper(Some(RLHelper::new()));
         editor.load_history(history_file_path).unwrap_or_default();
 
         println!("Welcome to Dune v{}", env!("CARGO_PKG_VERSION"));
-        let prompt = "> ".to_string();
+        println!("exit using ctrl+d, ctrl+c or .close");
 
         // Note: In order to wake-up the event-loop (so the main thread can evaluate the JS expression) in
         // case it's stack in the poll phase waiting for new I/O will call the `handle.interrupt()`
         // method that sends a wake-up signal across the main thread.
 
         loop {
-            match editor.readline(&prompt) {
+            match editor.readline(prompt) {
                 Ok(line) if line == ".exit" => {
                     sender.send(ReplMessage::Terminate).unwrap();
                     handle.interrupt();
@@ -273,6 +274,7 @@ pub fn start(mut runtime: JsRuntime) {
                     eprintln!("{error}");
                 }
             });
+
             continue;
         }
 
