@@ -1,5 +1,7 @@
 use crate::runtime::check_exceptions;
 use crate::runtime::JsRuntime;
+use anyhow::bail;
+use anyhow::Result;
 use colored::*;
 use phf::phf_set;
 use phf::Set;
@@ -20,6 +22,24 @@ use std::borrow::Cow;
 use std::fs;
 use std::sync::mpsc;
 use std::thread;
+use swc_common::sync::Lrc;
+use swc_common::FileName;
+use swc_common::SourceMap;
+use swc_ecma_ast::ImportDecl;
+use swc_ecma_ast::ImportSpecifier;
+use swc_ecma_ast::Module;
+use swc_ecma_ast::ModuleDecl;
+use swc_ecma_ast::ModuleItem;
+use swc_ecma_ast::Script;
+use swc_ecma_ast::Stmt;
+use swc_ecma_codegen::text_writer::JsWriter;
+use swc_ecma_codegen::Emitter;
+use swc_ecma_parser::lexer::Lexer;
+use swc_ecma_parser::EsSyntax;
+use swc_ecma_parser::Parser;
+use swc_ecma_parser::StringInput;
+use swc_ecma_parser::Syntax;
+use swc_ecma_visit::Visit;
 
 const STRING_COLOR: Color = Color::Green;
 const NUMBER_COLOR: Color = Color::Yellow;
@@ -280,30 +300,135 @@ pub fn start(mut runtime: JsRuntime) {
 
         // Try execute the given expression, or exit the process.
         match maybe_message.unwrap() {
-            ReplMessage::Evaluate(expression) => {
-                match runtime.execute_script("<anonymous>", &expression) {
-                    // Uses the global console.log to print the provided value.
-                    Ok(Some(value)) => runtime.with_scope(|scope| {
-                        let context = scope.get_current_context();
-                        let scope = &mut v8::ContextScope::new(scope, context);
-                        let global = context.global(scope);
-
-                        let console_name = v8::String::new(scope, "console").unwrap();
-                        let console = global.get(scope, console_name.into()).unwrap();
-                        let console = v8::Local::<v8::Object>::try_from(console).unwrap();
-
-                        let log_name = v8::String::new(scope, "log").unwrap();
-                        let log = console.get(scope, log_name.into()).unwrap();
-                        let log = v8::Local::<v8::Function>::try_from(log).unwrap();
-
-                        let value = v8::Local::new(scope, value);
-                        log.call(scope, global.into(), &[value]);
-                    }),
-                    Ok(None) => {}
-                    Err(e) => eprintln!("{e}"),
-                };
-            }
+            ReplMessage::Evaluate(expression) => match EsModuleParts::parse(&expression) {
+                Ok(module) => {
+                    println!("DEBUG(imports): {}", module.imports());
+                    println!("DEBUG(script): {}", module.script());
+                }
+                Err(e) => eprintln!("{e}"),
+            },
             ReplMessage::Terminate => break,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct EsModuleParts {
+    /// All the imports in AST format.
+    imports: Vec<ImportDecl>,
+    /// The rest of the code in AST format.
+    statements: Vec<Stmt>,
+    /// SWC internal source-map.
+    cm: Lrc<SourceMap>,
+}
+
+impl EsModuleParts {
+    /// Parsed a source string into a module.
+    pub fn parse(source: &str) -> Result<Self> {
+        // Initialize the JavaScript lexer.
+        let cm: Lrc<SourceMap> = Default::default();
+        let fm = cm.new_source_file(FileName::Anon.into(), source.to_string());
+        let lexer = Lexer::new(
+            Syntax::Es(EsSyntax::default()),
+            Default::default(),
+            StringInput::from(&*fm),
+            None,
+        );
+
+        let mut parser = Parser::new_from(lexer);
+        let module = match parser.parse_module().map_err(|e| e.into_kind().msg()) {
+            Ok(module) => module,
+            Err(e) => bail!(e),
+        };
+
+        // Visit nodes and extract imports and statements.
+        let mut this = Self {
+            cm,
+            ..Default::default()
+        };
+        this.visit_module(&module);
+
+        Ok(this)
+    }
+
+    /// Returns only the module imports as source code.
+    pub fn imports(&self) -> String {
+        self.imports
+            .iter()
+            .map(|import_ast| {
+                // Find the import's source (meaning the "from" part).
+                let source = import_ast.src.raw.clone().unwrap().to_string();
+
+                // No specifiers means an import like "import x".
+                if import_ast.specifiers.is_empty() {
+                    return format!("import {};", source);
+                }
+
+                // Collect formatted import statements.
+                let mut named = vec![];
+                for specifier in &import_ast.specifiers {
+                    match specifier {
+                        ImportSpecifier::Default(s) => {
+                            let specifier = s.local.sym.to_string();
+                            return format!("import {} from {};", specifier, source);
+                        }
+                        ImportSpecifier::Namespace(s) => {
+                            let specifier = s.local.sym.to_string();
+                            return format!("import * as {} from {};", specifier, source);
+                        }
+                        ImportSpecifier::Named(s) => {
+                            let specifier = s.local.sym.to_string();
+                            named.push(specifier);
+                        }
+                    };
+                }
+
+                // Reaching this point means we have a named import (import { x, y } from z)
+                // so, we will collect all the names and build the import.
+                format!("import {{ {} }} from {};", named.join(", "), source)
+            })
+            .collect::<Vec<String>>()
+            .join("\n")
+    }
+
+    /// Returns the rest of the JS expressions.
+    pub fn script(&self) -> String {
+        // We have to convert the vec of AST statements that we have
+        // into a Script so the emitter can emit the JS code.
+        let script = Script {
+            body: self.statements.clone(),
+            ..Default::default()
+        };
+
+        // This is where we're gonna store the JavaScript output.
+        let mut output = vec![];
+        let mut emitter = Emitter {
+            cfg: swc_ecma_codegen::Config::default(),
+            cm: self.cm.clone(),
+            comments: None,
+            wr: JsWriter::new(self.cm.clone(), "\n", &mut output, None),
+        };
+
+        emitter.emit_script(&script).unwrap();
+
+        String::from_utf8_lossy(&output).to_string()
+    }
+}
+
+impl Visit for EsModuleParts {
+    fn visit_module(&mut self, node: &Module) {
+        for item in &node.body {
+            match item {
+                // Parse ES module imports.
+                ModuleItem::ModuleDecl(ModuleDecl::Import(value)) => {
+                    self.imports.push(value.clone());
+                }
+                // Rest of expressions.
+                ModuleItem::Stmt(statement) => {
+                    self.statements.push(statement.clone());
+                }
+                _ => {}
+            }
         }
     }
 }
