@@ -29,6 +29,7 @@ use swc_ecma_ast::ImportDecl;
 use swc_ecma_ast::ImportSpecifier;
 use swc_ecma_ast::Module;
 use swc_ecma_ast::ModuleDecl;
+use swc_ecma_ast::ModuleExportName;
 use swc_ecma_ast::ModuleItem;
 use swc_ecma_ast::Script;
 use swc_ecma_ast::Stmt;
@@ -302,8 +303,7 @@ pub fn start(mut runtime: JsRuntime) {
         match maybe_message.unwrap() {
             ReplMessage::Evaluate(expression) => match EsModuleParts::parse(&expression) {
                 Ok(module) => {
-                    println!("DEBUG(imports): {}", module.imports());
-                    println!("DEBUG(script): {}", module.script());
+                    println!("DEBUG: {}", module.has_await_statement());
                 }
                 Err(e) => eprintln!("{e}"),
             },
@@ -323,7 +323,7 @@ pub struct EsModuleParts {
 }
 
 impl EsModuleParts {
-    /// Parsed a source string into a module.
+    /// Parses a given module into parts.
     pub fn parse(source: &str) -> Result<Self> {
         // Initialize the JavaScript lexer.
         let cm: Lrc<SourceMap> = Default::default();
@@ -352,7 +352,7 @@ impl EsModuleParts {
     }
 
     /// Returns only the module imports as source code.
-    pub fn imports(&self) -> String {
+    pub fn convert_to_dynamic_imports(&self) -> String {
         self.imports
             .iter()
             .map(|import_ast| {
@@ -361,7 +361,7 @@ impl EsModuleParts {
 
                 // No specifiers means an import like "import x".
                 if import_ast.specifiers.is_empty() {
-                    return format!("import {};", source);
+                    return format!("await import({});", source);
                 }
 
                 // Collect formatted import statements.
@@ -370,54 +370,55 @@ impl EsModuleParts {
                     match specifier {
                         ImportSpecifier::Default(s) => {
                             let specifier = s.local.sym.to_string();
-                            return format!("import {} from {};", specifier, source);
+                            return format!(
+                                "globalThis.{} = (await import({})).default;",
+                                specifier, source
+                            );
                         }
                         ImportSpecifier::Namespace(s) => {
                             let specifier = s.local.sym.to_string();
-                            return format!("import * as {} from {};", specifier, source);
+                            return format!("globalThis.{} = await import({});", specifier, source);
                         }
                         ImportSpecifier::Named(s) => {
-                            let specifier = s.local.sym.to_string();
-                            named.push(specifier);
+                            let local = s.local.sym.to_string();
+                            let imported = s.imported.as_ref().map(|name| match name {
+                                ModuleExportName::Ident(v) => v.sym.to_string(),
+                                ModuleExportName::Str(v) => v.value.to_string(),
+                            });
+                            named.push((local, imported));
                         }
                     };
                 }
 
                 // Reaching this point means we have a named import (import { x, y } from z)
                 // so, we will collect all the names and build the import.
-                format!("import {{ {} }} from {};", named.join(", "), source)
+                named
+                    .iter()
+                    .map(|(local, imported)| {
+                        format!(
+                            "globalThis.{} = (await import({})).{};",
+                            local,
+                            source,
+                            imported.as_ref().unwrap_or(local)
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n")
             })
             .collect::<Vec<String>>()
             .join("\n")
     }
 
-    /// Returns the rest of the JS expressions.
-    pub fn script(&self) -> String {
-        // We have to convert the vec of AST statements that we have
-        // into a Script so the emitter can emit the JS code.
-        let script = Script {
-            body: self.statements.clone(),
-            ..Default::default()
-        };
-
-        // This is where we're gonna store the JavaScript output.
-        let mut output = vec![];
-        let mut emitter = Emitter {
-            cfg: swc_ecma_codegen::Config::default(),
-            cm: self.cm.clone(),
-            comments: None,
-            wr: JsWriter::new(self.cm.clone(), "\n", &mut output, None),
-        };
-
-        emitter.emit_script(&script).unwrap();
-
-        String::from_utf8_lossy(&output).to_string()
+    /// Returns if we have an await keyword in the statements.
+    pub fn has_await_statement(&self) -> bool {
+        println!("DEBUG: {:#?}", self.statements);
+        false
     }
 }
 
 impl Visit for EsModuleParts {
-    fn visit_module(&mut self, node: &Module) {
-        for item in &node.body {
+    fn visit_module(&mut self, module: &Module) {
+        for item in &module.body {
             match item {
                 // Parse ES module imports.
                 ModuleItem::ModuleDecl(ModuleDecl::Import(value)) => {
