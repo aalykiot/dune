@@ -376,7 +376,7 @@ impl ParsedInput {
         use swc_ecma_ast::*;
         // Traverse nodes and apply necessery transformations.
         for statement in self.statements.iter_mut() {
-            // Bind any function declaration to global scope.
+            // Transform any function declarations to globalThis assignments.
             if let Stmt::Decl(Decl::Fn(fn_decl)) = statement {
                 let name = fn_decl.ident.sym.clone();
                 let fn_span = fn_decl.span();
@@ -410,6 +410,46 @@ impl ParsedInput {
                     span: fn_span,
                     expr: Box::new(assignment),
                 });
+
+                continue;
+            }
+
+            // Transform any class declarations to globalThis assignments.
+            if let Stmt::Decl(Decl::Class(class_decl)) = statement {
+                let name = class_decl.ident.sym.clone();
+                let class_span = class_decl.span();
+
+                // Builds the `globalThis.<name>` part of the expression.
+                let class_binding = MemberExpr {
+                    span: class_span,
+                    obj: Box::new(Expr::Ident(Ident::new(
+                        "globalThis".into(),
+                        class_span,
+                        SyntaxContext::empty(),
+                    ))),
+                    prop: MemberProp::Ident(IdentName::new(name.clone(), class_span)),
+                };
+
+                // Builds the `class <name>() {}` part.
+                let class_expr = Expr::Class(ClassExpr {
+                    ident: Some(Ident::new(name.clone(), class_span, SyntaxContext::empty())),
+                    class: class_decl.class.clone(),
+                });
+
+                // Binds the function to the above namespace.
+                let assignment = Expr::Assign(AssignExpr {
+                    span: class_span,
+                    op: op!("="),
+                    left: AssignTarget::Simple(SimpleAssignTarget::Member(class_binding)),
+                    right: Box::new(class_expr),
+                });
+
+                *statement = Stmt::Expr(ExprStmt {
+                    span: class_span,
+                    expr: Box::new(assignment),
+                });
+
+                continue;
             }
         }
 
