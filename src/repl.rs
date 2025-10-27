@@ -23,15 +23,21 @@ use std::fs;
 use std::sync::mpsc;
 use std::thread;
 use swc_common::sync::Lrc;
+use swc_common::util::take::Take;
 use swc_common::FileName;
 use swc_common::SourceMap;
+use swc_common::Spanned;
+use swc_common::SyntaxContext;
 use swc_ecma_ast::Decl;
 use swc_ecma_ast::Expr;
 use swc_ecma_ast::ImportDecl;
 use swc_ecma_ast::Module;
 use swc_ecma_ast::ModuleDecl;
 use swc_ecma_ast::ModuleItem;
+use swc_ecma_ast::Script;
 use swc_ecma_ast::Stmt;
+use swc_ecma_codegen::text_writer::JsWriter;
+use swc_ecma_codegen::Emitter;
 use swc_ecma_parser::lexer::Lexer;
 use swc_ecma_parser::EsSyntax;
 use swc_ecma_parser::Parser;
@@ -296,7 +302,7 @@ pub fn start(mut runtime: JsRuntime) {
             continue;
         }
 
-        let input = match repl_command.unwrap() {
+        let mut input = match repl_command.unwrap() {
             ReplCommand::Terminate => break,
             ReplCommand::Evaluate(prompt) => match ParsedInput::parse(&prompt) {
                 Ok(input) => input,
@@ -304,7 +310,8 @@ pub fn start(mut runtime: JsRuntime) {
             },
         };
 
-        println!("DEBUG: {}", input.async_wrapper_required);
+        input.transform();
+        println!("DEBUG: {:#?}", input.emit());
     }
 }
 
@@ -363,6 +370,83 @@ impl ParsedInput {
                 .any(|expr| matches!(expr, Expr::Await(_))),
             _ => false,
         })
+    }
+
+    fn transform(&mut self) {
+        use swc_ecma_ast::*;
+        // Traverse nodes and apply necessery transformations.
+        for statement in self.statements.iter_mut() {
+            // Bind any function declaration to global scope.
+            if let Stmt::Decl(Decl::Fn(fn_decl)) = statement {
+                let name = fn_decl.ident.sym.clone();
+                let fn_span = fn_decl.span();
+
+                // Builds the `globalThis.<name>` part of the expression.
+                let fn_binding = MemberExpr {
+                    span: fn_span,
+                    obj: Box::new(Expr::Ident(Ident::new(
+                        "globalThis".into(),
+                        fn_span,
+                        SyntaxContext::empty(),
+                    ))),
+                    prop: MemberProp::Ident(IdentName::new(name.clone(), fn_span)),
+                };
+
+                // Builds the `function <name>() {}` part.
+                let func_expr = Expr::Fn(FnExpr {
+                    ident: Some(Ident::new(name.clone(), fn_span, SyntaxContext::empty())),
+                    function: fn_decl.function.clone(),
+                });
+
+                // Binds the function to the above namespace.
+                let assignment = Expr::Assign(AssignExpr {
+                    span: fn_span,
+                    op: op!("="),
+                    left: AssignTarget::Simple(SimpleAssignTarget::Member(fn_binding)),
+                    right: Box::new(func_expr),
+                });
+
+                *statement = Stmt::Expr(ExprStmt {
+                    span: fn_span,
+                    expr: Box::new(assignment),
+                });
+            }
+        }
+
+        // If the last item is a statement, prepend it with `return`.
+        if let Some(statement) = self.statements.last_mut() {
+            if let Stmt::Expr(expr_statement) = statement {
+                let expr = expr_statement.expr.take();
+                *statement = Stmt::Return(ReturnStmt {
+                    span: expr_statement.span(),
+                    arg: Some(expr),
+                });
+            }
+        }
+    }
+
+    /// Emits JavaScript source code from the current AST statements.
+    pub fn emit(&self) -> String {
+        // We have to convert the vec of AST statements that we have
+        // into a Script so the emitter can emit the code.
+        let script = Script {
+            body: self.statements.clone(),
+            ..Default::default()
+        };
+
+        // Buffer to collect the emitted JavaScript bytes.
+        let mut output = vec![];
+
+        let cm: Lrc<SourceMap> = Default::default();
+        let mut emitter = Emitter {
+            cfg: swc_ecma_codegen::Config::default(),
+            cm: cm.clone(),
+            comments: None,
+            wr: JsWriter::new(cm, "\n", &mut output, None),
+        };
+
+        emitter.emit_script(&script).unwrap();
+        String::from_utf8_lossy(&output).to_string()
     }
 }
 
