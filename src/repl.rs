@@ -25,16 +25,13 @@ use std::thread;
 use swc_common::sync::Lrc;
 use swc_common::FileName;
 use swc_common::SourceMap;
+use swc_ecma_ast::Decl;
+use swc_ecma_ast::Expr;
 use swc_ecma_ast::ImportDecl;
-use swc_ecma_ast::ImportSpecifier;
 use swc_ecma_ast::Module;
 use swc_ecma_ast::ModuleDecl;
-use swc_ecma_ast::ModuleExportName;
 use swc_ecma_ast::ModuleItem;
-use swc_ecma_ast::Script;
 use swc_ecma_ast::Stmt;
-use swc_ecma_codegen::text_writer::JsWriter;
-use swc_ecma_codegen::Emitter;
 use swc_ecma_parser::lexer::Lexer;
 use swc_ecma_parser::EsSyntax;
 use swc_ecma_parser::Parser;
@@ -204,8 +201,8 @@ impl Highlighter for LineHighlighter {
     }
 }
 
-/// Type of messages the Repl thread can send.
-enum ReplMessage {
+/// Type of command the Repl thread can send.
+enum ReplCommand {
     // Evaluate a given JavaScript expression.
     Evaluate(String),
     // Terminate main process.
@@ -219,7 +216,7 @@ static CLI_HISTORY: &str = ".dune_history";
 /// Starts the REPL server.
 pub fn start(mut runtime: JsRuntime) {
     // Create a channel for thread communication.
-    let (sender, receiver) = mpsc::channel::<ReplMessage>();
+    let (sender, receiver) = mpsc::channel::<ReplCommand>();
     let handle = runtime.event_loop.interrupt_handle();
 
     // Note: To prevent a busy loop, we schedule an empty repeatable
@@ -251,7 +248,7 @@ pub fn start(mut runtime: JsRuntime) {
         loop {
             match editor.readline(prompt) {
                 Ok(line) if line == ".exit" => {
-                    sender.send(ReplMessage::Terminate).unwrap();
+                    sender.send(ReplCommand::Terminate).unwrap();
                     handle.interrupt();
                     break;
                 }
@@ -259,18 +256,18 @@ pub fn start(mut runtime: JsRuntime) {
                     // Update REPL's history file.
                     editor.add_history_entry(&line).unwrap();
                     // Evaluate current expression.
-                    let message = ReplMessage::Evaluate(line.trim_end().into());
+                    let message = ReplCommand::Evaluate(line.trim_end().into());
                     sender.send(message).unwrap();
                     handle.interrupt();
                 }
                 Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
-                    sender.send(ReplMessage::Terminate).unwrap();
+                    sender.send(ReplCommand::Terminate).unwrap();
                     handle.interrupt();
                     break;
                 }
                 Err(e) => {
                     eprintln!("{e}");
-                    sender.send(ReplMessage::Terminate).unwrap();
+                    sender.send(ReplCommand::Terminate).unwrap();
                     handle.interrupt();
                     break;
                 }
@@ -283,10 +280,10 @@ pub fn start(mut runtime: JsRuntime) {
 
     loop {
         // Check for REPL messages.
-        let maybe_message = receiver.try_recv();
+        let repl_command = receiver.try_recv();
 
         // Poll the event-loop.
-        if maybe_message.is_err() {
+        if repl_command.is_err() {
             // Tick the event loop and report exceptions.
             runtime.tick_event_loop();
             // Check for exceptions.
@@ -299,35 +296,36 @@ pub fn start(mut runtime: JsRuntime) {
             continue;
         }
 
-        // Try execute the given expression, or exit the process.
-        match maybe_message.unwrap() {
-            ReplMessage::Evaluate(expression) => match EsModuleParts::parse(&expression) {
-                Ok(module) => {
-                    println!("DEBUG: {}", module.has_await_statement());
-                }
-                Err(e) => eprintln!("{e}"),
+        let input = match repl_command.unwrap() {
+            ReplCommand::Terminate => break,
+            ReplCommand::Evaluate(prompt) => match ParsedInput::parse(&prompt) {
+                Ok(input) => input,
+                Err(_) => todo!(),
             },
-            ReplMessage::Terminate => break,
-        }
+        };
+
+        println!("DEBUG: {}", input.async_wrapper_required);
     }
 }
 
-#[derive(Default)]
-pub struct EsModuleParts {
-    /// All the imports in AST format.
+#[derive(Default, Debug)]
+pub struct ParsedInput {
+    /// Any esm imports in AST format.
     imports: Vec<ImportDecl>,
-    /// The rest of the code in AST format.
+    /// Rest of the code in AST format.
     statements: Vec<Stmt>,
-    /// SWC internal source-map.
-    cm: Lrc<SourceMap>,
+    /// We need an async IIFE to wrap await code.
+    async_wrapper_required: bool,
 }
 
-impl EsModuleParts {
+impl ParsedInput {
     /// Parses a given module into parts.
     pub fn parse(source: &str) -> Result<Self> {
         // Initialize the JavaScript lexer.
+        let mut this = ParsedInput::default();
         let cm: Lrc<SourceMap> = Default::default();
         let fm = cm.new_source_file(FileName::Anon.into(), source.to_string());
+
         let lexer = Lexer::new(
             Syntax::Es(EsSyntax::default()),
             Default::default(),
@@ -341,82 +339,34 @@ impl EsModuleParts {
             Err(e) => bail!(e),
         };
 
-        // Visit nodes and extract imports and statements.
-        let mut this = Self {
-            cm,
-            ..Default::default()
-        };
         this.visit_module(&module);
+
+        // If we have esm imports or a top-level await then we need to wrap
+        // user's prompt into an async IIFE before execution.
+        if !this.imports.is_empty() || this.has_top_level_await() {
+            this.async_wrapper_required = true;
+        }
 
         Ok(this)
     }
 
-    /// Returns only the module imports as source code.
-    pub fn convert_to_dynamic_imports(&self) -> String {
-        self.imports
-            .iter()
-            .map(|import_ast| {
-                // Find the import's source (meaning the "from" part).
-                let source = import_ast.src.raw.clone().unwrap().to_string();
-
-                // No specifiers means an import like "import x".
-                if import_ast.specifiers.is_empty() {
-                    return format!("await import({});", source);
-                }
-
-                // Collect formatted import statements.
-                let mut named = vec![];
-                for specifier in &import_ast.specifiers {
-                    match specifier {
-                        ImportSpecifier::Default(s) => {
-                            let specifier = s.local.sym.to_string();
-                            return format!(
-                                "globalThis.{} = (await import({})).default;",
-                                specifier, source
-                            );
-                        }
-                        ImportSpecifier::Namespace(s) => {
-                            let specifier = s.local.sym.to_string();
-                            return format!("globalThis.{} = await import({});", specifier, source);
-                        }
-                        ImportSpecifier::Named(s) => {
-                            let local = s.local.sym.to_string();
-                            let imported = s.imported.as_ref().map(|name| match name {
-                                ModuleExportName::Ident(v) => v.sym.to_string(),
-                                ModuleExportName::Str(v) => v.value.to_string(),
-                            });
-                            named.push((local, imported));
-                        }
-                    };
-                }
-
-                // Reaching this point means we have a named import (import { x, y } from z)
-                // so, we will collect all the names and build the import.
-                named
-                    .iter()
-                    .map(|(local, imported)| {
-                        format!(
-                            "globalThis.{} = (await import({})).{};",
-                            local,
-                            source,
-                            imported.as_ref().unwrap_or(local)
-                        )
-                    })
-                    .collect::<Vec<String>>()
-                    .join("\n")
-            })
-            .collect::<Vec<String>>()
-            .join("\n")
-    }
-
-    /// Returns if we have an await keyword in the statements.
-    pub fn has_await_statement(&self) -> bool {
-        println!("DEBUG: {:#?}", self.statements);
-        false
+    /// Traverses the AST nodes to find any top-level await.
+    fn has_top_level_await(&self) -> bool {
+        self.statements.iter().any(|statement| match statement {
+            // Expression statement e.g. `await fs.readFile()`.
+            Stmt::Expr(stmt) => matches!(*stmt.expr, Expr::Await(_)),
+            // Variable declaration e.g. `const x = await fs.readFile()`.
+            Stmt::Decl(Decl::Var(decl)) => decl
+                .decls
+                .iter()
+                .filter_map(|var| var.init.as_deref())
+                .any(|expr| matches!(expr, Expr::Await(_))),
+            _ => false,
+        })
     }
 }
 
-impl Visit for EsModuleParts {
+impl Visit for ParsedInput {
     fn visit_module(&mut self, module: &Module) {
         for item in &module.body {
             match item {

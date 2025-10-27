@@ -260,7 +260,7 @@ impl JsRuntime {
     }
 
     /// Executes traditional JavaScript code (traditional = not ES modules).
-    pub fn execute_script(
+    pub fn _execute_script(
         &mut self,
         filename: &str,
         source: &str,
