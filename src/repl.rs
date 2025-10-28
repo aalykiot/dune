@@ -375,7 +375,8 @@ impl ParsedInput {
     fn transform(&mut self) {
         use swc_ecma_ast::*;
         // Traverse nodes and apply necessery transformations.
-        for statement in self.statements.iter_mut() {
+        let mut extras: Vec<(usize, Vec<Stmt>)> = vec![];
+        for (idx, statement) in self.statements.iter_mut().enumerate() {
             // Transform any function declarations to globalThis assignments.
             if let Stmt::Decl(Decl::Fn(fn_decl)) = statement {
                 let name = fn_decl.ident.sym.clone();
@@ -451,6 +452,57 @@ impl ParsedInput {
 
                 continue;
             }
+
+            // Transform any variable declarations to globalThis assignments.
+            if let Stmt::Decl(Decl::Var(var_decl)) = statement {
+                let var_span = var_decl.span();
+                let mut new_nodes = vec![];
+                for decl in var_decl.decls.iter() {
+                    // If we don't have an initialization expression then
+                    // create an AST node with undefined.
+                    let init = decl.init.clone().unwrap_or(Box::new(Expr::Ident(Ident::new(
+                        "undefined".into(),
+                        var_span,
+                        SyntaxContext::empty(),
+                    ))));
+
+                    if let Pat::Ident(ident) = decl.name.clone() {
+                        // Builds the `globalThis.<name>` part of the expression.
+                        let name = ident.id.sym.clone();
+                        let var_binding = MemberExpr {
+                            span: var_span,
+                            obj: Box::new(Expr::Ident(Ident::new(
+                                "globalThis".into(),
+                                var_span,
+                                SyntaxContext::empty(),
+                            ))),
+                            prop: MemberProp::Ident(IdentName::new(name, var_span)),
+                        };
+
+                        let assignment = Expr::Assign(AssignExpr {
+                            span: var_span,
+                            op: op!("="),
+                            left: AssignTarget::Simple(SimpleAssignTarget::Member(var_binding)),
+                            right: init,
+                        });
+
+                        new_nodes.push(Stmt::Expr(ExprStmt {
+                            span: var_span,
+                            expr: Box::new(assignment),
+                        }));
+                    }
+                }
+
+                // Append the new nodes to the extra statements vector.
+                extras.push((idx, new_nodes));
+            }
+        }
+
+        // We need to append any new nodes to the original statements.
+        for (pos, mut nodes) in extras.drain(..) {
+            // Remove the original statement once.
+            self.statements.remove(pos);
+            self.statements.splice(pos..pos, nodes.drain(..));
         }
 
         // If the last item is a statement, prepend it with `return`.
