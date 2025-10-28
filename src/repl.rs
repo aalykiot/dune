@@ -22,20 +22,15 @@ use std::borrow::Cow;
 use std::fs;
 use std::sync::mpsc;
 use std::thread;
+use swc_atoms::Atom;
 use swc_common::sync::Lrc;
 use swc_common::util::take::Take;
 use swc_common::FileName;
 use swc_common::SourceMap;
+use swc_common::Span;
 use swc_common::Spanned;
 use swc_common::SyntaxContext;
-use swc_ecma_ast::Decl;
-use swc_ecma_ast::Expr;
-use swc_ecma_ast::ImportDecl;
-use swc_ecma_ast::Module;
-use swc_ecma_ast::ModuleDecl;
-use swc_ecma_ast::ModuleItem;
-use swc_ecma_ast::Script;
-use swc_ecma_ast::Stmt;
+use swc_ecma_ast::*;
 use swc_ecma_codegen::text_writer::JsWriter;
 use swc_ecma_codegen::Emitter;
 use swc_ecma_parser::lexer::Lexer;
@@ -373,39 +368,25 @@ impl ParsedInput {
     }
 
     fn transform(&mut self) {
-        use swc_ecma_ast::*;
-        // Traverse nodes and apply necessery transformations.
+        // This vector keeps any additional nodes we might generate when doing
+        // the transformations that we need to insert into the statements.
         let mut extras: Vec<(usize, Vec<Stmt>)> = vec![];
+
+        // Traverse nodes and apply necessery transformations.
         for (idx, statement) in self.statements.iter_mut().enumerate() {
             // Transform any function declarations to globalThis assignments.
             if let Stmt::Decl(Decl::Fn(fn_decl)) = statement {
                 let name = fn_decl.ident.sym.clone();
                 let fn_span = fn_decl.span();
-
-                // Builds the `globalThis.<name>` part of the expression.
-                let fn_binding = MemberExpr {
-                    span: fn_span,
-                    obj: Box::new(Expr::Ident(Ident::new(
-                        "globalThis".into(),
-                        fn_span,
-                        SyntaxContext::empty(),
-                    ))),
-                    prop: MemberProp::Ident(IdentName::new(name.clone(), fn_span)),
-                };
+                let fn_binding = Self::attach_to_global(fn_span, name.clone());
 
                 // Builds the `function <name>() {}` part.
-                let func_expr = Expr::Fn(FnExpr {
+                let func_expr = Box::new(Expr::Fn(FnExpr {
                     ident: Some(Ident::new(name.clone(), fn_span, SyntaxContext::empty())),
                     function: fn_decl.function.clone(),
-                });
+                }));
 
-                // Binds the function to the above namespace.
-                let assignment = Expr::Assign(AssignExpr {
-                    span: fn_span,
-                    op: op!("="),
-                    left: AssignTarget::Simple(SimpleAssignTarget::Member(fn_binding)),
-                    right: Box::new(func_expr),
-                });
+                let assignment = Self::create_assignment(fn_span, fn_binding, func_expr);
 
                 *statement = Stmt::Expr(ExprStmt {
                     span: fn_span,
@@ -419,31 +400,15 @@ impl ParsedInput {
             if let Stmt::Decl(Decl::Class(class_decl)) = statement {
                 let name = class_decl.ident.sym.clone();
                 let class_span = class_decl.span();
-
-                // Builds the `globalThis.<name>` part of the expression.
-                let class_binding = MemberExpr {
-                    span: class_span,
-                    obj: Box::new(Expr::Ident(Ident::new(
-                        "globalThis".into(),
-                        class_span,
-                        SyntaxContext::empty(),
-                    ))),
-                    prop: MemberProp::Ident(IdentName::new(name.clone(), class_span)),
-                };
+                let class_binding = Self::attach_to_global(class_span, name.clone());
 
                 // Builds the `class <name>() {}` part.
-                let class_expr = Expr::Class(ClassExpr {
+                let class_expr = Box::new(Expr::Class(ClassExpr {
                     ident: Some(Ident::new(name.clone(), class_span, SyntaxContext::empty())),
                     class: class_decl.class.clone(),
-                });
+                }));
 
-                // Binds the function to the above namespace.
-                let assignment = Expr::Assign(AssignExpr {
-                    span: class_span,
-                    op: op!("="),
-                    left: AssignTarget::Simple(SimpleAssignTarget::Member(class_binding)),
-                    right: Box::new(class_expr),
-                });
+                let assignment = Self::create_assignment(class_span, class_binding, class_expr);
 
                 *statement = Stmt::Expr(ExprStmt {
                     span: class_span,
@@ -469,22 +434,8 @@ impl ParsedInput {
                     if let Pat::Ident(ident) = decl.name.clone() {
                         // Builds the `globalThis.<name>` part of the expression.
                         let name = ident.id.sym.clone();
-                        let var_binding = MemberExpr {
-                            span: var_span,
-                            obj: Box::new(Expr::Ident(Ident::new(
-                                "globalThis".into(),
-                                var_span,
-                                SyntaxContext::empty(),
-                            ))),
-                            prop: MemberProp::Ident(IdentName::new(name, var_span)),
-                        };
-
-                        let assignment = Expr::Assign(AssignExpr {
-                            span: var_span,
-                            op: op!("="),
-                            left: AssignTarget::Simple(SimpleAssignTarget::Member(var_binding)),
-                            right: init,
-                        });
+                        let var_binding = Self::attach_to_global(var_span, name);
+                        let assignment = Self::create_assignment(var_span, var_binding, init);
 
                         new_nodes.push(Stmt::Expr(ExprStmt {
                             span: var_span,
@@ -514,6 +465,29 @@ impl ParsedInput {
                     arg: Some(expr),
                 });
             }
+        }
+    }
+
+    /// Binds an expression to a provided identifier.
+    fn create_assignment(span: Span, left: MemberExpr, right: Box<Expr>) -> Expr {
+        Expr::Assign(AssignExpr {
+            span,
+            op: op!("="),
+            left: AssignTarget::Simple(SimpleAssignTarget::Member(left)),
+            right,
+        })
+    }
+
+    /// Builds the `globalThis.<name>` part of the expression.
+    fn attach_to_global(span: Span, name: Atom) -> MemberExpr {
+        MemberExpr {
+            span,
+            obj: Box::new(Expr::Ident(Ident::new(
+                "globalThis".into(),
+                span,
+                SyntaxContext::empty(),
+            ))),
+            prop: MemberProp::Ident(IdentName::new(name, span)),
         }
     }
 
