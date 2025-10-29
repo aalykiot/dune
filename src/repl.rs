@@ -297,7 +297,7 @@ pub fn start(mut runtime: JsRuntime) {
             continue;
         }
 
-        let mut input = match repl_command.unwrap() {
+        let input = match repl_command.unwrap() {
             ReplCommand::Terminate => break,
             ReplCommand::Evaluate(prompt) => match ParsedInput::parse(&prompt) {
                 Ok(input) => input,
@@ -305,8 +305,7 @@ pub fn start(mut runtime: JsRuntime) {
             },
         };
 
-        input.transform();
-        println!("DEBUG: {:#?}", input.emit());
+        println!("DEBUG: {:#?}", input.statements);
     }
 }
 
@@ -367,128 +366,25 @@ impl ParsedInput {
         })
     }
 
-    fn transform(&mut self) {
-        // This vector keeps any additional nodes we might generate when doing
-        // the transformations that we need to insert into the statements.
-        let mut extras: Vec<(usize, Vec<Stmt>)> = vec![];
+    pub fn transform(&self) -> Vec<String> {
+        // We need to find all the declerations (classes, fucntions and variables)
+        // that we will need to assign to globalThis later on.
+        let mut declerations = vec![];
 
-        // Traverse nodes and apply necessery transformations.
-        for (idx, statement) in self.statements.iter_mut().enumerate() {
-            // Transform any function declarations to globalThis assignments.
-            if let Stmt::Decl(Decl::Fn(fn_decl)) = statement {
-                let name = fn_decl.ident.sym.clone();
-                let fn_span = fn_decl.span();
-                let fn_binding = Self::attach_to_global(fn_span, name.clone());
-
-                // Builds the `function <name>() {}` part.
-                let func_expr = Box::new(Expr::Fn(FnExpr {
-                    ident: Some(Ident::new(name.clone(), fn_span, SyntaxContext::empty())),
-                    function: fn_decl.function.clone(),
-                }));
-
-                let assignment = Self::create_assignment(fn_span, fn_binding, func_expr);
-
-                *statement = Stmt::Expr(ExprStmt {
-                    span: fn_span,
-                    expr: Box::new(assignment),
-                });
-
-                continue;
-            }
-
-            // Transform any class declarations to globalThis assignments.
-            if let Stmt::Decl(Decl::Class(class_decl)) = statement {
-                let name = class_decl.ident.sym.clone();
-                let class_span = class_decl.span();
-                let class_binding = Self::attach_to_global(class_span, name.clone());
-
-                // Builds the `class <name>() {}` part.
-                let class_expr = Box::new(Expr::Class(ClassExpr {
-                    ident: Some(Ident::new(name.clone(), class_span, SyntaxContext::empty())),
-                    class: class_decl.class.clone(),
-                }));
-
-                let assignment = Self::create_assignment(class_span, class_binding, class_expr);
-
-                *statement = Stmt::Expr(ExprStmt {
-                    span: class_span,
-                    expr: Box::new(assignment),
-                });
-
-                continue;
-            }
-
-            // Transform any variable declarations to globalThis assignments.
-            if let Stmt::Decl(Decl::Var(var_decl)) = statement {
-                let var_span = var_decl.span();
-                let mut new_nodes = vec![];
-                for decl in var_decl.decls.iter() {
-                    // If we don't have an initialization expression then
-                    // create an AST node with undefined.
-                    let init = decl.init.clone().unwrap_or(Box::new(Expr::Ident(Ident::new(
-                        "undefined".into(),
-                        var_span,
-                        SyntaxContext::empty(),
-                    ))));
-
-                    if let Pat::Ident(ident) = decl.name.clone() {
-                        // Builds the `globalThis.<name>` part of the expression.
-                        let name = ident.id.sym.clone();
-                        let var_binding = Self::attach_to_global(var_span, name);
-                        let assignment = Self::create_assignment(var_span, var_binding, init);
-
-                        new_nodes.push(Stmt::Expr(ExprStmt {
-                            span: var_span,
-                            expr: Box::new(assignment),
-                        }));
-                    }
+        for statement in self.statements.iter() {
+            if let Stmt::Decl(decleration) = statement {
+                match decleration {
+                    Decl::Class(class) => declerations.push(class.ident.sym.to_string()),
+                    Decl::Fn(function) => declerations.push(function.ident.sym.to_string()),
+                    Decl::Var(variable) => variable.decls.iter().for_each(|decl| {
+                        collect_var_declerations(&decl.name, &mut declerations);
+                    }),
+                    _ => {}
                 }
-
-                // Append the new nodes to the extra statements vector.
-                extras.push((idx, new_nodes));
             }
         }
 
-        // We need to append any new nodes to the original statements.
-        for (pos, mut nodes) in extras.drain(..) {
-            // Remove the original statement once.
-            self.statements.remove(pos);
-            self.statements.splice(pos..pos, nodes.drain(..));
-        }
-
-        // If the last item is a statement, prepend it with `return`.
-        if let Some(statement) = self.statements.last_mut() {
-            if let Stmt::Expr(expr_statement) = statement {
-                let expr = expr_statement.expr.take();
-                *statement = Stmt::Return(ReturnStmt {
-                    span: expr_statement.span(),
-                    arg: Some(expr),
-                });
-            }
-        }
-    }
-
-    /// Binds an expression to a provided identifier.
-    fn create_assignment(span: Span, left: MemberExpr, right: Box<Expr>) -> Expr {
-        Expr::Assign(AssignExpr {
-            span,
-            op: op!("="),
-            left: AssignTarget::Simple(SimpleAssignTarget::Member(left)),
-            right,
-        })
-    }
-
-    /// Builds the `globalThis.<name>` part of the expression.
-    fn attach_to_global(span: Span, name: Atom) -> MemberExpr {
-        MemberExpr {
-            span,
-            obj: Box::new(Expr::Ident(Ident::new(
-                "globalThis".into(),
-                span,
-                SyntaxContext::empty(),
-            ))),
-            prop: MemberProp::Ident(IdentName::new(name, span)),
-        }
+        declerations
     }
 
     /// Emits JavaScript source code from the current AST statements.
@@ -532,4 +428,60 @@ impl Visit for ParsedInput {
             }
         }
     }
+}
+
+/// Traverses a variable declaration pattern and collects all declared names.
+fn collect_var_declerations(pattern: &Pat, names: &mut Vec<String>) {
+    // This function is recursive because JavaScript allows complex
+    // and deeply nested assignment patterns.
+    match pattern {
+        Pat::Ident(binding) => names.push(binding.sym.to_string()),
+        Pat::Rest(rest) => collect_var_declerations(&rest.arg, names),
+        Pat::Assign(assign) => collect_var_declerations(&assign.left, names),
+        Pat::Array(array) => array.elems.iter().flatten().for_each(|pat| {
+            collect_var_declerations(pat, names);
+        }),
+        Pat::Object(object) => {
+            for prop in object.props.iter() {
+                match prop {
+                    ObjectPatProp::KeyValue(kv) => collect_var_declerations(&kv.value, names),
+                    ObjectPatProp::Rest(rest) => collect_var_declerations(&rest.arg, names),
+                    ObjectPatProp::Assign(assign) => names.push(assign.key.id.to_string()),
+                }
+            }
+        }
+        _ => {}
+    };
+}
+
+// Creates a statement that assigns a variable to globalThis.
+fn assign_to_global_this(name: &str) -> Stmt {
+    let span: Span = Default::default();
+    let property = IdentName::new(name.into(), span);
+    let global_this = Expr::Ident(Ident::new(
+        "globalThis".into(),
+        span,
+        SyntaxContext::empty(),
+    ));
+
+    // The left-hand side: 'globalThis.<name>'.
+    let left_target = AssignTarget::Simple(SimpleAssignTarget::Member(MemberExpr {
+        span,
+        obj: Box::new(global_this),
+        prop: MemberProp::Ident(property),
+    }));
+
+    // The right-hand side: '<name>'.
+    let right_expr = Expr::Ident(Ident::new(name.into(), span, SyntaxContext::empty()));
+    let assign_expr = Expr::Assign(AssignExpr {
+        span,
+        op: op!("="),
+        left: left_target,
+        right: Box::new(right_expr),
+    });
+
+    Stmt::Expr(ExprStmt {
+        span,
+        expr: Box::new(assign_expr),
+    })
 }
