@@ -310,11 +310,15 @@ impl JsRuntime {
             _ => return Ok(None),
         };
 
-        // Poll micro-task queue until the promise is resolved.
+        // Poll micro queue until the promise is resolved.
         while module_promise.state() == v8::PromiseState::Pending {
             tc_scope.perform_microtask_checkpoint();
-            if module_promise.state() == v8::PromiseState::Rejected {
-                return handle_exception(tc_scope);
+        }
+
+        if module_promise.state() == v8::PromiseState::Rejected {
+            match check_exceptions(tc_scope) {
+                Some(error) => bail!(error),
+                None => return Ok(None),
             }
         }
 
