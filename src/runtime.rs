@@ -9,7 +9,6 @@ use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
 use crate::hooks::promise_reject_cb;
 use crate::inspector::JsRuntimeInspector;
-use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
 use crate::modules::load_import;
 use crate::modules::resolve_import;
@@ -21,8 +20,8 @@ use crate::modules::ModuleMap;
 use crate::modules::ModuleStatus;
 use crate::process;
 use anyhow::bail;
-use anyhow::Error;
 use anyhow::Ok;
+use anyhow::Result;
 use dune_event_loop::EventLoop;
 use dune_event_loop::LoopHandle;
 use dune_event_loop::LoopInterruptHandle;
@@ -259,24 +258,15 @@ impl JsRuntime {
         process::refresh(tc_scope);
     }
 
-    /// Executes traditional JavaScript code (traditional = not ES modules).
-    pub fn _execute_script(
-        &mut self,
-        filename: &str,
-        source: &str,
-    ) -> Result<Option<v8::Global<v8::Value>>, Error> {
-        // Get the handle-scope.
+    /// Executes JavaScript code coming from the REPL interface.
+    pub fn execute_repl_module(&mut self, source: &str) -> Result<Option<v8::Global<v8::Value>>> {
+        // Get a reference to v8's scope.
         let context = self.context();
         v8::scope_with_context!(scope, &mut self.isolate, context);
         let state_rc = JsRuntime::state(scope);
-
-        let origin = create_origin(scope, filename, false);
-        let source = v8::String::new(scope, source).unwrap();
-
-        // The `TryCatch` scope allows us to catch runtime errors rather than panicking.
         v8::tc_scope!(let tc_scope, scope);
-        type ExecuteScriptResult = Result<Option<v8::Global<v8::Value>>, Error>;
 
+        type ExecuteScriptResult = Result<Option<v8::Global<v8::Value>>>;
         let handle_exception = |scope: &mut v8::PinnedRef<
             '_,
             v8::TryCatch<'_, '_, v8::HandleScope<'_>>,
@@ -297,19 +287,48 @@ impl JsRuntime {
             Ok(None)
         };
 
-        let script = match v8::Script::compile(tc_scope, source, Some(&origin)) {
-            Some(script) => script,
+        let module = match fetch_module_tree(tc_scope, "anonymous", Some(source)) {
+            Some(module) => module,
             None => return handle_exception(tc_scope),
         };
 
-        match script.run(tc_scope) {
-            Some(value) => Ok(Some(v8::Global::new(tc_scope, value))),
-            None => handle_exception(tc_scope),
+        if module
+            .instantiate_module(tc_scope, module_resolve_cb)
+            .is_none()
+        {
+            return handle_exception(tc_scope);
         }
+
+        // TODO: Make sure that we're handling the exception correctly here because we
+        // might have listeners in place so we might don't want to return errors.
+        let module_promise: v8::Local<v8::Promise> = match module.evaluate(tc_scope) {
+            Some(value) => value.try_into().unwrap(),
+            None if module.get_status() == v8::ModuleStatus::Errored => {
+                return handle_exception(tc_scope);
+            }
+            // No idea when this case happens..
+            _ => return Ok(None),
+        };
+
+        // Poll micro-task queue until the promise is resolved.
+        while module_promise.state() == v8::PromiseState::Pending {
+            tc_scope.perform_microtask_checkpoint();
+            if module_promise.state() == v8::PromiseState::Rejected {
+                return handle_exception(tc_scope);
+            }
+        }
+
+        // Unwrap the REPL's result from the module's namespace.
+        let namespace = module.get_module_namespace();
+        let namespace = v8::Local::<v8::Object>::try_from(namespace).unwrap();
+        let key = v8::String::new(tc_scope, "default").unwrap();
+        let value = namespace.get(tc_scope, key.into()).unwrap();
+
+        Ok(Some(v8::Global::new(tc_scope, value)))
     }
 
     /// Executes JavaScript code as ES module.
-    pub fn execute_module(&mut self, filename: &str, source: Option<&str>) -> Result<(), Error> {
+    pub fn execute_module(&mut self, filename: &str, source: Option<&str>) -> Result<()> {
         // Get a reference to v8's scope.
         let context = self.context();
         v8::scope_with_context!(scope, &mut self.isolate, context);

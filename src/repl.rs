@@ -306,7 +306,26 @@ pub fn start(mut runtime: JsRuntime) {
             },
         };
 
-        println!("DEBUG: {:?}", input.transform());
+        match runtime.execute_repl_module(&input.transform()) {
+            // Format the expression using console.log.
+            Ok(Some(value)) => {
+                runtime.with_scope(|scope| {
+                    let context = scope.get_current_context();
+                    let scope = &mut v8::ContextScope::new(scope, context);
+                    let global = context.global(scope);
+                    let console_name = v8::String::new(scope, "console").unwrap();
+                    let console = global.get(scope, console_name.into()).unwrap();
+                    let console = v8::Local::<v8::Object>::try_from(console).unwrap();
+                    let log_name = v8::String::new(scope, "log").unwrap();
+                    let log = console.get(scope, log_name.into()).unwrap();
+                    let log = v8::Local::<v8::Function>::try_from(log).unwrap();
+                    let value = v8::Local::new(scope, value);
+                    log.call(scope, global.into(), &[value]);
+                });
+            }
+            Ok(None) => {}
+            Err(e) => eprintln!("{e}"),
+        }
     }
 }
 
