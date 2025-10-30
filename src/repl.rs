@@ -1,6 +1,6 @@
 use crate::runtime::check_exceptions;
 use crate::runtime::JsRuntime;
-use anyhow::bail;
+use anyhow::anyhow;
 use anyhow::Result;
 use colored::*;
 use phf::phf_set;
@@ -299,7 +299,10 @@ pub fn start(mut runtime: JsRuntime) {
             ReplCommand::Terminate => break,
             ReplCommand::Evaluate(prompt) => match ParsedInput::parse(&prompt) {
                 Ok(input) => input,
-                Err(_) => todo!(),
+                Err(e) => {
+                    eprintln!("{}: {e}", "Parse Error".red().bold());
+                    continue;
+                }
             },
         };
 
@@ -313,8 +316,6 @@ pub struct ParsedInput {
     imports: Vec<ImportDecl>,
     /// Rest of the code in AST format.
     statements: Vec<Stmt>,
-    /// We need an async IIFE to wrap await code.
-    async_wrapper_required: bool,
 }
 
 impl ParsedInput {
@@ -333,37 +334,17 @@ impl ParsedInput {
         );
 
         let mut parser = Parser::new_from(lexer);
-        let module = match parser.parse_module().map_err(|e| e.into_kind().msg()) {
-            Ok(module) => module,
-            Err(e) => bail!(e),
-        };
+        let module = parser.parse_module().map_err(|e| {
+            let span = e.span();
+            let loc = cm.lookup_char_pos(span.lo());
+            anyhow!("{} at {}:{}", e.kind().msg(), loc.line, loc.col_display + 1)
+        })?;
 
         this.visit_module(&module);
-
-        // If we have esm imports or a top-level await then we need to wrap
-        // user's prompt into an async IIFE before execution.
-        if !this.imports.is_empty() || this.has_top_level_await() {
-            this.async_wrapper_required = true;
-        }
-
         Ok(this)
     }
 
-    /// Traverses the AST nodes to find any top-level await.
-    fn has_top_level_await(&self) -> bool {
-        self.statements.iter().any(|statement| match statement {
-            // Expression statement e.g. `await fs.readFile()`.
-            Stmt::Expr(stmt) => matches!(*stmt.expr, Expr::Await(_)),
-            // Variable declaration e.g. `const x = await fs.readFile()`.
-            Stmt::Decl(Decl::Var(decl)) => decl
-                .decls
-                .iter()
-                .filter_map(|var| var.init.as_deref())
-                .any(|expr| matches!(expr, Expr::Await(_))),
-            _ => false,
-        })
-    }
-
+    /// Modifies the AST so that the given prompt runs as an ES module.
     pub fn transform(&mut self) -> String {
         // We need to find all the declerations (classes, fucntions and variables)
         // that we will need to assign to globalThis later on.
