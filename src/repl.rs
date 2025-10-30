@@ -22,9 +22,7 @@ use std::borrow::Cow;
 use std::fs;
 use std::sync::mpsc;
 use std::thread;
-use swc_atoms::Atom;
 use swc_common::sync::Lrc;
-use swc_common::util::take::Take;
 use swc_common::FileName;
 use swc_common::SourceMap;
 use swc_common::Span;
@@ -297,7 +295,7 @@ pub fn start(mut runtime: JsRuntime) {
             continue;
         }
 
-        let input = match repl_command.unwrap() {
+        let mut input = match repl_command.unwrap() {
             ReplCommand::Terminate => break,
             ReplCommand::Evaluate(prompt) => match ParsedInput::parse(&prompt) {
                 Ok(input) => input,
@@ -305,7 +303,7 @@ pub fn start(mut runtime: JsRuntime) {
             },
         };
 
-        println!("DEBUG: {:#?}", input.statements);
+        println!("DEBUG: {:?}", input.transform());
     }
 }
 
@@ -366,34 +364,73 @@ impl ParsedInput {
         })
     }
 
-    pub fn transform(&self) -> Vec<String> {
+    pub fn transform(&mut self) -> String {
         // We need to find all the declerations (classes, fucntions and variables)
         // that we will need to assign to globalThis later on.
-        let mut declerations = vec![];
+        let mut declarations = vec![];
+
+        for specifier in self.imports.iter().flat_map(|import| &import.specifiers) {
+            collect_import_declarations(specifier, &mut declarations);
+        }
 
         for statement in self.statements.iter() {
             if let Stmt::Decl(decleration) = statement {
                 match decleration {
-                    Decl::Class(class) => declerations.push(class.ident.sym.to_string()),
-                    Decl::Fn(function) => declerations.push(function.ident.sym.to_string()),
+                    Decl::Class(class) => declarations.push(class.ident.sym.to_string()),
+                    Decl::Fn(function) => declarations.push(function.ident.sym.to_string()),
                     Decl::Var(variable) => variable.decls.iter().for_each(|decl| {
-                        collect_var_declerations(&decl.name, &mut declerations);
+                        collect_var_declarations(&decl.name, &mut declarations);
                     }),
                     _ => {}
                 }
             }
         }
 
-        declerations
+        // If the last statement if an expression then we should default export it
+        // so we can capture and show its value on the REPL output.
+        let default_export = match self.statements.last() {
+            Some(Stmt::Expr(expression)) => Some(ExportDefaultExpr {
+                span: expression.span(),
+                expr: expression.expr.clone(),
+            }),
+            _ => None,
+        };
+
+        // In case we default export an expression we should remove the actual
+        // node from the statements to avoid duplicate code.
+        if default_export.is_some() {
+            self.statements.pop();
+        }
+
+        // Appened auto generated statements as AST nodes.
+        for dec_name in declarations.iter() {
+            self.statements.push(assign_to_global_this(dec_name));
+        }
+
+        self.emit_module(default_export)
     }
 
-    /// Emits JavaScript source code from the current AST statements.
-    pub fn emit(&self) -> String {
+    /// Emits a JavaScript module from the AST statements.
+    fn emit_module(&self, mut default_export: Option<ExportDefaultExpr>) -> String {
+        // Combine imports and statements into the same AST.
+        let mut module_items: Vec<ModuleItem> = self
+            .imports
+            .iter()
+            .cloned()
+            .map(|i| ModuleItem::ModuleDecl(ModuleDecl::Import(i)))
+            .chain(self.statements.iter().cloned().map(ModuleItem::Stmt))
+            .collect();
+
+        if let Some(value) = default_export.take() {
+            module_items.push(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(value)));
+        }
+
         // We have to convert the vec of AST statements that we have
         // into a Script so the emitter can emit the code.
-        let script = Script {
-            body: self.statements.clone(),
-            ..Default::default()
+        let module = Module {
+            body: module_items,
+            span: Default::default(),
+            shebang: None,
         };
 
         // Buffer to collect the emitted JavaScript bytes.
@@ -406,8 +443,8 @@ impl ParsedInput {
             comments: None,
             wr: JsWriter::new(cm, "\n", &mut output, None),
         };
+        emitter.emit_module(&module).unwrap();
 
-        emitter.emit_script(&script).unwrap();
         String::from_utf8_lossy(&output).to_string()
     }
 }
@@ -431,27 +468,36 @@ impl Visit for ParsedInput {
 }
 
 /// Traverses a variable declaration pattern and collects all declared names.
-fn collect_var_declerations(pattern: &Pat, names: &mut Vec<String>) {
+fn collect_var_declarations(pattern: &Pat, locals: &mut Vec<String>) {
     // This function is recursive because JavaScript allows complex
     // and deeply nested assignment patterns.
     match pattern {
-        Pat::Ident(binding) => names.push(binding.sym.to_string()),
-        Pat::Rest(rest) => collect_var_declerations(&rest.arg, names),
-        Pat::Assign(assign) => collect_var_declerations(&assign.left, names),
+        Pat::Ident(binding) => locals.push(binding.sym.to_string()),
+        Pat::Rest(rest) => collect_var_declarations(&rest.arg, locals),
+        Pat::Assign(assign) => collect_var_declarations(&assign.left, locals),
         Pat::Array(array) => array.elems.iter().flatten().for_each(|pat| {
-            collect_var_declerations(pat, names);
+            collect_var_declarations(pat, locals);
         }),
         Pat::Object(object) => {
             for prop in object.props.iter() {
                 match prop {
-                    ObjectPatProp::KeyValue(kv) => collect_var_declerations(&kv.value, names),
-                    ObjectPatProp::Rest(rest) => collect_var_declerations(&rest.arg, names),
-                    ObjectPatProp::Assign(assign) => names.push(assign.key.id.to_string()),
+                    ObjectPatProp::KeyValue(kv) => collect_var_declarations(&kv.value, locals),
+                    ObjectPatProp::Rest(rest) => collect_var_declarations(&rest.arg, locals),
+                    ObjectPatProp::Assign(assign) => locals.push(assign.key.id.to_string()),
                 }
             }
         }
         _ => {}
     };
+}
+
+#[inline]
+fn collect_import_declarations(specifier: &ImportSpecifier, locals: &mut Vec<String>) {
+    locals.push(match specifier {
+        ImportSpecifier::Default(value) => value.local.sym.to_string(),
+        ImportSpecifier::Namespace(value) => value.local.sym.to_string(),
+        ImportSpecifier::Named(value) => value.local.sym.to_string(),
+    });
 }
 
 // Creates a statement that assigns a variable to globalThis.
