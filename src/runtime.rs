@@ -299,8 +299,8 @@ impl JsRuntime {
             return handle_exception(tc_scope);
         }
 
-        // TODO: Make sure that we're handling the exception correctly here because we
-        // might have listeners in place so we might don't want to return errors.
+        // TODO: Handle exceptions properly; listeners may be present, so we
+        // might not want to return errors (should investigate).
         let module_promise: v8::Local<v8::Promise> = match module.evaluate(tc_scope) {
             Some(value) => value.try_into().unwrap(),
             None if module.get_status() == v8::ModuleStatus::Errored => {
@@ -310,7 +310,7 @@ impl JsRuntime {
             _ => return Ok(None),
         };
 
-        // Poll micro queue until the promise is resolved.
+        // Poll micro-task queue until the promise is resolved.
         while module_promise.state() == v8::PromiseState::Pending {
             tc_scope.perform_microtask_checkpoint();
         }
@@ -322,7 +322,7 @@ impl JsRuntime {
             }
         }
 
-        // Unwrap the REPL's result from the module's namespace.
+        // Get the REPL's result from the module's namespace.
         let namespace = module.get_module_namespace();
         let namespace = v8::Local::<v8::Object>::try_from(namespace).unwrap();
         let key = v8::String::new(tc_scope, "default").unwrap();
