@@ -1,6 +1,7 @@
 use crate::runtime::check_exceptions;
 use crate::runtime::JsRuntime;
 use anyhow::anyhow;
+use anyhow::Error;
 use anyhow::Result;
 use colored::*;
 use phf::phf_set;
@@ -200,7 +201,28 @@ impl Highlighter for LineHighlighter {
     }
 }
 
-/// Type of command the Repl thread can send.
+#[derive(Debug)]
+pub struct EvaluationTask {
+    /// The module created from the repl's prompt.
+    pub module: v8::Global<v8::Module>,
+    /// The promise tracking the state of the above module.
+    pub promise: v8::Global<v8::Promise>,
+}
+
+#[derive(Debug)]
+pub enum EvaluationState {
+    /// The promise is still pending.
+    Pending,
+    /// The promise has been fulfilled.
+    Succeeded(v8::Global<v8::Value>),
+    /// The promise has been rejected.
+    Failed(Error),
+    /// No action required — this usually occurs when an error has happened,
+    /// but a user-defined listener has already handled it.
+    NoAction,
+}
+
+#[derive(Debug)]
 enum ReplCommand {
     // Evaluate a given JavaScript expression.
     Evaluate(String),
@@ -277,7 +299,7 @@ pub fn start(mut runtime: JsRuntime) {
         editor.save_history(history_file_path).unwrap()
     });
 
-    loop {
+    'outer: loop {
         // Check for REPL messages.
         let repl_command = receiver.try_recv();
 
@@ -295,10 +317,10 @@ pub fn start(mut runtime: JsRuntime) {
             continue;
         }
 
-        let mut _input = match repl_command.unwrap() {
+        let source = match repl_command.unwrap() {
             ReplCommand::Terminate => break,
             ReplCommand::Evaluate(prompt) => match ParsedInput::parse(&prompt) {
-                Ok(input) => input,
+                Ok(mut input) => input.transform(),
                 Err(e) => {
                     eprintln!("{}: {e}", "Parse Error".red().bold());
                     continue;
@@ -306,7 +328,50 @@ pub fn start(mut runtime: JsRuntime) {
             },
         };
 
-        todo!()
+        // Dispatch a new repl prompt to the runtime for execution.
+        match runtime.repl_dispatch(&source) {
+            Ok(None) => continue,
+            Err(e) => {
+                eprintln!("{e}");
+                continue;
+            }
+            _ => {}
+        };
+
+        let value: v8::Global<v8::Value>;
+
+        // Keep running the event-loop until the promise associated with the
+        // repl prompt execution is fulfilled or rejected.
+        loop {
+            match runtime.repl_perform_checkpoint() {
+                EvaluationState::Pending => {}
+                EvaluationState::NoAction => continue 'outer,
+                EvaluationState::Failed(e) => {
+                    eprintln!("{e}");
+                    continue 'outer;
+                }
+                EvaluationState::Succeeded(repl_value) => {
+                    value = repl_value;
+                    break;
+                }
+            }
+            runtime.tick_event_loop();
+        }
+
+        // Output the value to the using teh console module.
+        runtime.with_scope(|scope| {
+            let context = scope.get_current_context();
+            let scope = &mut v8::ContextScope::new(scope, context);
+            let global = context.global(scope);
+            let console_name = v8::String::new(scope, "console").unwrap();
+            let console = global.get(scope, console_name.into()).unwrap();
+            let console = v8::Local::<v8::Object>::try_from(console).unwrap();
+            let log_name = v8::String::new(scope, "log").unwrap();
+            let log = console.get(scope, log_name.into()).unwrap();
+            let log = v8::Local::<v8::Function>::try_from(log).unwrap();
+            let value = v8::Local::new(scope, value);
+            log.call(scope, global.into(), &[value]);
+        });
     }
 }
 
