@@ -46,10 +46,10 @@ packageJson.version = possibleVersions[version];
 await exec(`cargo set-version ${packageJson.version}`);
 await fs.writeFile('./package.json', JSON.stringify(packageJson, null, 2));
 
-spinner.text = 'Updating cargo lock file (cargo build)';
+spinner.text = 'Updating cargo lock file';
 
-// Run cargo build to update the lock file as well.
-await exec('cargo build');
+// Run cargo update to sync the lock file as well.
+await exec('cargo update');
 
 spinner.text = 'Committing changes and creating new version tag';
 
