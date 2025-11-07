@@ -7,6 +7,7 @@ import semver from 'semver';
 import packageJson from '../package.json';
 
 const exec = promisify(child_process.exec);
+
 const possibleVersions = {
   major: semver.inc(packageJson.version, 'major'),
   minor: semver.inc(packageJson.version, 'minor'),
