@@ -19,9 +19,8 @@ use crate::modules::ModuleGraph;
 use crate::modules::ModuleMap;
 use crate::modules::ModuleStatus;
 use crate::process;
-use crate::repl::EvaluationState;
-use crate::repl::EvaluationTask;
-use anyhow::bail;
+use crate::repl::EvaluationContext;
+use crate::repl::EvaluationStatus;
 use anyhow::Ok;
 use anyhow::Result;
 use dune_event_loop::EventLoop;
@@ -65,10 +64,10 @@ pub struct JsRuntimeState {
     pub time_origin: u128,
     /// Holds callbacks scheduled by nextTick.
     pub next_tick_queue: NextTickQueue,
+    /// Tracks the execution of the current repl prompt.
+    pub repl_context: Option<EvaluationContext>,
     /// Stores and manages uncaught exceptions.
     pub exceptions: ExceptionState,
-    /// Tracks the execution of the current repl prompt.
-    pub repl_execution: Option<EvaluationTask>,
     /// Runtime options.
     pub options: JsRuntimeOptions,
     /// Tracks wake event for current loop iteration.
@@ -196,7 +195,7 @@ impl JsRuntime {
             time_origin,
             next_tick_queue: Vec::new(),
             exceptions: ExceptionState::new(),
-            repl_execution: None,
+            repl_context: None,
             options,
             wake_event_queued: false,
         }));
@@ -264,7 +263,7 @@ impl JsRuntime {
     }
 
     /// Runs some JavaScript code from the REPL interface.
-    pub fn repl_dispatch(&mut self, source: &str) -> Result<Option<()>> {
+    pub fn repl_dispatch(&mut self, source: &str) -> Option<Result<()>> {
         // Get a reference to v8's scope.
         let context = self.context();
         v8::scope_with_context!(scope, &mut self.isolate, context);
@@ -275,7 +274,7 @@ impl JsRuntime {
             '_,
             v8::TryCatch<'_, '_, v8::HandleScope<'_>>,
         >|
-         -> Result<Option<()>> {
+         -> Option<Result<()>> {
             // Extract the exception during compilation.
             assert!(scope.has_caught());
             let exception = scope.exception().unwrap();
@@ -286,9 +285,9 @@ impl JsRuntime {
             drop(state);
             // Perform an exception check.
             if let Some(error) = check_exceptions(scope) {
-                bail!(error)
+                return Some(Err(error.into()));
             }
-            Ok(None)
+            None
         };
 
         let module = match fetch_module_tree(tc_scope, "anonymous", Some(source)) {
@@ -309,31 +308,30 @@ impl JsRuntime {
                 return handle_exception(tc_scope);
             }
             // No idea when this case happens..
-            _ => return Ok(None),
+            _ => return None,
         };
 
         // Process microtasks once to handle promises not linked to an event loop task.
         tc_scope.perform_microtask_checkpoint();
 
-        let execution_task = EvaluationTask {
+        let execution_task = EvaluationContext {
             module: v8::Global::new(tc_scope, module),
             promise: v8::Global::new(tc_scope, repl_promise),
         };
 
-        state_rc.borrow_mut().repl_execution = Some(execution_task);
-
-        Ok(Some(()))
+        state_rc.borrow_mut().repl_context = Some(execution_task);
+        Some(Ok(()))
     }
 
     /// Performs a checkpoint on the REPL promise.
-    pub fn repl_perform_checkpoint(&mut self) -> EvaluationState {
+    pub fn repl_perform_checkpoint(&mut self) -> EvaluationStatus {
         // Get the repl's execution promise from the runtime's state.
         let context = self.context();
         v8::scope_with_context!(scope, &mut self.isolate, context);
         let state_rc = JsRuntime::state(scope);
         let state = state_rc.borrow();
 
-        let promise = state.repl_execution.as_ref().unwrap().promise.clone();
+        let promise = state.repl_context.as_ref().unwrap().promise.clone();
         let promise = promise.open(scope);
 
         // Freeing the state here to avoid panics since the `check_exceptions`
@@ -341,26 +339,26 @@ impl JsRuntime {
         drop(state);
 
         if promise.state() == v8::PromiseState::Pending {
-            return EvaluationState::Pending;
+            return EvaluationStatus::Pending;
         }
 
         if promise.state() == v8::PromiseState::Rejected {
             match check_exceptions(scope) {
-                Some(e) => return EvaluationState::Failed(e.into()),
-                None => return EvaluationState::NoAction,
+                Some(e) => return EvaluationStatus::Failed(e.into()),
+                None => return EvaluationStatus::NoAction,
             };
         }
 
         // Get the REPL's result from the module's namespace.
         let state = state_rc.borrow();
-        let module = state.repl_execution.as_ref().unwrap().module.clone();
+        let module = state.repl_context.as_ref().unwrap().module.clone();
         let module = module.open(scope);
         let namespace = module.get_module_namespace();
         let namespace = v8::Local::<v8::Object>::try_from(namespace).unwrap();
         let key = v8::String::new(scope, "default").unwrap();
         let value = namespace.get(scope, key.into()).unwrap();
 
-        EvaluationState::Succeeded(v8::Global::new(scope, value))
+        EvaluationStatus::Succeeded(v8::Global::new(scope, value))
     }
 
     /// Executes JavaScript code as ES module.

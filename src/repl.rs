@@ -22,6 +22,9 @@ use rustyline_derive::Hinter;
 use std::borrow::Cow;
 use std::fs;
 use std::sync::mpsc;
+use std::sync::Arc;
+use std::sync::Condvar;
+use std::sync::Mutex;
 use std::thread;
 use swc_common::sync::Lrc;
 use swc_common::FileName;
@@ -202,7 +205,7 @@ impl Highlighter for LineHighlighter {
 }
 
 #[derive(Debug)]
-pub struct EvaluationTask {
+pub struct EvaluationContext {
     /// The module created from the repl's prompt.
     pub module: v8::Global<v8::Module>,
     /// The promise tracking the state of the above module.
@@ -210,7 +213,7 @@ pub struct EvaluationTask {
 }
 
 #[derive(Debug)]
-pub enum EvaluationState {
+pub enum EvaluationStatus {
     /// The promise is still pending.
     Pending,
     /// The promise has been fulfilled.
@@ -224,10 +227,45 @@ pub enum EvaluationState {
 
 #[derive(Debug)]
 enum ReplCommand {
-    // Evaluate a given JavaScript expression.
+    /// Evaluate a given JavaScript expression.
     Evaluate(String),
-    // Terminate main process.
+    /// Terminate main process.
     Terminate,
+}
+
+#[derive(Default, Clone)]
+pub struct PromptMutex {
+    /// Internal structure that holds the lock.
+    inner: Arc<(Mutex<bool>, Condvar)>,
+}
+
+impl PromptMutex {
+    /// Locks the input interface, preventing the user from entering a new REPL prompt
+    /// until the main thread finishes evaluating the current expression.
+    pub fn lock(&self) {
+        let (mutex, _) = &*self.inner;
+        let mut locked = mutex.lock().unwrap();
+        *locked = true;
+    }
+
+    /// Unlocks the input interface and notifies waiting threads that the lock has been released.
+    pub fn unlock(&self) {
+        let (mutex, cvar) = &*self.inner;
+        let mut locked = mutex.lock().unwrap();
+
+        *locked = false;
+        cvar.notify_all();
+    }
+
+    /// Blocks the current thread until the input interface is unlocked.
+    pub fn wait_until_unlocked(&self) {
+        let (mutex, cvar) = &*self.inner;
+        let mut locked = mutex.lock().unwrap();
+
+        while *locked {
+            locked = cvar.wait(locked).unwrap();
+        }
+    }
 }
 
 /// CLI configuration for REPL.
@@ -240,11 +278,14 @@ pub fn start(mut runtime: JsRuntime) {
     let (sender, receiver) = mpsc::channel::<ReplCommand>();
     let handle = runtime.event_loop.interrupt_handle();
 
+    // Simple mechanism to lock and unlock user's prompt.
+    let prompt_mutex = PromptMutex::default();
+    let prompt_mutex_ref = prompt_mutex.clone();
+
     // Note: To prevent a busy loop, we schedule an empty repeatable
     // timer with a close to maximum timeout value.
     //
     // https://doc.rust-lang.org/std/time/struct.Instant.html#os-specific-behaviors
-
     runtime
         .event_loop
         .handle()
@@ -267,6 +308,9 @@ pub fn start(mut runtime: JsRuntime) {
         // method that sends a wake-up signal across the main thread.
 
         loop {
+            // Block here until the REPL interface is unlocked.
+            prompt_mutex_ref.wait_until_unlocked();
+
             match editor.readline(prompt) {
                 Ok(line) if line == ".exit" => {
                     sender.send(ReplCommand::Terminate).unwrap();
@@ -276,10 +320,15 @@ pub fn start(mut runtime: JsRuntime) {
                 Ok(line) => {
                     // Update REPL's history file.
                     editor.add_history_entry(&line).unwrap();
+
                     // Evaluate current expression.
                     let message = ReplCommand::Evaluate(line.trim_end().into());
                     sender.send(message).unwrap();
                     handle.interrupt();
+
+                    // Locking the prompt so we can evaluate the expression before
+                    // we allow the user to enter a new one.
+                    prompt_mutex_ref.lock();
                 }
                 Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
                     sender.send(ReplCommand::Terminate).unwrap();
@@ -294,6 +343,7 @@ pub fn start(mut runtime: JsRuntime) {
                 }
             }
         }
+
         // Save REPL's history.
         fs::create_dir_all(history_file_path.parent().unwrap()).unwrap();
         editor.save_history(history_file_path).unwrap()
@@ -301,58 +351,60 @@ pub fn start(mut runtime: JsRuntime) {
 
     'outer: loop {
         // Check for REPL messages.
-        let repl_command = receiver.try_recv();
+        let command = receiver.try_recv();
 
-        // Poll the event-loop.
-        if repl_command.is_err() {
+        if command.is_err() {
             // Tick the event loop and report exceptions.
             runtime.tick_event_loop();
-            // Check for exceptions.
             runtime.with_scope(|scope| {
                 if let Some(error) = check_exceptions(scope) {
                     eprintln!("{error}");
                 }
             });
-
             continue;
         }
 
-        let source = match repl_command.unwrap() {
+        let source = match command.unwrap() {
             ReplCommand::Terminate => break,
             ReplCommand::Evaluate(prompt) => match ParsedInput::parse(&prompt) {
                 Ok(mut input) => input.transform(),
                 Err(e) => {
                     eprintln!("{}: {e}", "Parse Error".red().bold());
+                    prompt_mutex.unlock();
                     continue;
                 }
             },
         };
 
-        // Dispatch a new repl prompt to the runtime for execution.
-        match runtime.repl_dispatch(&source) {
-            Ok(None) => continue,
-            Err(e) => {
-                eprintln!("{e}");
-                continue;
-            }
-            _ => {}
-        };
-
         let value: v8::Global<v8::Value>;
+        let dispatched = runtime.repl_dispatch(&source);
+
+        // Handle any errors that occurred during the dispatch action.
+        if matches!(dispatched, Some(Err(_)) | None) {
+            if let Some(Err(e)) = dispatched {
+                eprintln!("{e}");
+            }
+            prompt_mutex.unlock();
+            continue;
+        }
 
         // Keep running the event-loop until the promise associated with the
         // repl prompt execution is fulfilled or rejected.
         loop {
             match runtime.repl_perform_checkpoint() {
-                EvaluationState::Pending => {}
-                EvaluationState::NoAction => continue 'outer,
-                EvaluationState::Failed(e) => {
-                    eprintln!("{e}");
-                    continue 'outer;
-                }
-                EvaluationState::Succeeded(repl_value) => {
+                EvaluationStatus::Pending => {}
+                EvaluationStatus::Succeeded(repl_value) => {
                     value = repl_value;
                     break;
+                }
+                EvaluationStatus::Failed(e) => {
+                    eprintln!("{e}");
+                    prompt_mutex.unlock();
+                    continue 'outer;
+                }
+                EvaluationStatus::NoAction => {
+                    prompt_mutex.unlock();
+                    continue 'outer;
                 }
             }
             runtime.tick_event_loop();
@@ -372,6 +424,8 @@ pub fn start(mut runtime: JsRuntime) {
             let value = v8::Local::new(scope, value);
             log.call(scope, global.into(), &[value]);
         });
+
+        prompt_mutex.unlock();
     }
 }
 
