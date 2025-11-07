@@ -1,6 +1,7 @@
 use crate::bindings;
 use crate::errors::report_and_exit;
 use crate::errors::unwrap_or_exit;
+use crate::errors::generic_error;
 use crate::errors::JsError;
 use crate::exceptions::ExceptionState;
 use crate::exceptions::PromiseRejectionEntry;
@@ -21,7 +22,6 @@ use crate::modules::ModuleStatus;
 use crate::process;
 use crate::repl::EvaluationContext;
 use crate::repl::EvaluationStatus;
-use anyhow::Ok;
 use anyhow::Result;
 use dune_event_loop::EventLoop;
 use dune_event_loop::LoopHandle;
@@ -230,11 +230,8 @@ impl JsRuntime {
         v8::tc_scope!(let tc_scope, scope);
 
         let module = match fetch_module_tree(tc_scope, name, Some(source)) {
-            Some(module) => module,
-            None => {
-                assert!(tc_scope.has_caught());
-                let exception = tc_scope.exception().unwrap();
-                let exception = JsError::from_v8_exception(tc_scope, exception, None);
+            Ok(module) => module.unwrap(),
+            Err(exception) => {
                 eprintln!("{exception:?}");
                 std::process::exit(1);
             }
@@ -291,8 +288,9 @@ impl JsRuntime {
         };
 
         let module = match fetch_module_tree(tc_scope, "anonymous", Some(source)) {
-            Some(module) => module,
-            None => return handle_exception(tc_scope),
+            Ok(Some(module)) => module,
+            Ok(None) => return None,
+            Err(e) => return Some(Err(generic_error(e.to_string()))),
         };
 
         if module
