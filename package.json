@@ -7,6 +7,7 @@
   "author": "Alex Alikiotis <alexalikiotis5@gmail.com>",
   "license": "MIT",
   "main": "src/js/main.js",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/aalykiot/dune/issues"
   },
@@ -16,12 +17,17 @@
   },
   "scripts": {
     "lint": "eslint .",
+    "update-version": "tsx ./scripts/version.ts",
     "api": "concurrently \"nodemon --exec 'npm run build:api' --watch src/js/\" 'serve dist/api/'",
     "build:api": "jsdoc -c .jsdoc.json",
     "build:aarch64": "./scripts/build-aarch64.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",
+    "@inquirer/prompts": "^7.9.0",
+    "@topcli/spinner": "^4.0.0",
+    "@types/node": "^24.10.0",
+    "@types/semver": "^7.7.1",
     "concurrently": "^8.2.2",
     "eslint": "^9.37.0",
     "eslint-config-prettier": "^10.1.8",
@@ -30,7 +36,9 @@
     "jsdoc": "^4.0.2",
     "minami": "^1.2.3",
     "nodemon": "^3.0.3",
+    "semver": "^7.7.3",
     "serve": "^14.2.1",
-    "taffydb": "^2.7.3"
+    "taffydb": "^2.7.3",
+    "tsx": "^4.20.6"
   }
 }
