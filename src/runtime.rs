@@ -1,7 +1,7 @@
 use crate::bindings;
+use crate::errors::generic_error;
 use crate::errors::report_and_exit;
 use crate::errors::unwrap_or_exit;
-use crate::errors::generic_error;
 use crate::errors::JsError;
 use crate::exceptions::ExceptionState;
 use crate::exceptions::PromiseRejectionEntry;

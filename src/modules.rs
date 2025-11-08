@@ -4,9 +4,9 @@ use crate::loaders::CoreModuleLoader;
 use crate::loaders::FsModuleLoader;
 use crate::loaders::ModuleLoader;
 use crate::loaders::UrlModuleLoader;
+use crate::runtime::check_exceptions;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
-use crate::runtime::check_exceptions;
 use anyhow::anyhow;
 use anyhow::Error;
 use anyhow::Result;
@@ -601,7 +601,12 @@ pub fn fetch_module_tree<'a>(
         let specifier = resolve_import(Some(filename), &specifier, false, None)?;
 
         // Resolve subtree of modules.
-        if !state_rc.borrow().module_map.by_path.contains_key(&specifier) {
+        if !state_rc
+            .borrow()
+            .module_map
+            .by_path
+            .contains_key(&specifier)
+        {
             fetch_module_tree(tc_scope, &specifier, None)?;
         }
     }
