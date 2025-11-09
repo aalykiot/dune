@@ -52,9 +52,11 @@ function stringify(value, seen, depth = 0) {
     case 'object':
       return !value ? 'null' : stringifyObject(value, seen, ++depth);
     case 'function':
-      return !value.name
-        ? cyan('[Function (anonymous)]')
-        : cyan(`[Function: ${value.name}]`);
+      return isClass(value)
+        ? cyan(`[Class: ${value.name}]`)
+        : !value.name
+          ? cyan('[Function (anonymous)]')
+          : cyan(`[Function: ${value.name}]`);
     default:
       return '[Unknown]';
   }
@@ -68,6 +70,10 @@ function stringifyText(value) {
 
 function isArray(value) {
   return Array.isArray(value);
+}
+
+function isClass(value) {
+  return String(value).startsWith('class');
 }
 
 function stringifyArray(arr, seen, depth) {
