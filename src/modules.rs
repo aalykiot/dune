@@ -557,8 +557,9 @@ pub fn fetch_module_tree<'a>(
     // Find appropriate loader if source is empty.
     let source = match source {
         Some(source) => source.into(),
-        None => load_import(filename, true)?,
+        None => load_import(filename, true).map_err(|e| generic_error(e.to_string()))?,
     };
+
     let source = v8::String::new(tc_scope, &source).unwrap();
     let mut source = v8::script_compiler::Source::new(source, Some(&origin));
 
@@ -598,7 +599,8 @@ pub fn fetch_module_tree<'a>(
 
         // Transform v8's ModuleRequest into Rust string.
         let specifier = request.get_specifier().to_rust_string_lossy(tc_scope);
-        let specifier = resolve_import(Some(filename), &specifier, false, None)?;
+        let specifier = resolve_import(Some(filename), &specifier, false, None)
+            .map_err(|e| generic_error(e.to_string()))?;
 
         // Resolve subtree of modules.
         if !state_rc

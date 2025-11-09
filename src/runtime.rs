@@ -1,5 +1,4 @@
 use crate::bindings;
-use crate::errors::generic_error;
 use crate::errors::report_and_exit;
 use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
@@ -290,7 +289,7 @@ impl JsRuntime {
         let module = match fetch_module_tree(tc_scope, "anonymous", Some(source)) {
             Ok(Some(module)) => module,
             Ok(None) => return None,
-            Err(e) => return Some(Err(generic_error(e.to_string()))),
+            Err(e) => return Some(Err(e)),
         };
 
         if module
