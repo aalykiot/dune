@@ -9,6 +9,7 @@ use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
 use crate::hooks::promise_reject_cb;
 use crate::inspector::JsRuntimeInspector;
+use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
 use crate::modules::load_import;
 use crate::modules::resolve_import;
@@ -263,29 +264,9 @@ impl JsRuntime {
         // Get a reference to v8's scope.
         let context = self.context();
         v8::scope_with_context!(scope, &mut self.isolate, context);
-        let state_rc = JsRuntime::state(scope);
         v8::tc_scope!(let tc_scope, scope);
 
-        let handle_exception = |scope: &mut v8::PinnedRef<
-            '_,
-            v8::TryCatch<'_, '_, v8::HandleScope<'_>>,
-        >|
-         -> Option<Result<()>> {
-            // Extract the exception during compilation.
-            assert!(scope.has_caught());
-            let exception = scope.exception().unwrap();
-            let exception = v8::Global::new(scope, exception);
-            let mut state = state_rc.borrow_mut();
-            // Capture the exception internally.
-            state.exceptions.capture_exception(exception);
-            drop(state);
-            // Perform an exception check.
-            if let Some(error) = check_exceptions(scope) {
-                return Some(Err(error.into()));
-            }
-            None
-        };
-
+        let state_rc = JsRuntime::state(tc_scope);
         let module = match fetch_module_tree(tc_scope, "anonymous", Some(source)) {
             Ok(Some(module)) => module,
             Ok(None) => return None,
@@ -296,13 +277,13 @@ impl JsRuntime {
             .instantiate_module(tc_scope, module_resolve_cb)
             .is_none()
         {
-            return handle_exception(tc_scope);
+            return handle_thrown_exception(tc_scope, state_rc).map(|err| Err(err.into()));
         }
 
         let repl_promise: v8::Local<v8::Promise> = match module.evaluate(tc_scope) {
             Some(value) => value.try_into().unwrap(),
             None if module.get_status() == v8::ModuleStatus::Errored => {
-                return handle_exception(tc_scope);
+                return handle_thrown_exception(tc_scope, state_rc).map(|err| Err(err.into()));
             }
             // No idea when this case happens..
             _ => return None,
@@ -356,6 +337,33 @@ impl JsRuntime {
         let value = namespace.get(scope, key.into()).unwrap();
 
         EvaluationStatus::Succeeded(v8::Global::new(scope, value))
+    }
+
+    /// Executes traditional JavaScript code (traditional = not ES modules).
+    pub fn execute_script(
+        &mut self,
+        filename: &str,
+        source: &str,
+    ) -> Option<Result<v8::Global<v8::Value>>> {
+        // Get a v8 handle scope.
+        let context = self.context();
+        v8::scope_with_context!(scope, &mut self.isolate, context);
+        v8::tc_scope!(let tc_scope, scope);
+
+        let state_rc = JsRuntime::state(tc_scope);
+        let origin = create_origin(tc_scope, filename, false);
+        let source = v8::String::new(tc_scope, source).unwrap();
+
+        // Try and compile the provided script.
+        let script = match v8::Script::compile(tc_scope, source, Some(&origin)) {
+            Some(script) => script,
+            None => return handle_thrown_exception(tc_scope, state_rc).map(|err| Err(err.into())),
+        };
+
+        match script.run(tc_scope) {
+            Some(value) => Some(Ok(v8::Global::new(tc_scope, value))),
+            None => handle_thrown_exception(tc_scope, state_rc).map(|err| Err(err.into())),
+        }
     }
 
     /// Executes JavaScript code as ES module.
@@ -712,6 +720,25 @@ fn run_next_tick_callbacks(scope: &mut v8::PinScope) {
     }
 
     tc_scope.perform_microtask_checkpoint();
+}
+
+/// Handles a JavaScript exception caught by a `v8::TryCatch` scope.
+fn handle_thrown_exception(
+    scope: &mut v8::PinnedRef<'_, v8::TryCatch<'_, '_, v8::HandleScope<'_>>>,
+    state_rc: Rc<RefCell<JsRuntimeState>>,
+) -> Option<JsError> {
+    // Make sure an exception was thrown.
+    assert!(scope.has_caught());
+    let exception = scope.exception().unwrap();
+    let exception = v8::Global::new(scope, exception);
+    let mut state = state_rc.borrow_mut();
+
+    // Capture the exception internally.
+    state.exceptions.capture_exception(exception);
+    drop(state);
+
+    // Check if the exception has handled or not.
+    check_exceptions(scope)
 }
 
 // Returns an error if an uncaught exception or unhandled rejection has been captured.

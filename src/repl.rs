@@ -364,10 +364,10 @@ pub fn start(mut runtime: JsRuntime) {
             continue;
         }
 
-        let source = match command.unwrap() {
+        let mut input = match command.unwrap() {
             ReplCommand::Terminate => break,
-            ReplCommand::Evaluate(prompt) => match ParsedInput::parse(&prompt) {
-                Ok(mut input) => input.transform(),
+            ReplCommand::Evaluate(prompt) => match ParsedInput::parse(prompt) {
+                Ok(input) => input,
                 Err(e) => {
                     eprintln!("{}: {e}", "Parse Error".red().bold());
                     prompt_mutex.unlock();
@@ -376,8 +376,23 @@ pub fn start(mut runtime: JsRuntime) {
             },
         };
 
+        // No special handling or code transformation is needed if the expression
+        // doesn’t include any import statements or top-level await usage.
+        if input.imports.is_empty() && !input.has_top_level_await() {
+            // Try to execute the provided expression.
+            match runtime.execute_script("<anonymous>", &input.source) {
+                Some(Ok(value)) => runtime.with_scope(|scope| {
+                    print_to_console(scope, value);
+                }),
+                Some(Err(e)) => eprintln!("{e}"),
+                None => {}
+            }
+            prompt_mutex.unlock();
+            continue;
+        }
+
         let value: v8::Global<v8::Value>;
-        let dispatched = runtime.repl_dispatch(&source);
+        let dispatched = runtime.repl_dispatch(&input.transform());
 
         // Handle any errors that occurred during the dispatch action.
         if matches!(dispatched, Some(Err(_)) | None) {
@@ -410,40 +425,33 @@ pub fn start(mut runtime: JsRuntime) {
             runtime.tick_event_loop();
         }
 
-        // Output the value to the using teh console module.
-        runtime.with_scope(|scope| {
-            let context = scope.get_current_context();
-            let scope = &mut v8::ContextScope::new(scope, context);
-            let global = context.global(scope);
-            let console_name = v8::String::new(scope, "console").unwrap();
-            let console = global.get(scope, console_name.into()).unwrap();
-            let console = v8::Local::<v8::Object>::try_from(console).unwrap();
-            let log_name = v8::String::new(scope, "log").unwrap();
-            let log = console.get(scope, log_name.into()).unwrap();
-            let log = v8::Local::<v8::Function>::try_from(log).unwrap();
-            let value = v8::Local::new(scope, value);
-            log.call(scope, global.into(), &[value]);
-        });
-
+        // Output the value to the using the JS console.
+        runtime.with_scope(|scope| print_to_console(scope, value));
         prompt_mutex.unlock();
     }
 }
 
 #[derive(Default, Debug)]
 pub struct ParsedInput {
+    /// The original source.
+    pub source: String,
     /// Any esm imports in AST format.
-    imports: Vec<ImportDecl>,
+    pub imports: Vec<ImportDecl>,
     /// Rest of the code in AST format.
-    statements: Vec<Stmt>,
+    pub statements: Vec<Stmt>,
 }
 
 impl ParsedInput {
     /// Parses a given module into parts.
-    pub fn parse(source: &str) -> Result<Self> {
+    pub fn parse(source: String) -> Result<Self> {
         // Initialize the JavaScript lexer.
-        let mut this = ParsedInput::default();
+        let mut this = ParsedInput {
+            source,
+            ..Default::default()
+        };
+
         let cm: Lrc<SourceMap> = Default::default();
-        let fm = cm.new_source_file(FileName::Anon.into(), source.to_string());
+        let fm = cm.new_source_file(FileName::Anon.into(), this.source.clone());
 
         let lexer = Lexer::new(
             Syntax::Es(EsSyntax::default()),
@@ -547,6 +555,19 @@ impl ParsedInput {
 
         String::from_utf8_lossy(&output).to_string()
     }
+
+    /// Traverses the AST nodes to find any top-level await.
+    pub fn has_top_level_await(&self) -> bool {
+        self.statements.iter().any(|statement| match statement {
+            Stmt::Expr(stmt) => contains_await(&stmt.expr),
+            Stmt::Decl(Decl::Var(decl)) => decl
+                .decls
+                .iter()
+                .filter_map(|var| var.init.as_deref())
+                .any(contains_await),
+            _ => false,
+        })
+    }
 }
 
 impl Visit for ParsedInput {
@@ -600,7 +621,7 @@ fn collect_import_declarations(specifier: &ImportSpecifier, locals: &mut Vec<Str
     });
 }
 
-// Creates a statement that assigns a variable to globalThis.
+/// Creates a statement that assigns a variable to globalThis.
 fn assign_to_global_this(name: &str) -> Stmt {
     let span: Span = Default::default();
     let property = IdentName::new(name.into(), span);
@@ -630,4 +651,55 @@ fn assign_to_global_this(name: &str) -> Stmt {
         span,
         expr: Box::new(assign_expr),
     })
+}
+
+/// Checks whether an expression contains an `await` keyword.
+fn contains_await(expr: &Expr) -> bool {
+    match expr {
+        Expr::Await(_) => true,
+        Expr::Bin(bin) => contains_await(&bin.left) || contains_await(&bin.right),
+        Expr::Unary(unary) => contains_await(&unary.arg),
+        Expr::Assign(assign) => contains_await(&assign.right),
+        Expr::Call(call) => {
+            let callee_has_await = match &call.callee {
+                Callee::Expr(expr) => contains_await(expr),
+                _ => false,
+            };
+            callee_has_await || call.args.iter().any(|arg| contains_await(&arg.expr))
+        }
+        Expr::Member(member) => contains_await(&member.obj),
+        Expr::Cond(cond) => {
+            contains_await(&cond.test) || contains_await(&cond.cons) || contains_await(&cond.alt)
+        }
+        Expr::Seq(seq) => seq.exprs.iter().any(|expr| contains_await(expr)),
+        Expr::Paren(paren) => contains_await(&paren.expr),
+        Expr::Array(array) => array
+            .elems
+            .iter()
+            .flatten()
+            .any(|e| contains_await(&e.expr)),
+        Expr::Object(obj) => obj.props.iter().any(|prop| match prop {
+            PropOrSpread::Prop(p) => match &**p {
+                Prop::KeyValue(kv) => contains_await(&kv.value),
+                _ => false,
+            },
+            _ => false,
+        }),
+        _ => false,
+    }
+}
+
+/// Outputs a v8 value using the internal JS console module.
+fn print_to_console(scope: &mut v8::PinScope, value: v8::Global<v8::Value>) {
+    let context = scope.get_current_context();
+    let scope = &mut v8::ContextScope::new(scope, context);
+    let global = context.global(scope);
+    let console_name = v8::String::new(scope, "console").unwrap();
+    let console = global.get(scope, console_name.into()).unwrap();
+    let console = v8::Local::<v8::Object>::try_from(console).unwrap();
+    let log_name = v8::String::new(scope, "log").unwrap();
+    let log = console.get(scope, log_name.into()).unwrap();
+    let log = v8::Local::<v8::Function>::try_from(log).unwrap();
+    let value = v8::Local::new(scope, value);
+    log.call(scope, global.into(), &[value]);
 }
