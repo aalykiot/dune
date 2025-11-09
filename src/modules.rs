@@ -1,10 +1,10 @@
 use crate::errors::generic_error;
-use crate::errors::unwrap_or_exit;
 use crate::errors::JsError;
 use crate::loaders::CoreModuleLoader;
 use crate::loaders::FsModuleLoader;
 use crate::loaders::ModuleLoader;
 use crate::loaders::UrlModuleLoader;
+use crate::runtime::check_exceptions;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::anyhow;
@@ -548,25 +548,44 @@ pub fn fetch_module_tree<'a>(
     scope: &mut v8::PinScope<'a, '_>,
     filename: &str,
     source: Option<&str>,
-) -> Option<v8::Local<'a, v8::Module>> {
+) -> Result<Option<v8::Local<'a, v8::Module>>> {
     // Create a script origin.
     let origin = create_origin(scope, filename, true);
-    let state = JsRuntime::state(scope);
+    let state_rc = JsRuntime::state(scope);
+    v8::tc_scope!(let tc_scope, scope);
 
     // Find appropriate loader if source is empty.
     let source = match source {
         Some(source) => source.into(),
-        None => unwrap_or_exit(load_import(filename, true)),
+        None => load_import(filename, true).map_err(|e| generic_error(e.to_string()))?,
     };
-    let source = v8::String::new(scope, &source).unwrap();
+
+    let source = v8::String::new(tc_scope, &source).unwrap();
     let mut source = v8::script_compiler::Source::new(source, Some(&origin));
 
-    let module = v8::script_compiler::compile_module(scope, &mut source)?;
+    let module = match v8::script_compiler::compile_module(tc_scope, &mut source) {
+        Some(module) => module,
+        None => {
+            // Extract the exception during compilation.
+            assert!(tc_scope.has_caught());
+            let exception = tc_scope.exception().unwrap();
+            let exception = v8::Global::new(tc_scope, exception);
+            // Capture the exception internally.
+            let mut state = state_rc.borrow_mut();
+            state.exceptions.capture_exception(exception);
+            drop(state);
+            // Perform an exception check.
+            if let Some(error) = check_exceptions(tc_scope) {
+                return Err(error.into());
+            }
+            return Ok(None);
+        }
+    };
 
     // Subscribe module to the module-map.
     let module_id = module.get_identity_hash().get();
-    let module_ref = v8::Global::new(scope, module);
-    state
+    let module_ref = v8::Global::new(tc_scope, module);
+    state_rc
         .borrow_mut()
         .module_map
         .insert(filename, module_id, module_ref);
@@ -575,18 +594,24 @@ pub fn fetch_module_tree<'a>(
 
     for i in 0..requests.length() {
         // Get import request from the `module_requests` array.
-        let request = requests.get(scope, i).unwrap();
+        let request = requests.get(tc_scope, i).unwrap();
         let request = v8::Local::<v8::ModuleRequest>::try_from(request).unwrap();
 
         // Transform v8's ModuleRequest into Rust string.
-        let specifier = request.get_specifier().to_rust_string_lossy(scope);
-        let specifier = unwrap_or_exit(resolve_import(Some(filename), &specifier, false, None));
+        let specifier = request.get_specifier().to_rust_string_lossy(tc_scope);
+        let specifier = resolve_import(Some(filename), &specifier, false, None)
+            .map_err(|e| generic_error(e.to_string()))?;
 
         // Resolve subtree of modules.
-        if !state.borrow().module_map.by_path.contains_key(&specifier) {
-            fetch_module_tree(scope, &specifier, None)?;
+        if !state_rc
+            .borrow()
+            .module_map
+            .by_path
+            .contains_key(&specifier)
+        {
+            fetch_module_tree(tc_scope, &specifier, None)?;
         }
     }
 
-    Some(module)
+    Ok(Some(module))
 }

@@ -20,9 +20,9 @@ use crate::modules::ModuleGraph;
 use crate::modules::ModuleMap;
 use crate::modules::ModuleStatus;
 use crate::process;
-use anyhow::bail;
-use anyhow::Error;
-use anyhow::Ok;
+use crate::repl::EvaluationContext;
+use crate::repl::EvaluationStatus;
+use anyhow::Result;
 use dune_event_loop::EventLoop;
 use dune_event_loop::LoopHandle;
 use dune_event_loop::LoopInterruptHandle;
@@ -64,6 +64,8 @@ pub struct JsRuntimeState {
     pub time_origin: u128,
     /// Holds callbacks scheduled by nextTick.
     pub next_tick_queue: NextTickQueue,
+    /// Tracks the execution of the current repl prompt.
+    pub repl_context: Option<EvaluationContext>,
     /// Stores and manages uncaught exceptions.
     pub exceptions: ExceptionState,
     /// Runtime options.
@@ -193,6 +195,7 @@ impl JsRuntime {
             time_origin,
             next_tick_queue: Vec::new(),
             exceptions: ExceptionState::new(),
+            repl_context: None,
             options,
             wake_event_queued: false,
         }));
@@ -227,11 +230,8 @@ impl JsRuntime {
         v8::tc_scope!(let tc_scope, scope);
 
         let module = match fetch_module_tree(tc_scope, name, Some(source)) {
-            Some(module) => module,
-            None => {
-                assert!(tc_scope.has_caught());
-                let exception = tc_scope.exception().unwrap();
-                let exception = JsError::from_v8_exception(tc_scope, exception, None);
+            Ok(module) => module.unwrap(),
+            Err(exception) => {
                 eprintln!("{exception:?}");
                 std::process::exit(1);
             }
@@ -259,57 +259,115 @@ impl JsRuntime {
         process::refresh(tc_scope);
     }
 
+    /// Runs some JavaScript code from the REPL interface.
+    pub fn repl_dispatch(&mut self, source: &str) -> Option<Result<()>> {
+        // Get a reference to v8's scope.
+        let context = self.context();
+        v8::scope_with_context!(scope, &mut self.isolate, context);
+        v8::tc_scope!(let tc_scope, scope);
+
+        let state_rc = JsRuntime::state(tc_scope);
+        let module = match fetch_module_tree(tc_scope, "anonymous", Some(source)) {
+            Ok(Some(module)) => module,
+            Ok(None) => return None,
+            Err(e) => return Some(Err(e)),
+        };
+
+        if module
+            .instantiate_module(tc_scope, module_resolve_cb)
+            .is_none()
+        {
+            return handle_thrown_exception(tc_scope, state_rc).map(|err| Err(err.into()));
+        }
+
+        let repl_promise: v8::Local<v8::Promise> = match module.evaluate(tc_scope) {
+            Some(value) => value.try_into().unwrap(),
+            None if module.get_status() == v8::ModuleStatus::Errored => {
+                return handle_thrown_exception(tc_scope, state_rc).map(|err| Err(err.into()));
+            }
+            // No idea when this case happens..
+            _ => return None,
+        };
+
+        // Process microtasks once to handle promises not linked to an event loop task.
+        tc_scope.perform_microtask_checkpoint();
+
+        let execution_task = EvaluationContext {
+            module: v8::Global::new(tc_scope, module),
+            promise: v8::Global::new(tc_scope, repl_promise),
+        };
+
+        state_rc.borrow_mut().repl_context = Some(execution_task);
+        Some(Ok(()))
+    }
+
+    /// Performs a checkpoint on the REPL promise.
+    pub fn repl_perform_checkpoint(&mut self) -> EvaluationStatus {
+        // Get the repl's execution promise from the runtime's state.
+        let context = self.context();
+        v8::scope_with_context!(scope, &mut self.isolate, context);
+        let state_rc = JsRuntime::state(scope);
+        let state = state_rc.borrow();
+
+        let promise = state.repl_context.as_ref().unwrap().promise.clone();
+        let promise = promise.open(scope);
+
+        // Freeing the state here to avoid panics since the `check_exceptions`
+        // borrows the state again internally.
+        drop(state);
+
+        if promise.state() == v8::PromiseState::Pending {
+            return EvaluationStatus::Pending;
+        }
+
+        if promise.state() == v8::PromiseState::Rejected {
+            match check_exceptions(scope) {
+                Some(e) => return EvaluationStatus::Failed(e.into()),
+                None => return EvaluationStatus::NoAction,
+            };
+        }
+
+        // Get the REPL's result from the module's namespace.
+        let state = state_rc.borrow();
+        let module = state.repl_context.as_ref().unwrap().module.clone();
+        let module = module.open(scope);
+        let namespace = module.get_module_namespace();
+        let namespace = v8::Local::<v8::Object>::try_from(namespace).unwrap();
+        let key = v8::String::new(scope, "default").unwrap();
+        let value = namespace.get(scope, key.into()).unwrap();
+
+        EvaluationStatus::Succeeded(v8::Global::new(scope, value))
+    }
+
     /// Executes traditional JavaScript code (traditional = not ES modules).
     pub fn execute_script(
         &mut self,
         filename: &str,
         source: &str,
-    ) -> Result<Option<v8::Global<v8::Value>>, Error> {
-        // Get the handle-scope.
+    ) -> Option<Result<v8::Global<v8::Value>>> {
+        // Get a v8 handle scope.
         let context = self.context();
         v8::scope_with_context!(scope, &mut self.isolate, context);
-        let state_rc = JsRuntime::state(scope);
-
-        let origin = create_origin(scope, filename, false);
-        let source = v8::String::new(scope, source).unwrap();
-
-        // The `TryCatch` scope allows us to catch runtime errors rather than panicking.
         v8::tc_scope!(let tc_scope, scope);
-        type ExecuteScriptResult = Result<Option<v8::Global<v8::Value>>, Error>;
 
-        let handle_exception = |scope: &mut v8::PinnedRef<
-            '_,
-            v8::TryCatch<'_, '_, v8::HandleScope<'_>>,
-        >|
-         -> ExecuteScriptResult {
-            // Extract the exception during compilation.
-            assert!(scope.has_caught());
-            let exception = scope.exception().unwrap();
-            let exception = v8::Global::new(scope, exception);
-            let mut state = state_rc.borrow_mut();
-            // Capture the exception internally.
-            state.exceptions.capture_exception(exception);
-            drop(state);
-            // Force an exception check.
-            if let Some(error) = check_exceptions(scope) {
-                bail!(error)
-            }
-            Ok(None)
-        };
+        let state_rc = JsRuntime::state(tc_scope);
+        let origin = create_origin(tc_scope, filename, false);
+        let source = v8::String::new(tc_scope, source).unwrap();
 
+        // Try and compile the provided script.
         let script = match v8::Script::compile(tc_scope, source, Some(&origin)) {
             Some(script) => script,
-            None => return handle_exception(tc_scope),
+            None => return handle_thrown_exception(tc_scope, state_rc).map(|err| Err(err.into())),
         };
 
         match script.run(tc_scope) {
-            Some(value) => Ok(Some(v8::Global::new(tc_scope, value))),
-            None => handle_exception(tc_scope),
+            Some(value) => Some(Ok(v8::Global::new(tc_scope, value))),
+            None => handle_thrown_exception(tc_scope, state_rc).map(|err| Err(err.into())),
         }
     }
 
     /// Executes JavaScript code as ES module.
-    pub fn execute_module(&mut self, filename: &str, source: Option<&str>) -> Result<(), Error> {
+    pub fn execute_module(&mut self, filename: &str, source: Option<&str>) -> Result<()> {
         // Get a reference to v8's scope.
         let context = self.context();
         v8::scope_with_context!(scope, &mut self.isolate, context);
@@ -662,6 +720,25 @@ fn run_next_tick_callbacks(scope: &mut v8::PinScope) {
     }
 
     tc_scope.perform_microtask_checkpoint();
+}
+
+/// Handles a JavaScript exception caught by a `v8::TryCatch` scope.
+fn handle_thrown_exception(
+    scope: &mut v8::PinnedRef<'_, v8::TryCatch<'_, '_, v8::HandleScope<'_>>>,
+    state_rc: Rc<RefCell<JsRuntimeState>>,
+) -> Option<JsError> {
+    // Make sure an exception was thrown.
+    assert!(scope.has_caught());
+    let exception = scope.exception().unwrap();
+    let exception = v8::Global::new(scope, exception);
+    let mut state = state_rc.borrow_mut();
+
+    // Capture the exception internally.
+    state.exceptions.capture_exception(exception);
+    drop(state);
+
+    // Check if the exception has handled or not.
+    check_exceptions(scope)
 }
 
 // Returns an error if an uncaught exception or unhandled rejection has been captured.
