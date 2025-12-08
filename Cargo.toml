@@ -58,7 +58,7 @@ pest_derive = "2.8.3"
 futures = "0.3.31"
 tokio = { version = "1.48.0", features = ["full"] }
 axum = { version = "0.8.6", features = ["ws"] }
-uuid = { version = "1.18.1", features = ["v4", "fast-rng"] }
+uuid = { version = "1.19.0", features = ["v4", "fast-rng"] }
 base64 = "0.22.1"
 indicatif = "0.18.2"
 rusqlite = { version = "0.37.0", features = ["bundled", "load_extension", "column_decltype", "column_metadata"] }
