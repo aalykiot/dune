@@ -11,7 +11,7 @@
 
 const binding = process.binding('fs');
 
-const BUFFER_SIZE = 40 * 1024; // 40KB bytes buffer when reading.
+const BUFFER_SIZE = 256 * 1024; // 256 KB buffer when reading.
 
 /**
  * A File object is an object wrapper for a numeric file descriptor.
