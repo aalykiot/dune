@@ -202,10 +202,8 @@ fn open_sync(
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
-    // Get file path.
+    // Get file path and open flags.
     let path = args.get(0).to_rust_string_lossy(scope);
-
-    // Get flags which can be used to configure how a file is opened.
     let flags = args.get(1).to_rust_string_lossy(scope);
 
     match open_file_op(path, flags) {
