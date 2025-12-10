@@ -438,11 +438,16 @@ fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
 
-    // Get data as ArrayBuffer.
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
+    let store = data.get_backing_store().unwrap();
+    let store_length = store.byte_length();
 
-    let mut buffer = vec![0; data.byte_length()];
-    data.copy_contents(&mut buffer);
+    let buffer = unsafe {
+        // For performance, we avoid copying and instead (unsafely) create a u8 slice
+        // directly from the backing store’s raw c_void pointer.
+        let store_ptr = store.data().unwrap();
+        std::slice::from_raw_parts(store_ptr.as_ptr() as *const u8, store_length)
+    };
 
     // Create a promise resolver and extract the actual promise.
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
@@ -464,7 +469,7 @@ fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || match write_file_op(&mut file, &buffer) {
+    let task = move || match write_file_op(&mut file, buffer) {
         Ok(_) => None,
         Err(e) => Some(Result::Err(e)),
     };
@@ -505,13 +510,18 @@ fn write_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
         }
     };
 
-    // Get data as ArrayBuffer.
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
+    let store = data.get_backing_store().unwrap();
+    let store_length = store.byte_length();
 
-    let mut buffer = vec![0; data.byte_length()];
-    data.copy_contents(&mut buffer);
+    let buffer = unsafe {
+        // For performance, we avoid copying and instead (unsafely) create a u8 slice
+        // directly from the backing store’s raw c_void pointer.
+        let store_ptr = store.data().unwrap();
+        std::slice::from_raw_parts(store_ptr.as_ptr() as *const u8, store_length)
+    };
 
-    if let Err(e) = write_file_op(&mut file, &buffer) {
+    if let Err(e) = write_file_op(&mut file, buffer) {
         throw_exception(scope, &e);
     }
 }
