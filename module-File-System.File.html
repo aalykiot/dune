@@ -329,7 +329,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line207">line 207</a>
+        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line199">line 199</a>
     </li></ul></dd>
     
 
@@ -412,7 +412,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line223">line 223</a>
+        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line215">line 215</a>
     </li></ul></dd>
     
 
@@ -738,7 +738,7 @@
 
     
 
-    <h4 class="name" id="read"><span class="type-signature">(async) </span>read<span class="signature">(buffer, offset)</span><span class="type-signature"> &rarr; {Promise.&lt;Number>}</span></h4>
+    <h4 class="name" id="read"><span class="type-signature">(async) </span>read<span class="signature">(size, offset)</span><span class="type-signature"> &rarr; {Promise.&lt;Uint8Array>}</span></h4>
 
     
 
@@ -827,13 +827,13 @@
 
         <tr>
             
-                <td class="name"><code>buffer</code></td>
+                <td class="name"><code>size</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><code>Uint8Array</code></span>
+<span class="param-type"><code>Number</code></span>
 
 
             
@@ -848,7 +848,7 @@
             
 
             <td class="description last">
-                <p>The buffer into which the data will be read.</p>
+                <p>The maximum amount of bytes to read.</p>
                 
             </td>
         </tr>
@@ -913,7 +913,7 @@
     </dt>
     <dd>
         
-<span class="param-type"><code>Promise.&lt;Number></code></span>
+<span class="param-type"><code>Promise.&lt;Uint8Array></code></span>
 
 
     </dd>
@@ -922,7 +922,7 @@
 
 <div class="param-desc">
     <ul>
-<li>The amount of bytes read.</li>
+<li>A Uint8Array containing the bytes read from the file.</li>
 </ul>
 </div>
 
@@ -938,7 +938,7 @@
 
     
 
-    <h4 class="name" id="readSync"><span class="type-signature"></span>readSync<span class="signature">(buffer, offset)</span><span class="type-signature"> &rarr; {Number}</span></h4>
+    <h4 class="name" id="readSync"><span class="type-signature"></span>readSync<span class="signature">(size, offset)</span><span class="type-signature"> &rarr; {Uint8Array}</span></h4>
 
     
 
@@ -981,7 +981,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line98">line 98</a>
+        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line94">line 94</a>
     </li></ul></dd>
     
 
@@ -1027,13 +1027,13 @@
 
         <tr>
             
-                <td class="name"><code>buffer</code></td>
+                <td class="name"><code>size</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><code>Uint8Array</code></span>
+<span class="param-type"><code>Number</code></span>
 
 
             
@@ -1048,7 +1048,7 @@
             
 
             <td class="description last">
-                <p>The buffer into which the data will be read.</p>
+                <p>The maximum amount of bytes to read.</p>
                 
             </td>
         </tr>
@@ -1113,7 +1113,7 @@
     </dt>
     <dd>
         
-<span class="param-type"><code>Number</code></span>
+<span class="param-type"><code>Uint8Array</code></span>
 
 
     </dd>
@@ -1122,7 +1122,7 @@
 
 <div class="param-desc">
     <ul>
-<li>The amount of bytes read.</li>
+<li>A Uint8Array containing the bytes read from the file.</li>
 </ul>
 </div>
 
@@ -1181,7 +1181,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line181">line 181</a>
+        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line173">line 173</a>
     </li></ul></dd>
     
 
@@ -1289,7 +1289,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line195">line 195</a>
+        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line187">line 187</a>
     </li></ul></dd>
     
 
@@ -1397,7 +1397,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line118">line 118</a>
+        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line110">line 110</a>
     </li></ul></dd>
     
 
@@ -1532,7 +1532,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line137">line 137</a>
+        <a href="fs.js.html">fs.js</a>, <a href="fs.js.html#line129">line 129</a>
     </li></ul></dd>
     
 
@@ -1636,7 +1636,7 @@
 <br class="clear">
 
 <footer>
-    Generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Nov 09 2025 20:09:17 GMT+0000 (Coordinated Universal Time) using the Minami theme.
+    Generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Dec 17 2025 15:56:11 GMT+0000 (Coordinated Universal Time) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>
