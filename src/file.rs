@@ -112,7 +112,7 @@ impl JsFuture for FsOpenFuture {
         let result = result.unwrap();
 
         // Deserialize bytes into a file-descriptor.
-        let file_ptr: usize = bincode::deserialize(&result).unwrap();
+        let file_ptr: usize = postcard::from_bytes(&result).unwrap();
         let file = get_file_reference(file_ptr);
 
         let file_wrapper = v8::ObjectTemplate::new(scope);
@@ -171,7 +171,7 @@ fn open(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
 
     // The actual async task.
     let task = move || match open_file_op(path, flags) {
-        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
 
@@ -271,8 +271,8 @@ impl JsFuture for FsReadFuture {
         // Otherwise, resolve the promise passing the result.
         let result = result.unwrap();
 
-        // Deserialize bincode binary into actual rust types.
-        let (n, mut buffer): (usize, Vec<u8>) = bincode::deserialize(&result).unwrap();
+        // Deserialize bytes into actual rust types.
+        let (n, mut buffer): (usize, Vec<u8>) = postcard::from_bytes(&result).unwrap();
 
         // We reached the end of the file.
         if n == 0 {
@@ -325,7 +325,7 @@ fn read(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
 
     // The actual async task.
     let task = move || match read_file_op(&mut file, size, offset) {
-        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
 
@@ -549,8 +549,8 @@ impl JsFuture for FsStatFuture {
         // Otherwise, resolve the promise passing the result.
         let result = result.unwrap();
 
-        // Deserialize bincode binary into actual rust types.
-        let stats: FileStatistics = bincode::deserialize(&result).unwrap();
+        // Deserialize bytes into actual rust types.
+        let stats: FileStatistics = postcard::from_bytes(&result).unwrap();
         let stats = create_v8_stats_object(scope, stats);
 
         self.promise
@@ -573,7 +573,7 @@ fn stat(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
     let state = state_rc.borrow();
 
     let task = move || match stats_op(path) {
-        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
 
@@ -801,8 +801,8 @@ impl JsFuture for ReadDirFuture {
         // Otherwise, resolve the promise passing the result.
         let result = result.unwrap();
 
-        // Deserialize bincode binary into an actual rust type.
-        let directory: Vec<OsString> = bincode::deserialize(&result).unwrap();
+        // Deserialize bytes into an actual rust type.
+        let directory: Vec<OsString> = postcard::from_bytes(&result).unwrap();
         let directory: Vec<v8::Local<v8::Value>> = directory
             .iter()
             .map(|entry| entry.to_str().unwrap())
@@ -832,7 +832,7 @@ fn readdir(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv
     let state = state_rc.borrow();
 
     let task = move || match readdir_op(path) {
-        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
 

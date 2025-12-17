@@ -33,7 +33,6 @@ ureq = { version = "3.1.4", features = ["charset"] }
 phf = { version = "0.13.1", features = ["macros"] }
 url = "2.5.7"
 clearscreen = "4.0.2"
-bincode = "1.3.3"
 swc_common = { version = "18.0.1", features = ["tty-emitter", "sourcemap"] }
 swc_ecma_codegen = "21.0.0"
 swc_ecma_parser = "29.0.2"
@@ -62,6 +61,7 @@ uuid = { version = "1.19.0", features = ["v4", "fast-rng"] }
 base64 = "0.22.1"
 indicatif = "0.18.3"
 rusqlite = { version = "0.37.0", features = ["bundled", "load_extension", "column_decltype", "column_metadata"] }
+postcard = { version = "1.1.3", features = ["use-std"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.30.1", features = ["signal"] }

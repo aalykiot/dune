@@ -42,7 +42,7 @@ impl JsFuture for DnsLookupFuture {
 
         // Otherwise, get the result and deserialize it.
         let result = result.unwrap();
-        let result: Vec<(String, String)> = bincode::deserialize(&result).unwrap();
+        let result: Vec<(String, String)> = postcard::from_bytes(&result).unwrap();
 
         let ips: Vec<v8::Local<v8::Value>> = result
             .iter()
@@ -87,7 +87,7 @@ fn dns_lookup(
 
     // The actual async task.
     let task = move || match dns_lookup_op(&host) {
-        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
 

@@ -394,7 +394,7 @@ impl JsRuntime {
             state.pending_futures.push(Box::new(EsModuleFuture {
                 path,
                 module: Rc::clone(&graph_rc.borrow().root_rc),
-                maybe_result: Some(Ok(bincode::serialize(&source).unwrap())),
+                maybe_result: Some(Ok(postcard::to_stdvec(&source).unwrap())),
             }));
             return Ok(());
         }
@@ -404,7 +404,7 @@ impl JsRuntime {
         let task = {
             let specifier = path.clone();
             move || match load_import(&specifier, true) {
-                anyhow::Result::Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
+                anyhow::Result::Ok(source) => Some(Ok(postcard::to_stdvec(&source).unwrap())),
                 Err(e) => Some(Result::Err(e)),
             }
         };
