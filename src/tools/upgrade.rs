@@ -95,13 +95,18 @@ pub fn run_upgrade() -> Result<()> {
     let current = std::env::current_exe()?;
 
     if cfg!(windows) {
-        // On windows you cannot replace the currently running executable.
+        // On windows you cannot replace the currently running executable,
         // so first we rename it to dune.outdated.exe
         fs::rename(&current, current.with_extension("outdated.exe"))?;
+    } else {
+        fs::remove_file(&current)?;
     }
 
-    // Copy new binary to dune's execution path.
-    fs::copy(next, &current)?;
+    // Windows does not allow renaming across different file-systems (devices)
+    // so if the rename fails default to copying the binary.
+    if fs::rename(&next, &current).is_err() {
+        fs::copy(next, &current)?;
+    }
 
     Ok(())
 }
