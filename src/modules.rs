@@ -305,7 +305,7 @@ impl JsFuture for EsModuleFuture {
         // Extract module's source code.
         let source = self.maybe_result.take().unwrap();
         let source = match source {
-            Ok(source) => bincode::deserialize::<String>(&source).unwrap(),
+            Ok(source) => postcard::from_bytes::<String>(&source).unwrap(),
             Err(e) => {
                 self.handle_failure(Error::msg(e.to_string()));
                 return;
@@ -394,7 +394,7 @@ impl JsFuture for EsModuleFuture {
                 let task = {
                     let specifier = specifier.clone();
                     move || match load_import(&specifier, skip_cache) {
-                        Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
+                        Ok(source) => Some(Ok(postcard::to_stdvec(&source).unwrap())),
                         Err(e) => Some(Result::Err(e)),
                     }
                 };

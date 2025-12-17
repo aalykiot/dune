@@ -224,7 +224,7 @@ pub fn host_import_module_dynamically_cb<'s>(
     let task = {
         let specifier = specifier.clone();
         move || match load_import(&specifier, true) {
-            anyhow::Result::Ok(source) => Some(Ok(bincode::serialize(&source).unwrap())),
+            anyhow::Result::Ok(source) => Some(Ok(postcard::to_stdvec(&source).unwrap())),
             Err(e) => Some(Result::Err(e)),
         }
     };

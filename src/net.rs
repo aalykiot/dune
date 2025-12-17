@@ -236,10 +236,15 @@ impl JsFuture for TcpWriteFuture {
 fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     let index = args.get(0).int32_value(scope).unwrap() as u32;
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
+    let store = data.get_backing_store().unwrap();
+    let store_length = store.byte_length();
 
-    // Move bytes from the ArrayBuffer to a Rust vector.
-    let mut buffer = vec![0; data.byte_length()];
-    data.copy_contents(&mut buffer);
+    let buffer = unsafe {
+        // For performance, we avoid copying and instead (unsafely) create a u8 slice
+        // directly from the backing store’s raw c_void pointer.
+        let store_ptr = store.data().unwrap();
+        std::slice::from_raw_parts(store_ptr.as_ptr() as *const u8, store_length)
+    };
 
     // Create a promise resolver and extract the actual promise.
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
@@ -258,7 +263,7 @@ fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
         }
     };
 
-    state.handle.tcp_write(index, &buffer, on_write);
+    state.handle.tcp_write(index, buffer, on_write);
     rv.set(promise.into());
 }
 

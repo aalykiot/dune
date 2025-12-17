@@ -112,7 +112,7 @@ impl JsFuture for FsOpenFuture {
         let result = result.unwrap();
 
         // Deserialize bytes into a file-descriptor.
-        let file_ptr: usize = bincode::deserialize(&result).unwrap();
+        let file_ptr: usize = postcard::from_bytes(&result).unwrap();
         let file = get_file_reference(file_ptr);
 
         let file_wrapper = v8::ObjectTemplate::new(scope);
@@ -171,7 +171,7 @@ fn open(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
 
     // The actual async task.
     let task = move || match open_file_op(path, flags) {
-        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
 
@@ -202,10 +202,8 @@ fn open_sync(
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
-    // Get file path.
+    // Get file path and open flags.
     let path = args.get(0).to_rust_string_lossy(scope);
-
-    // Get flags which can be used to configure how a file is opened.
     let flags = args.get(1).to_rust_string_lossy(scope);
 
     match open_file_op(path, flags) {
@@ -254,7 +252,6 @@ fn open_sync(
 /// Describes what will run after the async read_file_op completes.
 struct FsReadFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    buffer_store: v8::SharedRef<v8::BackingStore>,
     maybe_result: TaskResult,
 }
 
@@ -274,33 +271,37 @@ impl JsFuture for FsReadFuture {
         // Otherwise, resolve the promise passing the result.
         let result = result.unwrap();
 
-        // Deserialize bincode binary into actual rust types.
-        let (n, data): (usize, Vec<u8>) = bincode::deserialize(&result).unwrap();
+        // Deserialize bytes into actual rust types.
+        let (n, mut buffer): (usize, Vec<u8>) = postcard::from_bytes(&result).unwrap();
 
-        // Copy the slice's bytes into v8's typed-array backing store.
-        for (i, value) in data.iter().enumerate() {
-            self.buffer_store[i].set(*value);
+        // We reached the end of the file.
+        if n == 0 {
+            let undefined = v8::undefined(scope);
+            self.promise.open(scope).resolve(scope, undefined.into());
+            return;
         }
 
-        let bytes_read = v8::Integer::new(scope, n as i32);
+        // We need to resize the given buffer in case we read less
+        // bytes than requested from the caller.
+        buffer.resize(n, 0);
+
+        // Initialize the JS array buffer with a custom backing store.
+        let store = buffer.into_boxed_slice();
+        let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store).make_shared();
+        let array_buffer = v8::ArrayBuffer::with_backing_store(scope, &store);
 
         self.promise
             .open(scope)
-            .resolve(scope, bytes_read.into())
+            .resolve(scope, array_buffer.into())
             .unwrap();
     }
 }
 
 /// Reads asynchronously a chunk of a file (as bytes).
 fn read(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
-    // Get the file_wrap object.
+    // Get the file ref, chunk size and offset.
     let file_wrap = args.get(0).to_object(scope).unwrap();
-
-    // Get a reference to the provided JS land buffer.
-    let buffer = v8::Local::<v8::ArrayBuffer>::try_from(args.get(1)).unwrap();
-    let buffer_size = buffer.byte_length() as i64;
-    let buffer_store = buffer.get_backing_store();
-
+    let size = args.get(1).to_integer(scope).unwrap().value();
     let offset = args.get(2).to_integer(scope).unwrap().value();
 
     // Create a promise resolver and extract the actual promise.
@@ -323,8 +324,8 @@ fn read(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || match read_file_op(&mut file, buffer_size, offset) {
-        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+    let task = move || match read_file_op(&mut file, size, offset) {
+        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
 
@@ -338,7 +339,6 @@ fn read(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
             let future = FsReadFuture {
                 promise,
                 maybe_result,
-                buffer_store,
             };
             state.pending_futures.push(Box::new(future));
         }
@@ -356,17 +356,12 @@ fn read_sync(
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
-    // Get the file_wrap object.
+    // Get the file ref, chunk size and offset.
     let file_wrap = args.get(0).to_object(scope).unwrap();
-
-    // Get a reference to the provided JS land buffer.
-    let buffer = v8::Local::<v8::ArrayBuffer>::try_from(args.get(1)).unwrap();
-    let buffer_size = buffer.byte_length() as i64;
-    let buffer_store = buffer.get_backing_store();
-
+    let size = args.get(1).to_integer(scope).unwrap().value();
     let offset = args.get(2).to_integer(scope).unwrap().value();
 
-    // Check if the file is already closed, otherwise create a file reference.
+    // Check if the file is already closed.
     let mut file = match get_internal_ref::<Option<File>>(scope, file_wrap, 0) {
         Some(file) => file.try_clone().unwrap(),
         None => {
@@ -375,15 +370,24 @@ fn read_sync(
         }
     };
 
-    match read_file_op(&mut file, buffer_size, offset) {
-        Ok((n, data)) => {
-            // Copy the slice's bytes into v8's typed-array backing store.
-            for (i, value) in data.iter().enumerate() {
-                buffer_store[i].set(*value);
+    match read_file_op(&mut file, size, offset) {
+        Ok((n, mut buffer)) => {
+            // We reached the end of the file.
+            if n == 0 {
+                rv.set_undefined();
+                return;
             }
 
-            let bytes_read = v8::Integer::new(scope, n as i32);
-            rv.set(bytes_read.into());
+            // We need to resize the given buffer in case we read less
+            // bytes than requested from the caller.
+            buffer.resize(n, 0);
+
+            // Initialize the JS array buffer with a custom backing store.
+            let store = buffer.into_boxed_slice();
+            let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store).make_shared();
+            let array_buffer = v8::ArrayBuffer::with_backing_store(scope, &store);
+
+            rv.set(array_buffer.into());
         }
         Err(e) => {
             throw_exception(scope, &e);
@@ -434,11 +438,16 @@ fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     // Get the file_wrap object.
     let file_wrap = args.get(0).to_object(scope).unwrap();
 
-    // Get data as ArrayBuffer.
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
+    let store = data.get_backing_store().unwrap();
+    let store_length = store.byte_length();
 
-    let mut buffer = vec![0; data.byte_length()];
-    data.copy_contents(&mut buffer);
+    let buffer = unsafe {
+        // For performance, we avoid copying and instead (unsafely) create a u8 slice
+        // directly from the backing store’s raw c_void pointer.
+        let store_ptr = store.data().unwrap();
+        std::slice::from_raw_parts(store_ptr.as_ptr() as *const u8, store_length)
+    };
 
     // Create a promise resolver and extract the actual promise.
     let promise_resolver = v8::PromiseResolver::new(scope).unwrap();
@@ -460,7 +469,7 @@ fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || match write_file_op(&mut file, &buffer) {
+    let task = move || match write_file_op(&mut file, buffer) {
         Ok(_) => None,
         Err(e) => Some(Result::Err(e)),
     };
@@ -501,13 +510,18 @@ fn write_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
         }
     };
 
-    // Get data as ArrayBuffer.
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
+    let store = data.get_backing_store().unwrap();
+    let store_length = store.byte_length();
 
-    let mut buffer = vec![0; data.byte_length()];
-    data.copy_contents(&mut buffer);
+    let buffer = unsafe {
+        // For performance, we avoid copying and instead (unsafely) create a u8 slice
+        // directly from the backing store’s raw c_void pointer.
+        let store_ptr = store.data().unwrap();
+        std::slice::from_raw_parts(store_ptr.as_ptr() as *const u8, store_length)
+    };
 
-    if let Err(e) = write_file_op(&mut file, &buffer) {
+    if let Err(e) = write_file_op(&mut file, buffer) {
         throw_exception(scope, &e);
     }
 }
@@ -535,8 +549,8 @@ impl JsFuture for FsStatFuture {
         // Otherwise, resolve the promise passing the result.
         let result = result.unwrap();
 
-        // Deserialize bincode binary into actual rust types.
-        let stats: FileStatistics = bincode::deserialize(&result).unwrap();
+        // Deserialize bytes into actual rust types.
+        let stats: FileStatistics = postcard::from_bytes(&result).unwrap();
         let stats = create_v8_stats_object(scope, stats);
 
         self.promise
@@ -559,7 +573,7 @@ fn stat(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
     let state = state_rc.borrow();
 
     let task = move || match stats_op(path) {
-        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
 
@@ -787,8 +801,8 @@ impl JsFuture for ReadDirFuture {
         // Otherwise, resolve the promise passing the result.
         let result = result.unwrap();
 
-        // Deserialize bincode binary into an actual rust type.
-        let directory: Vec<OsString> = bincode::deserialize(&result).unwrap();
+        // Deserialize bytes into an actual rust type.
+        let directory: Vec<OsString> = postcard::from_bytes(&result).unwrap();
         let directory: Vec<v8::Local<v8::Value>> = directory
             .iter()
             .map(|entry| entry.to_str().unwrap())
@@ -818,7 +832,7 @@ fn readdir(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv
     let state = state_rc.borrow();
 
     let task = move || match readdir_op(path) {
-        Ok(result) => Some(Ok(bincode::serialize(&result).unwrap())),
+        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
         Err(e) => Some(Result::Err(e)),
     };
 

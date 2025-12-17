@@ -11,7 +11,7 @@
 
 const binding = process.binding('fs');
 
-const BUFFER_SIZE = 40 * 1024; // 40KB bytes buffer when reading.
+const BUFFER_SIZE = 256 * 1024; // 256 KB buffer when reading.
 
 /**
  * A File object is an object wrapper for a numeric file descriptor.
@@ -69,45 +69,37 @@ export class File {
   /**
    * Reads asynchronously some bytes from the file.
    *
-   * @param {Uint8Array} buffer - The buffer into which the data will be read.
+   * @param {Number} size - The maximum amount of bytes to read.
    * @param {Number} offset - The starting position in the file from which to begin reading data.
-   * @returns {Promise<Number>} - The amount of bytes read.
+   * @returns {Promise<Uint8Array>} - A Uint8Array containing the bytes read from the file.
    */
-  async read(buffer, offset = 0) {
+  async read(size = BUFFER_SIZE, offset = 0) {
     // Check if the file is open.
     if (!this._handle) {
       throw new Error('The file is not open.');
     }
 
-    // Provided buffers must be Uint8Arrays.
-    if (!(buffer instanceof Uint8Array)) {
-      throw new TypeError(`The "buffer" argument must be of type Uint8Array.`);
-    }
+    const bytes = await binding.read(this._handle, size, offset);
 
-    // Copy bytes into buffer and return bytes read.
-    return binding.read(this._handle, buffer.buffer, offset);
+    return new Uint8Array(bytes);
   }
 
   /**
    * Reads synchronously some bytes from the file.
    *
-   * @param {Uint8Array} buffer - The buffer into which the data will be read.
+   * @param {Number} size - The maximum amount of bytes to read.
    * @param {Number} offset - The starting position in the file from which to begin reading data.
-   * @returns {Number} - The amount of bytes read.
+   * @returns {Uint8Array} - A Uint8Array containing the bytes read from the file.
    */
-  readSync(buffer, offset = 0) {
+  readSync(size = BUFFER_SIZE, offset = 0) {
     // Check if the file is open.
     if (!this._handle) {
       throw new Error('The file is not open.');
     }
 
-    // Provided buffers must be Uint8Arrays.
-    if (!(buffer instanceof Uint8Array)) {
-      throw new TypeError(`The "buffer" argument must be of type Uint8Array.`);
-    }
+    const bytes = binding.readSync(this._handle, size, offset);
 
-    // Copy bytes into buffer and return bytes read.
-    return binding.readSync(this._handle, buffer.buffer, offset);
+    return new Uint8Array(bytes);
   }
 
   /**
@@ -241,13 +233,13 @@ export class File {
     // Close the file on stream pipeline errors.
     if (signal) signal.on('uncaughtStreamException', () => this.close());
 
-    let buffer = new Uint8Array(BUFFER_SIZE);
-    let bytesRead = 0;
+    let data;
     let offset = 0;
-    while ((bytesRead = await this.read(buffer, offset))) {
-      if (bytesRead === 0) break;
-      offset += bytesRead;
-      yield buffer.subarray(0, bytesRead);
+
+    while ((data = await this.read(BUFFER_SIZE, offset))) {
+      if (data.length === 0) break;
+      offset += data.length;
+      yield data;
     }
   }
 
@@ -256,13 +248,13 @@ export class File {
    * @ignore
    */
   *[Symbol.iterator]() {
-    let buffer = new Uint8Array(BUFFER_SIZE);
-    let bytesRead = 0;
+    let data;
     let offset = 0;
-    while ((bytesRead = this.readSync(buffer, offset))) {
-      if (bytesRead === 0) break;
-      offset += bytesRead;
-      yield buffer.subarray(0, bytesRead);
+
+    while ((data = this.readSync(BUFFER_SIZE, offset))) {
+      if (data.length === 0) break;
+      offset += data.length;
+      yield data;
     }
   }
 }
@@ -425,8 +417,8 @@ export async function readFile(path, options = {}) {
 
   let bytesRead = 0;
 
-  // Note: Since the file object is async iterable will read the entire content
-  // of the file using the for-await loop.
+  // Note: Since the file object is async iterable will read the
+  // entire content of the file using the for-await loop.
   for await (let chunk of file) {
     data.set(chunk, bytesRead);
     bytesRead += chunk.length;
@@ -463,8 +455,8 @@ export function readFileSync(path, options = {}) {
 
   let bytesRead = 0;
 
-  // Note: Since the file object is iterable will read the entire content
-  // of the file using the for-of loop.
+  // Note: Since the file object is iterable will read the
+  // entire content of the file using the for-of loop.
   for (let chunk of file) {
     data.set(chunk, bytesRead);
     bytesRead += chunk.length;
@@ -935,11 +927,13 @@ export function createReadStream(path, options = {}) {
     // Open file and handle broken pipeline clean-ups.
     const file = await open(path, options?.mode);
     signal.on('uncaughtStreamException', () => file.close());
+
     // Start consuming chunks.
     for await (const chunk of file) {
       yield encoding ? textDecoder.decode(chunk) : chunk;
     }
-    file.close();
+
+    await file.close();
   };
 }
 
@@ -953,19 +947,19 @@ export function createReadStream(path, options = {}) {
  */
 export function createWriteStream(path, options = {}) {
   // We want to open the file the moment the stream becomes active.
-  let _handle;
+  let handle;
   const encoding = typeof options === 'string' ? options : options.encoding;
 
   // Every object with `.write()` and `.end()` is a writable stream.
   return {
     async write(chunk) {
-      if (!_handle) _handle = await open(path, options.mode || 'w');
+      if (!handle) handle = await open(path, options.mode || 'w');
       const data = toUint8Array(chunk, encoding || 'utf-8');
-      await _handle.write(data);
+      await handle.write(data);
     },
     async end(chunk) {
       if (chunk) await this.write(chunk);
-      if (_handle) await _handle.close();
+      if (handle) await handle.close();
     },
   };
 }
