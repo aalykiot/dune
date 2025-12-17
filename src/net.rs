@@ -263,7 +263,7 @@ fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
         }
     };
 
-    state.handle.tcp_write(index, &buffer, on_write);
+    state.handle.tcp_write(index, buffer, on_write);
     rv.set(promise.into());
 }
 
