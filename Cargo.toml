@@ -18,8 +18,8 @@ git = "https://github.com/aalykiot/dune-event-loop"
 branch = "main"
 
 [dependencies]
-v8 = { version = "142.1.0", default-features = false }
-clap = { version = "4.5.51", features = ["derive"] }
+v8 = { version = "142.2.0", default-features = false }
+clap = { version = "4.5.53", features = ["derive"] }
 anyhow = "1.0.100"
 colored = "3.0.0"
 rustyline = "17.0.2"
@@ -53,14 +53,14 @@ tempdir = "0.3.7"
 zstd = "0.13.3"
 notify = "8.2.0"
 httparse = "1.10.1"
-pest = "2.8.3"
-pest_derive = "2.8.3"
+pest = "2.8.4"
+pest_derive = "2.8.4"
 futures = "0.3.31"
 tokio = { version = "1.48.0", features = ["full"] }
-axum = { version = "0.8.6", features = ["ws"] }
-uuid = { version = "1.18.1", features = ["v4", "fast-rng"] }
+axum = { version = "0.8.7", features = ["ws"] }
+uuid = { version = "1.19.0", features = ["v4", "fast-rng"] }
 base64 = "0.22.1"
-indicatif = "0.18.2"
+indicatif = "0.18.3"
 rusqlite = { version = "0.37.0", features = ["bundled", "load_extension", "column_decltype", "column_metadata"] }
 
 [target.'cfg(unix)'.dependencies]
