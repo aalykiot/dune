@@ -1,4 +1,4 @@
-name: Deploy API References
+name: api-reference
 
 permissions:
   contents: write
