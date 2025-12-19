@@ -1,0 +1,55 @@
+name: Bump Version
+
+permissions:
+  contents: write
+on:
+  workflow_dispatch:
+    inputs:
+      releaseKind:
+        description: 'Release Kind'
+        type: choice
+        default: 'patch'
+        options:
+          - patch
+          - minor
+          - major
+        required: true
+      releaseNote:
+        description: 'Release Note'
+        required: true
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+      - name: Install Stable Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install cargo-edit
+        run: cargo install cargo-edit
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Bump Version in Cargo.toml
+        run: cargo set-version --bump ${{ github.event.inputs.releaseKind }}
+      - name: Read Version Tag
+        id: version
+        run: |
+          VERSION=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[0].version')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Commit Changes
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: |
+            - Cargo.toml
+            - Cargo.lock
+          default_author: github_actions
+          push: true
+          message: 'Getting ready for v${{ steps.version.outputs.version }} release 🚀'
+          tag: '-a v${{ steps.version.outputs.version }} -m "${{ github.event.inputs.releaseNote }}"'

@@ -10,43 +10,43 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout sources
+      - name: Checkout
         uses: actions/checkout@v2
-      - name: Install stable toolchain
+      - name: Install Stable Toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - name: Run cargo check
+      - name: Run Cargo Check
         uses: actions-rs/cargo@v1
         with:
           command: check
   cargo-lint:
-    name: Lints
+    name: Cargo Lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
-      - name: Install stable toolchain
+      - name: Install Stable Toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
           components: rustfmt, clippy
-      - name: Run cargo fmt
+      - name: Run Cargo Format
         uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
-      - name: Run cargo clippy
+      - name: Run Clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: -- -D warnings
   eslint:
-    name: Lints
+    name: EsLint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -56,7 +56,7 @@ jobs:
       - run: npm i
       - run: npm run lint
   test:
-    name: Test Suite
+    name: Test
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -67,15 +67,15 @@ jobs:
       RUSTFLAGS: >-
         -D warnings ${{ matrix.os == 'windows-latest' && '-Csymbol-mangling-version=v0' || '' }}
     steps:
-      - name: Checkout sources
+      - name: Checkout
         uses: actions/checkout@v2
-      - name: Install stable toolchain
+      - name: Install Stable Toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - name: Run cargo test
+      - name: Run Cargo Test
         uses: actions-rs/cargo@v1
         with:
           command: test

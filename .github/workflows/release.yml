@@ -1,4 +1,4 @@
-name: Build and Release
+name: Release
 
 permissions:
   contents: write
@@ -7,7 +7,7 @@ on:
     tags:
       - v[0-9]+.*
 jobs:
-  create-release:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -38,5 +38,5 @@ jobs:
           target: ${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  build-api:
-    uses: ./.github/workflows/dune-api.yml
+  api-reference:
+    uses: ./.github/workflows/api.yml
