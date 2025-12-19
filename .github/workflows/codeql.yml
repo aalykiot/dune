@@ -28,7 +28,7 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           paths-ingore:
-            - examples/**
+            - examples/**/*.js
       # Autobuild attempts to build any compiled languages.
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4
