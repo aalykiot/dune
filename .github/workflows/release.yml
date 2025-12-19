@@ -1,4 +1,4 @@
-name: release
+name: Release
 
 permissions:
   contents: write
@@ -7,7 +7,7 @@ on:
     tags:
       - v[0-9]+.*
 jobs:
-  create-release:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -39,4 +39,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   api-reference:
-    uses: ./.github/workflows/api-reference.yml
+    uses: ./.github/workflows/api.yml
