@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['javascript']
+        language: ['rust', 'javascript']
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -27,11 +27,12 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          paths-ignore:
-            - 'examples/**'
+          config: |
+            paths-ignore:
+              - 'examples/**'
       # Autobuild attempts to build any compiled languages.
-      # - name: Autobuild
-      # uses: github/codeql-action/autobuild@v4
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
       # Run code analysis
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
