@@ -27,10 +27,8 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          paths:
-            - src
           paths-ignore:
-            - examples/**
+            - 'examples/**'
       # Autobuild attempts to build any compiled languages.
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4
