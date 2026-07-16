@@ -17,8 +17,10 @@ use crate::stdio;
 use crate::timers;
 use anyhow::Error;
 use lazy_static::lazy_static;
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::ffi::c_void;
+use std::rc::Rc;
 
 /// Function pointer for the bindings initializers.
 type BindingInitFn = fn(&mut v8::PinScope) -> v8::Global<v8::Object>;
@@ -207,4 +209,37 @@ pub fn throw_type_error(scope: &mut v8::PinScope, message: &str) {
     let message = v8::String::new(scope, message).unwrap();
     let exception = v8::Exception::type_error(scope, message);
     scope.throw_exception(exception);
+}
+
+/// Returns a v8 object that will drop the internal Rust instance
+/// when the garbage collector runs the clean-up.
+pub fn wrap_gc_dropped<'s, T: 'static>(
+    scope: &mut v8::PinScope<'s, '_>,
+    value: T,
+) -> v8::Local<'s, v8::Object> {
+    // Allocate space for the Rust value.
+    let wrapper = v8::ObjectTemplate::new(scope);
+    wrapper.set_internal_field_count(1);
+
+    let wrapper = wrapper.new_instance(scope).unwrap();
+    let value_ptr = set_internal_ref(scope, wrapper, 0, value);
+    let weak_rc = Rc::new(Cell::new(None));
+
+    // Note: To automatically release the resource when the object that
+    // owns the underlying Rust instance is garbage collected, we use
+    // a Weak reference with a finalizer callback.
+    let value_weak = v8::Weak::with_finalizer(
+        scope,
+        wrapper,
+        Box::new({
+            let weak_rc = weak_rc.clone();
+            move |isolate| unsafe {
+                drop(Box::from_raw(value_ptr));
+                drop(v8::Weak::from_raw(isolate, weak_rc.get()));
+            }
+        }),
+    );
+
+    weak_rc.set(value_weak.into_raw());
+    wrapper
 }

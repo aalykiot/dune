@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use anyhow::Error;
 use anyhow::Result;
 use colored::*;
+use crabuv::timers::TimerKind;
 use phf::phf_set;
 use phf::Set;
 use regex::Captures;
@@ -26,6 +27,7 @@ use std::sync::Arc;
 use std::sync::Condvar;
 use std::sync::Mutex;
 use std::thread;
+use std::time::Duration;
 use swc_common::sync::Lrc;
 use swc_common::FileName;
 use swc_common::SourceMap;
@@ -276,7 +278,7 @@ static CLI_HISTORY: &str = ".dune_history";
 pub fn start(mut runtime: JsRuntime) {
     // Create a channel for thread communication.
     let (sender, receiver) = mpsc::channel::<ReplCommand>();
-    let handle = runtime.event_loop.interrupt_handle();
+    let thread_handle = runtime.event_loop.interrupt_handle();
 
     // Simple mechanism to lock and unlock user's prompt.
     let prompt_mutex = PromptMutex::default();
@@ -286,10 +288,8 @@ pub fn start(mut runtime: JsRuntime) {
     // timer with a close to maximum timeout value.
     //
     // https://doc.rust-lang.org/std/time/struct.Instant.html#os-specific-behaviors
-    runtime
-        .event_loop
-        .handle()
-        .timer(u32::MAX as u64, true, |_| {});
+    let handle = runtime.event_loop.handle();
+    handle.timer(Duration::from_millis(u64::MAX), TimerKind::Interval, |_| {});
 
     // Spawn the REPL thread.
     thread::spawn(move || {
@@ -314,7 +314,7 @@ pub fn start(mut runtime: JsRuntime) {
             match editor.readline(prompt) {
                 Ok(line) if line == ".exit" => {
                     sender.send(ReplCommand::Terminate).unwrap();
-                    handle.interrupt();
+                    thread_handle.interrupt();
                     break;
                 }
                 Ok(line) => {
@@ -324,7 +324,7 @@ pub fn start(mut runtime: JsRuntime) {
                     // Evaluate current expression.
                     let message = ReplCommand::Evaluate(line.trim_end().into());
                     sender.send(message).unwrap();
-                    handle.interrupt();
+                    thread_handle.interrupt();
 
                     // Locking the prompt so we can evaluate the expression before
                     // we allow the user to enter a new one.
@@ -332,13 +332,13 @@ pub fn start(mut runtime: JsRuntime) {
                 }
                 Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
                     sender.send(ReplCommand::Terminate).unwrap();
-                    handle.interrupt();
+                    thread_handle.interrupt();
                     break;
                 }
                 Err(e) => {
                     eprintln!("{e}");
                     sender.send(ReplCommand::Terminate).unwrap();
-                    handle.interrupt();
+                    thread_handle.interrupt();
                     break;
                 }
             }

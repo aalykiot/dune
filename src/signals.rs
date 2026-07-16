@@ -1,11 +1,14 @@
+use crate::bindings::get_internal_ref;
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
 use crate::bindings::throw_exception;
+use crate::bindings::wrap_gc_dropped;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::anyhow;
-use dune_event_loop::LoopHandle;
-use dune_event_loop::Signal;
+use crabuv::signals::Lifetime;
+use crabuv::signals::SignalHandle;
+use crabuv::signals::SignalKind as Signal;
 use std::rc::Rc;
 
 #[cfg(windows)]
@@ -120,7 +123,7 @@ fn start_signal(
 
     let signal_cb = {
         let state_rc = state_rc.clone();
-        move |_: LoopHandle, _: i32| {
+        move |_: SignalHandle, _: i32| {
             let mut state = state_rc.borrow_mut();
             let future = SignalFuture(Rc::clone(&callback));
             state.pending_futures.push(Box::new(future));
@@ -129,10 +132,13 @@ fn start_signal(
 
     // Schedule a new signal listener to the event-loop.
     let state = state_rc.borrow();
-    let id = state.handle.signal_start(signal_type, signal_cb).unwrap();
+    let signal = state
+        .handle
+        .signal(signal_type, Lifetime::Persistent, signal_cb)
+        .unwrap();
 
-    // Return timeout's internal id.
-    rv.set(v8::Number::new(scope, id as f64).into());
+    let signal = wrap_gc_dropped(scope, signal);
+    rv.set(signal.into());
 }
 
 /// Removes a signal listener to the event-loop.
@@ -141,9 +147,9 @@ fn cancel_signal(
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
-    // Get handlers internal token.
-    let id = args.get(0).int32_value(scope).unwrap() as u32;
-    let state_rc = JsRuntime::state(scope);
+    // Get the signal handle from the object.
+    let wrapper = args.get(0).to_object(scope).unwrap();
+    let signal = get_internal_ref::<SignalHandle>(scope, wrapper, 0);
 
-    state_rc.borrow().handle.signal_stop(&id);
+    signal.stop();
 }

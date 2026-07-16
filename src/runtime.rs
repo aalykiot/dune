@@ -23,10 +23,11 @@ use crate::process;
 use crate::repl::EvaluationContext;
 use crate::repl::EvaluationStatus;
 use anyhow::Result;
-use dune_event_loop::EventLoop;
-use dune_event_loop::LoopHandle;
-use dune_event_loop::LoopInterruptHandle;
-use dune_event_loop::TaskResult;
+use crabuv::task::Output;
+use crabuv::EventLoop;
+use crabuv::LoopHandle;
+use crabuv::LoopInterruptHandle;
+use crabuv::RunMode;
 use std::cell::RefCell;
 use std::cmp;
 use std::net::SocketAddrV4;
@@ -394,7 +395,7 @@ impl JsRuntime {
             state.pending_futures.push(Box::new(EsModuleFuture {
                 path,
                 module: Rc::clone(&graph_rc.borrow().root_rc),
-                maybe_result: Some(Ok(postcard::to_stdvec(&source).unwrap())),
+                output: Some(Ok(postcard::to_stdvec(&source).unwrap())),
             }));
             return Ok(());
         }
@@ -411,18 +412,18 @@ impl JsRuntime {
 
         let task_cb = {
             let state_rc = state_rc.clone();
-            move |_: LoopHandle, maybe_result: TaskResult| {
+            move |_: LoopHandle, output: Output| {
                 let mut state = state_rc.borrow_mut();
                 let future = EsModuleFuture {
-                    path,
+                    path: path.clone(),
                     module: Rc::clone(&graph_rc.borrow().root_rc),
-                    maybe_result,
+                    output,
                 };
                 state.pending_futures.push(Box::new(future));
             }
         };
 
-        state.handle.spawn(task, Some(task_cb));
+        state.handle.spawn_with_callback(task, task_cb);
 
         Ok(())
     }
@@ -431,7 +432,7 @@ impl JsRuntime {
     pub fn tick_event_loop(&mut self) {
         self.with_scope(run_next_tick_callbacks);
         self.fast_forward_imports();
-        self.event_loop.tick();
+        self.event_loop.run(RunMode::Once);
         self.run_pending_futures();
     }
 

@@ -13,7 +13,7 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Json;
 use axum::Router;
-use dune_event_loop::LoopInterruptHandle;
+use crabuv::LoopInterruptHandle;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use serde::Serialize;

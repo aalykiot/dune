@@ -1,8 +1,14 @@
+use crate::bindings::get_internal_ref;
 use crate::bindings::set_function_to;
+use crate::bindings::wrap_gc_dropped;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
-use dune_event_loop::LoopHandle;
+use crabuv::check::CheckHandle;
+use crabuv::timers::TimerHandle;
+use crabuv::timers::TimerKind;
+use crabuv::LoopHandle;
 use std::rc::Rc;
+use std::time::Duration;
 
 pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
@@ -59,7 +65,10 @@ fn create_timeout(
     let millis = args.get(1).int32_value(scope).unwrap() as u64;
 
     // Decide if the timer is an interval.
-    let repeatable = args.get(2).to_rust_string_lossy(scope) == "true";
+    let kind = match args.get(2).to_rust_string_lossy(scope).as_str() {
+        "true" => TimerKind::Interval,
+        _ => TimerKind::Timeout,
+    };
 
     // Convert params argument (Array<Local<Value>>) to Rust vector.
     let params = match v8::Local::<v8::Array>::try_from(args.get(3)) {
@@ -96,12 +105,14 @@ fn create_timeout(
         }
     };
 
-    // Schedule a new timer to the event-loop.
     let state = state_rc.borrow();
-    let id = state.handle.timer(millis, repeatable, timeout_cb);
+    let duration = Duration::from_millis(millis);
 
-    // Return timeout's internal id.
-    rv.set(v8::Number::new(scope, id as f64).into());
+    // Schedule a new timer to the event-loop.
+    let timer = state.handle.timer(duration, kind, timeout_cb);
+    let timer = wrap_gc_dropped(scope, timer);
+
+    rv.set(timer.into());
 }
 
 /// Removes a scheduled timeout from the event-loop.
@@ -110,11 +121,11 @@ fn remove_timeout(
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
-    // Get timeout's ID, and remove it.
-    let id = args.get(0).int32_value(scope).unwrap() as u32;
-    let state_rc = JsRuntime::state(scope);
+    // Get timeout handle from the object.
+    let wrapper = args.get(0).to_object(scope).unwrap();
+    let timer = get_internal_ref::<TimerHandle>(scope, wrapper, 0);
 
-    state_rc.borrow().handle.remove_timer(&id);
+    timer.cancel();
 }
 
 struct ImmediateFuture {
@@ -172,22 +183,23 @@ fn create_immediate(
 
     let immediate_cb = {
         let state_rc = state_rc.clone();
-        move |_: LoopHandle| {
+        move |handle: CheckHandle| {
             let mut state = state_rc.borrow_mut();
             let future = ImmediateFuture {
                 cb: Rc::clone(&callback),
                 params: Rc::clone(&params),
             };
             state.pending_futures.push(Box::new(future));
+            handle.remove();
         }
     };
 
     // Schedule a check callback.
     let state = state_rc.borrow();
-    let id = state.handle.check(immediate_cb);
+    let immediate = state.handle.check(immediate_cb);
+    let immediate = wrap_gc_dropped(scope, immediate);
 
-    // Return immediate's internal id.
-    rv.set(v8::Number::new(scope, id as f64).into());
+    rv.set(immediate.into());
 }
 
 /// Removes a scheduled immediate timer.
@@ -196,9 +208,9 @@ fn remove_immediate(
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
-    // Get timeout's ID, and remove it.
-    let id = args.get(0).int32_value(scope).unwrap() as u32;
-    let state_rc = JsRuntime::state(scope);
+    // Get the immidiate handle from the object.
+    let wrapper = args.get(0).to_object(scope).unwrap();
+    let check = get_internal_ref::<CheckHandle>(scope, wrapper, 0);
 
-    state_rc.borrow().handle.remove_check(&id);
+    check.remove();
 }

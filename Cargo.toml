@@ -13,9 +13,9 @@ name = "dune"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies.dune_event_loop]
+[dependencies.crabuv]
 git = "https://github.com/aalykiot/dune-event-loop"
-branch = "main"
+branch = "next"
 
 [dependencies]
 v8 = { version = "150.0.0", default-features = false }

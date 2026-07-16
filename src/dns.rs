@@ -4,9 +4,9 @@ use crate::bindings::set_property_to;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
+use crabuv::task::Output;
+use crabuv::LoopHandle;
 use dns_lookup::lookup_host;
-use dune_event_loop::LoopHandle;
-use dune_event_loop::TaskResult;
 use std::net::IpAddr;
 
 pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
@@ -22,13 +22,13 @@ pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
 /// Describes what will run after the async dns_lookup completes.
 struct DnsLookupFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    maybe_result: TaskResult,
+    output: Output,
 }
 
 impl JsFuture for DnsLookupFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
         // Extract the result.
-        let result = self.maybe_result.take().unwrap();
+        let result = self.output.take().unwrap();
 
         // Handle when something goes wrong on the DNS lookup.
         if let Err(e) = result {
@@ -96,18 +96,14 @@ fn dns_lookup(
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |_: LoopHandle, maybe_result: TaskResult| {
+        move |_: LoopHandle, output: Output| {
             let mut state = state_rc.borrow_mut();
-            let future = DnsLookupFuture {
-                promise,
-                maybe_result,
-            };
+            let future = DnsLookupFuture { promise, output };
             state.pending_futures.push(Box::new(future));
         }
     };
 
-    state.handle.spawn(task, Some(task_cb));
-
+    state.handle.spawn_with_callback(task, task_cb);
     rv.set(promise.into());
 }
 

@@ -10,8 +10,8 @@ use crate::runtime::JsRuntime;
 use anyhow::anyhow;
 use anyhow::Error;
 use anyhow::Result;
-use dune_event_loop::LoopHandle;
-use dune_event_loop::TaskResult;
+use crabuv::task::Output;
+use crabuv::LoopHandle;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;
@@ -272,7 +272,7 @@ impl ModuleGraph {
 pub struct EsModuleFuture {
     pub path: ModulePath,
     pub module: Rc<RefCell<EsModule>>,
-    pub maybe_result: TaskResult,
+    pub output: Output,
 }
 
 impl EsModuleFuture {
@@ -303,7 +303,7 @@ impl JsFuture for EsModuleFuture {
         }
 
         // Extract module's source code.
-        let source = self.maybe_result.take().unwrap();
+        let source = self.output.take().unwrap();
         let source = match source {
             Ok(source) => postcard::from_bytes::<String>(&source).unwrap(),
             Err(e) => {
@@ -402,19 +402,19 @@ impl JsFuture for EsModuleFuture {
                 let task_cb = {
                     let specifier = specifier.clone();
                     let state_rc = state_rc.clone();
-                    move |_: LoopHandle, maybe_result: TaskResult| {
+                    move |_: LoopHandle, output: Output| {
                         let mut state = state_rc.borrow_mut();
                         let future = EsModuleFuture {
                             path: specifier,
                             module: Rc::clone(&module),
-                            maybe_result,
+                            output,
                         };
                         state.pending_futures.push(Box::new(future));
                     }
                 };
 
                 state.module_map.seen.insert(specifier, status);
-                state.handle.spawn(task, Some(task_cb));
+                state.handle.spawn_with_callback(task, task_cb);
             }
         }
 
