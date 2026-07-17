@@ -1164,6 +1164,10 @@ fn open_file_op<P: AsRef<Path>>(path: P, flags: String) -> Result<usize> {
 
 /// Pure rust implementation of reading a chunk from a file.
 fn read_file_op(file: &mut File, size: i64, offset: i64) -> Result<(usize, Vec<u8>)> {
+    // Adding guards to provided values.
+    assert!(offset >= 0);
+    assert!(size > 0);
+
     // Move file cursor to requested position.
     if let Err(e) = file.seek(SeekFrom::Start(offset as u64)) {
         bail!(e);
@@ -1198,20 +1202,20 @@ fn stats_op<P: AsRef<Path>>(path: P) -> Result<FileStatistics> {
             // Returns the last access time of this metadata.
             let access_time = metadata
                 .accessed()
-                .ok()
-                .map(|time| time.duration_since(UNIX_EPOCH).unwrap());
+                .map(|time| time.duration_since(UNIX_EPOCH).unwrap_or_default())
+                .ok();
 
             // Returns the last modification time listed in this metadata.
             let modified_time = metadata
                 .modified()
-                .ok()
-                .map(|time| time.duration_since(UNIX_EPOCH).unwrap());
+                .map(|time| time.duration_since(UNIX_EPOCH).unwrap_or_default())
+                .ok();
 
             // Returns the creation time listed in this metadata.
             let birth_time = metadata
                 .created()
-                .ok()
-                .map(|time| time.duration_since(UNIX_EPOCH).unwrap());
+                .map(|time| time.duration_since(UNIX_EPOCH).unwrap_or_default())
+                .ok();
 
             let is_directory = metadata.is_dir();
             let is_file = metadata.is_file();
