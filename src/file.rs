@@ -1272,7 +1272,12 @@ fn rmdir_op<P: AsRef<Path>>(path: P) -> Result<()> {
 /// Pure rust implementation of reading a directory.
 fn readdir_op<P: AsRef<Path>>(path: P) -> Result<Vec<OsString>> {
     fs::read_dir(path)
-        .map(|directory| directory.map(|entry| entry.unwrap().file_name()).collect())
+        .map(|directory| {
+            directory
+                .filter_map(|entry| entry.ok())
+                .map(|entry| entry.file_name())
+                .collect()
+        })
         .map_err(|e| anyhow!(e))
 }
 
