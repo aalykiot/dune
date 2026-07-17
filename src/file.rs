@@ -1133,7 +1133,7 @@ fn open_file_op<P: AsRef<Path>>(path: P, flags: String) -> Result<usize> {
     let read = flags == "r" || flags == "r+" || flags == "w+" || flags == "a+";
     let write = flags == "r+" || flags == "w" || flags == "w+";
     let create = flags == "w" || flags == "w+" || flags == "a" || flags == "a+";
-    let truncate = flags == "w+";
+    let truncate = flags == "w" || flags == "w+";
     let append = flags == "a" || flags == "a+";
 
     // Note: The reason we forget the file handle is to prevent rust from
