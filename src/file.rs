@@ -381,9 +381,7 @@ impl JsFuture for FsWriteFuture {
 
 // Writes asynchronously contents to a file.
 fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
-    assert_eq!(args.length(), 2);
     let file_wrap = args.get(0).to_object(scope).unwrap();
-
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
     let store = data.get_backing_store().unwrap();
     let store_length = store.byte_length();
