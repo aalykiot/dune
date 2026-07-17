@@ -116,14 +116,14 @@ impl JsFuture for FsOpenFuture {
         let file_ptr: usize = postcard::from_bytes(&result).unwrap();
         let file = get_file_reference(file_ptr);
 
-        let file_wrapper = wrap_gc_dropped(scope, Some(file));
+        let file_wrap = wrap_gc_dropped(scope, Some(file));
         let fd = v8::Number::new(scope, file_ptr as f64);
 
-        set_constant_to(scope, file_wrapper, "fd", fd.into());
+        set_constant_to(scope, file_wrap, "fd", fd.into());
 
         self.promise
             .open(scope)
-            .resolve(scope, file_wrapper.into())
+            .resolve(scope, file_wrap.into())
             .unwrap();
     }
 }
@@ -181,12 +181,12 @@ fn open_sync(
     match open_file_op(path, flags) {
         Ok(file_ptr) => {
             let file = get_file_reference(file_ptr);
-            let file_wrapper = wrap_gc_dropped(scope, Some(file));
+            let file_wrap = wrap_gc_dropped(scope, Some(file));
             let fd = v8::Number::new(scope, file_ptr as f64);
 
-            set_constant_to(scope, file_wrapper, "fd", fd.into());
+            set_constant_to(scope, file_wrap, "fd", fd.into());
 
-            rv.set(file_wrapper.into());
+            rv.set(file_wrap.into());
         }
         Err(e) => {
             throw_exception(scope, &e);

@@ -37,10 +37,10 @@ impl JsFuture for TcpConnectFuture {
         match self.stream.as_ref() {
             Ok(stream) => {
                 // Extract info from the TcpSocketInfo.
-                let socket = stream.info.as_ref().as_ref().unwrap();
-                let host_port = socket.host.port();
-                let host_address = socket.host.ip().to_string();
-                let host_family = match socket.host.ip() {
+                let metadata = stream.info.as_ref().as_ref().unwrap();
+                let host_port = metadata.host.port();
+                let host_address = metadata.host.ip().to_string();
+                let host_family = match metadata.host.ip() {
                     IpAddr::V4(_) => "IPv4",
                     IpAddr::V6(_) => "IPv6",
                 };
@@ -57,8 +57,8 @@ impl JsFuture for TcpConnectFuture {
                 set_property_to(scope, host, "address", address.into());
 
                 // Remote IP attributes.
-                let port = socket.remote.port();
-                let address = socket.remote.ip().to_string();
+                let port = metadata.remote.port();
+                let address = metadata.remote.ip().to_string();
 
                 let remote = v8::Object::new(scope);
 
@@ -70,9 +70,9 @@ impl JsFuture for TcpConnectFuture {
 
                 // Create a JavaScript socket info object.
                 let socket = v8::Object::new(scope);
-                let stream_wrap = wrap_gc_dropped(scope, stream.clone());
+                let fd = wrap_gc_dropped(scope, stream.clone());
 
-                set_property_to(scope, socket, "stream", stream_wrap.into());
+                set_property_to(scope, socket, "fd", fd.into());
                 set_property_to(scope, socket, "host", host.into());
                 set_property_to(scope, socket, "remote", remote.into());
 
@@ -144,7 +144,7 @@ struct ReadStartFuture {
 impl JsFuture for ReadStartFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
         // Create the v8 value for the data parameter.
-        let data_value: v8::Local<v8::Value> = match self.data.as_mut() {
+        let data: v8::Local<v8::Value> = match self.data.as_mut() {
             Ok(data) => {
                 // Create ArrayBuffer's backing store from Vec<u8>.
                 let store = data.clone().into_boxed_slice();
@@ -159,7 +159,7 @@ impl JsFuture for ReadStartFuture {
         };
 
         // Create the v8 value for the error parameter.
-        let error_value: v8::Local<v8::Value> = match self.data.as_mut() {
+        let error: v8::Local<v8::Value> = match self.data.as_mut() {
             Ok(_) => v8::null(scope).into(),
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
@@ -173,7 +173,7 @@ impl JsFuture for ReadStartFuture {
         let on_read = v8::Local::new(scope, (*self.on_read).clone());
         let undefined = v8::undefined(scope).into();
 
-        on_read.call(scope, undefined, &[error_value, data_value]);
+        on_read.call(scope, undefined, &[error, data]);
     }
 }
 
@@ -264,6 +264,7 @@ fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     };
 
     stream.write(buffer.to_vec(), on_write);
+
     rv.set(promise.into());
 }
 
@@ -275,35 +276,35 @@ struct TcpListenFuture {
 impl JsFuture for TcpListenFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
         // Create the v8 value for the data parameter.
-        let socket_value: v8::Local<v8::Value> = match self.stream.as_mut() {
+        let socket: v8::Local<v8::Value> = match self.stream.as_mut() {
+            Err(_) => v8::null(scope).into(),
             Ok(stream) => {
                 // Extract info from the TcpSocketInfo.
-                let socket = stream.info.as_ref().as_ref().unwrap();
-                let address = socket.remote.ip().to_string();
-                let port = socket.remote.port();
+                let metadata = stream.info.as_ref().as_ref().unwrap();
+                let address = metadata.remote.ip().to_string();
+                let port = metadata.remote.port();
 
-                let stream = wrap_gc_dropped(scope, stream.clone());
+                let fd = wrap_gc_dropped(scope, stream.clone());
 
-                let socket_info = v8::Object::new(scope);
+                let socket = v8::Object::new(scope);
                 let address = v8::String::new(scope, &address).unwrap();
                 let port = v8::Integer::new(scope, port as i32);
 
-                set_property_to(scope, socket_info, "stream", stream.into());
-                set_property_to(scope, socket_info, "remoteAddress", address.into());
-                set_property_to(scope, socket_info, "remotePort", port.into());
+                set_property_to(scope, socket, "fd", fd.into());
+                set_property_to(scope, socket, "remoteAddress", address.into());
+                set_property_to(scope, socket, "remotePort", port.into());
 
-                socket_info.into()
+                socket.into()
             }
-            Err(_) => v8::null(scope).into(),
         };
 
         // Create the v8 value for the error parameter.
-        let error_value: v8::Local<v8::Value> = match self.stream.as_mut() {
+        let error: v8::Local<v8::Value> = match self.stream.as_mut() {
+            Ok(_) => v8::null(scope).into(),
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 v8::Exception::error(scope, message)
             }
-            Ok(_) => v8::null(scope).into(),
         };
 
         v8::tc_scope!(let tc_scope, scope);
@@ -312,7 +313,7 @@ impl JsFuture for TcpListenFuture {
         let on_connection = v8::Local::new(tc_scope, (*self.on_connection).clone());
         let undefined = v8::undefined(tc_scope).into();
 
-        on_connection.call(tc_scope, undefined, &[error_value, socket_value]);
+        on_connection.call(tc_scope, undefined, &[error, socket]);
 
         if tc_scope.has_caught() {
             let exception = tc_scope.exception().unwrap();
@@ -361,7 +362,7 @@ fn listen(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv:
         return;
     }
 
-    let server = wrap_gc_dropped(scope, server);
+    let fd = wrap_gc_dropped(scope, server);
 
     let host = v8::Object::new(scope);
     let port = args.get(1).to_int32(scope).unwrap();
@@ -377,12 +378,12 @@ fn listen(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv:
     set_property_to(scope, host, "address", address.into());
 
     // The actual object we'll return.
-    let ret_value = v8::Object::new(scope);
+    let server = v8::Object::new(scope);
 
-    set_property_to(scope, ret_value, "server", server.into());
-    set_property_to(scope, ret_value, "host", host.into());
+    set_property_to(scope, server, "fd", fd.into());
+    set_property_to(scope, server, "host", host.into());
 
-    rv.set(ret_value.into());
+    rv.set(server.into());
 }
 
 struct TcpShutdownFuture {
