@@ -112,7 +112,9 @@ impl JsFuture for FsOpenFuture {
         // Otherwise, get the result and deserialize it.
         let result = result.unwrap();
 
-        // Deserialize bytes into a file-descriptor.
+        // Deserialize the bytes back into the original Rust types. Unwrapping is
+        // considered safe here because the bytes were produced from Rust values,
+        // so the payload should never be corrupted.
         let file_ptr: usize = postcard::from_bytes(&result).unwrap();
         let file = get_file_reference(file_ptr);
 
@@ -216,7 +218,9 @@ impl JsFuture for FsReadFuture {
         // Otherwise, resolve the promise passing the result.
         let result = result.unwrap();
 
-        // Deserialize bytes into actual rust types.
+        // Deserialize the bytes back into the original Rust types. Unwrapping is
+        // considered safe here because the bytes were produced from Rust values,
+        // so the payload should never be corrupted.
         let (n, mut buffer): (usize, Vec<u8>) = postcard::from_bytes(&result).unwrap();
 
         // We reached the end of the file.
@@ -377,7 +381,7 @@ impl JsFuture for FsWriteFuture {
 
 // Writes asynchronously contents to a file.
 fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
-    // Get the file_wrap object.
+    assert_eq!(args.length(), 2);
     let file_wrap = args.get(0).to_object(scope).unwrap();
 
     let data: v8::Local<v8::ArrayBufferView> = args.get(1).try_into().unwrap();
@@ -385,9 +389,17 @@ fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     let store_length = store.byte_length();
 
     let buffer = unsafe {
-        // For performance, we avoid copying and instead (unsafely) create a u8 slice
-        // directly from the backing store’s raw c_void pointer.
+        // For performance, we avoid copying and instead (unsafely) create a `&[u8]`
+        // directly from the backing store's raw `*const c_void` pointer.
+        //
+        // This is inherently fragile because the slice does not own the underlying
+        // memory. If V8 garbage-collects the backing store before the slice is dropped,
+        // the slice becomes dangling and any subsequent access is undefined behavior.
+        // We currently rely on the backing store remaining alive for the lifetime of
+        // the slice, but we should revisit whether this approach is actually sound or
+        // whether we need a stronger ownership/lifetime guarantee.
         let store_ptr = store.data().unwrap();
+
         std::slice::from_raw_parts(store_ptr.as_ptr() as *const u8, store_length)
     };
 
@@ -454,9 +466,17 @@ fn write_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
     let store_length = store.byte_length();
 
     let buffer = unsafe {
-        // For performance, we avoid copying and instead (unsafely) create a u8 slice
-        // directly from the backing store’s raw c_void pointer.
+        // For performance, we avoid copying and instead (unsafely) create a `&[u8]`
+        // directly from the backing store's raw `*const c_void` pointer.
+        //
+        // This is inherently fragile because the slice does not own the underlying
+        // memory. If V8 garbage-collects the backing store before the slice is dropped,
+        // the slice becomes dangling and any subsequent access is undefined behavior.
+        // We currently rely on the backing store remaining alive for the lifetime of
+        // the slice, but we should revisit whether this approach is actually sound or
+        // whether we need a stronger ownership/lifetime guarantee.
         let store_ptr = store.data().unwrap();
+
         std::slice::from_raw_parts(store_ptr.as_ptr() as *const u8, store_length)
     };
 
@@ -488,7 +508,9 @@ impl JsFuture for FsStatFuture {
         // Otherwise, resolve the promise passing the result.
         let result = result.unwrap();
 
-        // Deserialize bytes into actual rust types.
+        // Deserialize the bytes back into the original Rust types. Unwrapping is
+        // considered safe here because the bytes were produced from Rust values,
+        // so the payload should never be corrupted.
         let stats: FileStatistics = postcard::from_bytes(&result).unwrap();
         let stats = create_v8_stats_object(scope, stats);
 
@@ -567,10 +589,9 @@ impl JsFuture for FsMkdirFuture {
             return;
         }
 
-        // Something went wrong.
+        // If not, then an error happened during the operation.
         let result = self.output.take().unwrap();
 
-        // Something went wrong while getting the file's stats.
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
@@ -637,7 +658,7 @@ struct FsRmdirFuture {
 
 impl JsFuture for FsRmdirFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        // If the result is None then mkdir worked.
+        // If the result is None then rmdir worked.
         if self.output.is_none() {
             let undefined = v8::undefined(scope);
             self.promise
@@ -648,10 +669,9 @@ impl JsFuture for FsRmdirFuture {
             return;
         }
 
-        // Something went wrong.
+        // If not, then an error happened during the operation.
         let result = self.output.take().unwrap();
 
-        // Something went wrong while getting the file's stats.
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
@@ -731,7 +751,9 @@ impl JsFuture for ReadDirFuture {
         // Otherwise, resolve the promise passing the result.
         let result = result.unwrap();
 
-        // Deserialize bytes into an actual rust type.
+        // Deserialize the bytes back into the original Rust types. Unwrapping is
+        // considered safe here because the bytes were produced from Rust values,
+        // so the payload should never be corrupted.
         let directory: Vec<OsString> = postcard::from_bytes(&result).unwrap();
         let directory: Vec<v8::Local<v8::Value>> = directory
             .iter()
@@ -817,21 +839,17 @@ struct FsRmFuture {
 
 impl JsFuture for FsRmFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        // If the result is None then mkdir worked.
+        // If the result is None then rm worked.
         if self.output.is_none() {
-            let undefined = v8::undefined(scope);
-            self.promise
-                .open(scope)
-                .resolve(scope, undefined.into())
-                .unwrap();
+            let undefined = v8::undefined(scope).into();
+            self.promise.open(scope).resolve(scope, undefined).unwrap();
 
             return;
         }
 
-        // Something went wrong.
+        // If not, then an error happened during the operation.
         let result = self.output.take().unwrap();
 
-        // Something went wrong while getting the file's stats.
         if let Err(e) = result {
             let message = v8::String::new(scope, &e.to_string()).unwrap();
             let exception = v8::Exception::error(scope, message);
@@ -924,7 +942,8 @@ fn close_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
     if let Some(file) = get_internal_ref::<Option<File>>(scope, file_wrap, 0).take() {
         // Note: By taking the file reference out of the option and immediately dropping
         // it will make rust to close the file.
-        return drop(file);
+        drop(file);
+        return;
     }
 
     throw_exception(scope, &anyhow!("File is closed."));
@@ -1164,10 +1183,6 @@ fn open_file_op<P: AsRef<Path>>(path: P, flags: String) -> Result<usize> {
 
 /// Pure rust implementation of reading a chunk from a file.
 fn read_file_op(file: &mut File, size: i64, offset: i64) -> Result<(usize, Vec<u8>)> {
-    // Adding guards to provided values.
-    assert!(offset >= 0);
-    assert!(size > 0);
-
     // Move file cursor to requested position.
     if let Err(e) = file.seek(SeekFrom::Start(offset as u64)) {
         bail!(e);
