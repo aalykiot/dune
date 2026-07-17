@@ -735,8 +735,8 @@ impl JsFuture for ReadDirFuture {
         let directory: Vec<OsString> = postcard::from_bytes(&result).unwrap();
         let directory: Vec<v8::Local<v8::Value>> = directory
             .iter()
-            .map(|entry| entry.to_str().unwrap())
-            .map(|entry| v8::String::new(scope, entry).unwrap())
+            .map(|entry| entry.to_string_lossy())
+            .map(|entry| v8::String::new(scope, &entry).unwrap())
             .map(|entry_value| entry_value.into())
             .collect();
 
@@ -796,8 +796,8 @@ fn readdir_sync(
             // Cast OsString values to v8::Locals.
             let directory: Vec<v8::Local<v8::Value>> = directory
                 .iter()
-                .map(|entry| entry.to_str().unwrap())
-                .map(|entry| v8::String::new(scope, entry).unwrap())
+                .map(|entry| entry.to_string_lossy())
+                .map(|entry| v8::String::new(scope, &entry).unwrap())
                 .map(|entry_value| entry_value.into())
                 .collect();
 
@@ -1025,8 +1025,8 @@ impl JsFuture for WatchFuture {
                 let paths: Vec<v8::Local<v8::Value>> = event
                     .paths
                     .iter()
-                    .map(|path| path.to_str().unwrap())
-                    .map(|path| v8::String::new(scope, path).unwrap())
+                    .map(|path| path.to_string_lossy())
+                    .map(|path| v8::String::new(scope, &path).unwrap())
                     .map(|path_value| path_value.into())
                     .collect();
 
