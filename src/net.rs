@@ -117,8 +117,18 @@ fn connect(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv
         }
     };
 
+    let address = match format!("{ip}:{port}").parse() {
+        Ok(address) => address,
+        Err(_) => {
+            let message = format!("Invalid address: {ip}:{port}");
+            let message = v8::String::new(scope, &message).unwrap();
+            let exception = v8::Exception::error(scope, message);
+            promise_resolver.reject(scope, exception).unwrap();
+            return;
+        }
+    };
+
     // Try open a TCP stream with the remote host.
-    let address = format!("{ip}:{port}").parse().unwrap();
     let connection = state.handle.tcp_connect(address, on_connection);
 
     // Check if the tcp_connect failed early.
