@@ -37,10 +37,11 @@ impl JsFuture for TcpConnectFuture {
         match self.stream.as_ref() {
             Ok(stream) => {
                 // Extract info from the TcpSocketInfo.
-                let metadata = stream.info.as_ref().as_ref().unwrap();
-                let host_port = metadata.host.port();
-                let host_address = metadata.host.ip().to_string();
-                let host_family = match metadata.host.ip() {
+                let metadata = stream.info.as_ref();
+                let host = metadata.host.unwrap();
+                let host_port = host.port();
+                let host_address = host.ip().to_string();
+                let host_family = match metadata.host.unwrap().ip() {
                     IpAddr::V4(_) => "IPv4",
                     IpAddr::V6(_) => "IPv6",
                 };
@@ -57,8 +58,9 @@ impl JsFuture for TcpConnectFuture {
                 set_property_to(scope, host, "address", address.into());
 
                 // Remote IP attributes.
-                let port = metadata.remote.port();
-                let address = metadata.remote.ip().to_string();
+                let remote = metadata.remote.unwrap();
+                let port = remote.port();
+                let address = remote.ip().to_string();
 
                 let remote = v8::Object::new(scope);
 
@@ -290,9 +292,9 @@ impl JsFuture for TcpListenFuture {
             Err(_) => v8::null(scope).into(),
             Ok(stream) => {
                 // Extract info from the TcpSocketInfo.
-                let metadata = stream.info.as_ref().as_ref().unwrap();
-                let address = metadata.remote.ip().to_string();
-                let port = metadata.remote.port();
+                let metadata = stream.info.as_ref();
+                let address = metadata.remote.unwrap().ip().to_string();
+                let port = metadata.remote.unwrap().port();
 
                 let fd = wrap_gc_dropped(scope, stream.clone());
 

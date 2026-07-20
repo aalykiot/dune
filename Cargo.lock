@@ -551,7 +551,7 @@ dependencies = [
 [[package]]
 name = "crabuv"
 version = "0.1.3"
-source = "git+https://github.com/aalykiot/dune-event-loop?branch=next#7774747487d27992ca48842f475b18f8c44fe949"
+source = "git+https://github.com/aalykiot/dune-event-loop?branch=next#153a910c8e22b3e608644d785f0c7bd0d2182a6e"
 dependencies = [
  "anyhow",
  "ctrlc",

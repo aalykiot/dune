@@ -14,7 +14,6 @@ use crabuv::fs::FsEvent;
 use crabuv::fs::FsEventKind;
 use crabuv::fs::FsWatcherHandle;
 use crabuv::fs::WatchMode;
-use crabuv::task::Output;
 use crabuv::LoopHandle;
 use serde::Deserialize;
 use serde::Serialize;
@@ -24,6 +23,7 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io::SeekFrom;
+use std::mem;
 use std::path::Path;
 use std::rc::Rc;
 use std::time::Duration;
@@ -93,40 +93,32 @@ pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
 /// Describes what will run after the async open_file_op completes.
 struct FsOpenFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    output: Output,
+    result: Result<usize>,
 }
 
 impl JsFuture for FsOpenFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        let result = self.output.take().unwrap();
+        match self.result.as_ref() {
+            Ok(file_ptr) => {
+                let file = get_file_reference(*file_ptr);
+                let file_wrap = wrap_gc_dropped(scope, Some(file));
+                let fd = v8::Number::new(scope, *file_ptr as f64);
 
-        // Handle when something goes wrong with opening the file.
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception, &e);
-            self.promise.open(scope).reject(scope, exception);
-            return;
+                set_constant_to(scope, file_wrap, "fd", fd.into());
+
+                self.promise
+                    .open(scope)
+                    .resolve(scope, file_wrap.into())
+                    .unwrap();
+            }
+            // Handle when something goes wrong with opening the file.
+            Err(e) => {
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, message);
+                set_exception_code(scope, exception, &e);
+                self.promise.open(scope).reject(scope, exception);
+            }
         }
-
-        // Otherwise, get the result and deserialize it.
-        let result = result.unwrap();
-
-        // Deserialize the bytes back into the original Rust types. Unwrapping is
-        // considered safe here because the bytes were produced from Rust values,
-        // so the payload should never be corrupted.
-        let file_ptr: usize = postcard::from_bytes(&result).unwrap();
-        let file = get_file_reference(file_ptr);
-
-        let file_wrap = wrap_gc_dropped(scope, Some(file));
-        let fd = v8::Number::new(scope, file_ptr as f64);
-
-        set_constant_to(scope, file_wrap, "fd", fd.into());
-
-        self.promise
-            .open(scope)
-            .resolve(scope, file_wrap.into())
-            .unwrap();
     }
 }
 
@@ -146,26 +138,22 @@ fn open(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || match open_file_op(path, flags) {
-        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
-        Err(e) => Some(Result::Err(e)),
-    };
+    let task = move || open_file_op(path, flags);
 
     // The callback that will run after the above task completes.
     let task_cb = {
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |_: LoopHandle, output: Output| {
+        move |_: LoopHandle, result: Result<usize>| {
             let mut state = state_rc.borrow_mut();
-            let future = FsOpenFuture { promise, output };
+            let future = FsOpenFuture { promise, result };
 
             state.pending_futures.push(Box::new(future));
         }
     };
 
-    // Spawn the async task using the event-loop.
-    state.handle.spawn_with_callback(task, task_cb);
+    state.handle.spawn(task, Some(task_cb));
 
     rv.set(promise.into());
 }
@@ -187,7 +175,6 @@ fn open_sync(
             let fd = v8::Number::new(scope, file_ptr as f64);
 
             set_constant_to(scope, file_wrap, "fd", fd.into());
-
             rv.set(file_wrap.into());
         }
         Err(e) => {
@@ -199,50 +186,42 @@ fn open_sync(
 /// Describes what will run after the async read_file_op completes.
 struct FsReadFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    output: Output,
+    result: Result<(usize, Vec<u8>)>,
 }
 
 impl JsFuture for FsReadFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        let result = self.output.take().unwrap();
+        match self.result.as_mut() {
+            Ok((n, buffer)) => {
+                // We reached the end of the file.
+                if *n == 0 {
+                    let undefined = v8::undefined(scope);
+                    self.promise.open(scope).resolve(scope, undefined.into());
+                    return;
+                }
 
-        // Handle when something goes wrong with reading.
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception, &e);
-            self.promise.open(scope).reject(scope, exception);
-            return;
+                // We need to resize the given buffer in case we read less
+                // bytes than requested from the caller.
+                buffer.resize(*n, 0);
+
+                // Initialize the JS array buffer with a custom backing store.
+                let store = mem::take(buffer).into_boxed_slice();
+                let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store);
+                let array_buffer = v8::ArrayBuffer::with_backing_store(scope, &store.make_shared());
+
+                self.promise
+                    .open(scope)
+                    .resolve(scope, array_buffer.into())
+                    .unwrap();
+            }
+            // Something went wrong while reading the file.
+            Err(e) => {
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, message);
+                set_exception_code(scope, exception, &e);
+                self.promise.open(scope).reject(scope, exception);
+            }
         }
-
-        // Otherwise, resolve the promise passing the result.
-        let result = result.unwrap();
-
-        // Deserialize the bytes back into the original Rust types. Unwrapping is
-        // considered safe here because the bytes were produced from Rust values,
-        // so the payload should never be corrupted.
-        let (n, mut buffer): (usize, Vec<u8>) = postcard::from_bytes(&result).unwrap();
-
-        // We reached the end of the file.
-        if n == 0 {
-            let undefined = v8::undefined(scope);
-            self.promise.open(scope).resolve(scope, undefined.into());
-            return;
-        }
-
-        // We need to resize the given buffer in case we read less
-        // bytes than requested from the caller.
-        buffer.resize(n, 0);
-
-        // Initialize the JS array buffer with a custom backing store.
-        let store = buffer.into_boxed_slice();
-        let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store).make_shared();
-        let array_buffer = v8::ArrayBuffer::with_backing_store(scope, &store);
-
-        self.promise
-            .open(scope)
-            .resolve(scope, array_buffer.into())
-            .unwrap();
     }
 }
 
@@ -273,26 +252,23 @@ fn read(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || match read_file_op(&mut file, size, offset) {
-        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
-        Err(e) => Some(Result::Err(e)),
-    };
+    let task = move || read_file_op(&mut file, size, offset);
 
     // The callback that will run after the above task completes.
     let task_cb = {
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |_: LoopHandle, output: Output| {
+        move |_: LoopHandle, result: Result<(usize, Vec<u8>)>| {
             let mut state = state_rc.borrow_mut();
-            let future = FsReadFuture { promise, output };
+            let future = FsReadFuture { promise, result };
 
             state.pending_futures.push(Box::new(future));
         }
     };
 
-    // Spawn the async task using the event-loop.
-    state.handle.spawn_with_callback(task, task_cb);
+    state.handle.spawn(task, Some(task_cb));
+
     rv.set(promise.into());
 }
 
@@ -344,38 +320,27 @@ fn read_sync(
 /// Describes what will run after the async write_file_op completes.
 struct FsWriteFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    output: Output,
+    result: Result<()>,
 }
 
 impl JsFuture for FsWriteFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        // If the `task_result` is None it means everything is fine.
-        if self.output.is_none() {
-            let undefined = v8::undefined(scope);
-            self.promise
-                .open(scope)
-                .resolve(scope, undefined.into())
-                .unwrap();
-
-            return;
+        match self.result.as_ref() {
+            Ok(_) => {
+                let undefined = v8::undefined(scope);
+                self.promise
+                    .open(scope)
+                    .resolve(scope, undefined.into())
+                    .unwrap();
+            }
+            // Something went wrong.
+            Err(e) => {
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, message);
+                set_exception_code(scope, exception, &e);
+                self.promise.open(scope).reject(scope, exception);
+            }
         }
-
-        // Something went wrong.
-        let result = self.output.take().unwrap();
-
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception, &e);
-            self.promise.open(scope).reject(scope, exception);
-            return;
-        }
-
-        // Note: The result from the `write_file_op` should be None or some Error.
-        // Based on that assumption we should never reach this part of the
-        // function thus we use the unreachable! macro.
-
-        unreachable!();
     }
 }
 
@@ -421,27 +386,24 @@ fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || match write_file_op(&mut file, buffer) {
-        Ok(_) => None,
-        Err(e) => Some(Result::Err(e)),
-    };
+    let task = move || write_file_op(&mut file, buffer);
 
     // The callback that will run after the above task completes.
     let task_cb = {
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |_: LoopHandle, output: Output| {
+        move |_: LoopHandle, result: Result<()>| {
             // Get a mut reference to the runtime's state.
             let mut state = state_rc.borrow_mut();
-            let fs_write_handle = FsWriteFuture { promise, output };
+            let fs_write_handle = FsWriteFuture { promise, result };
 
             state.pending_futures.push(Box::new(fs_write_handle));
         }
     };
 
-    // Spawn the async task using the event-loop.
-    state.handle.spawn_with_callback(task, task_cb);
+    state.handle.spawn(task, Some(task_cb));
+
     rv.set(promise.into());
 }
 
@@ -486,36 +448,28 @@ fn write_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
 /// Describes what will run after the async stats_op completes.
 struct FsStatFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    output: Output,
+    result: Result<FileStatistics>,
 }
 
 impl JsFuture for FsStatFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        // Unwrap the result.
-        let result = self.output.take().unwrap();
-
-        // Something went wrong while getting the file's stats.
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception, &e);
-            self.promise.open(scope).reject(scope, exception);
-            return;
+        match self.result.as_ref() {
+            // Resolve the promise passing the result.
+            Ok(stats) => {
+                let stats = create_v8_stats_object(scope, stats);
+                self.promise
+                    .open(scope)
+                    .resolve(scope, stats.into())
+                    .unwrap();
+            }
+            // Something went wrong while getting the file's stats.
+            Err(e) => {
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, message);
+                set_exception_code(scope, exception, &e);
+                self.promise.open(scope).reject(scope, exception);
+            }
         }
-
-        // Otherwise, resolve the promise passing the result.
-        let result = result.unwrap();
-
-        // Deserialize the bytes back into the original Rust types. Unwrapping is
-        // considered safe here because the bytes were produced from Rust values,
-        // so the payload should never be corrupted.
-        let stats: FileStatistics = postcard::from_bytes(&result).unwrap();
-        let stats = create_v8_stats_object(scope, stats);
-
-        self.promise
-            .open(scope)
-            .resolve(scope, stats.into())
-            .unwrap();
     }
 }
 
@@ -531,25 +485,22 @@ fn stat(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
 
-    let task = move || match stats_op(path) {
-        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
-        Err(e) => Some(Result::Err(e)),
-    };
+    let task = || stats_op(path);
 
     let task_cb = {
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |_: LoopHandle, output: Output| {
+        move |_: LoopHandle, result: Result<FileStatistics>| {
             let mut state = state_rc.borrow_mut();
-            let future = FsStatFuture { promise, output };
+            let future = FsStatFuture { promise, result };
 
             state.pending_futures.push(Box::new(future));
         }
     };
 
-    // Spawn the async task using the event-loop.
-    state.handle.spawn_with_callback(task, task_cb);
+    state.handle.spawn(task, Some(task_cb));
+
     rv.set(promise.into());
 }
 
@@ -563,7 +514,7 @@ fn stat_sync(
     let path = args.get(0).to_rust_string_lossy(scope);
 
     match stats_op(path) {
-        Ok(stats) => rv.set(create_v8_stats_object(scope, stats).into()),
+        Ok(stats) => rv.set(create_v8_stats_object(scope, &stats).into()),
         Err(e) => throw_exception(scope, &e),
     };
 }
@@ -571,34 +522,27 @@ fn stat_sync(
 /// Describes what will run after the async mkdir_op completes.
 struct FsMkdirFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    output: Output,
+    result: Result<()>,
 }
 
 impl JsFuture for FsMkdirFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        // If the result is None then mkdir worked.
-        if self.output.is_none() {
-            let undefined = v8::undefined(scope);
-            self.promise
-                .open(scope)
-                .resolve(scope, undefined.into())
-                .unwrap();
-
-            return;
+        match self.result.as_ref() {
+            Ok(_) => {
+                let undefined = v8::undefined(scope);
+                self.promise
+                    .open(scope)
+                    .resolve(scope, undefined.into())
+                    .unwrap();
+            }
+            // An error happened during the operation.
+            Err(e) => {
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, message);
+                set_exception_code(scope, exception, &e);
+                self.promise.open(scope).reject(scope, exception);
+            }
         }
-
-        // If not, then an error happened during the operation.
-        let result = self.output.take().unwrap();
-
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception, &e);
-            self.promise.open(scope).reject(scope, exception);
-            return;
-        }
-
-        unreachable!();
     }
 }
 
@@ -615,25 +559,22 @@ fn mkdir(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
 
-    let task = move || match mkdir_op(path, recursive) {
-        Ok(_) => None,
-        Err(e) => Some(Result::Err(e)),
-    };
+    let task = move || mkdir_op(path, recursive);
 
     let task_cb = {
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |_: LoopHandle, output: Output| {
+        move |_: LoopHandle, result: Result<()>| {
             let mut state = state_rc.borrow_mut();
-            let future = FsMkdirFuture { promise, output };
+            let future = FsMkdirFuture { promise, result };
 
             state.pending_futures.push(Box::new(future));
         }
     };
 
-    // Spawn the async task using the event-loop.
-    state.handle.spawn_with_callback(task, task_cb);
+    state.handle.spawn(task, Some(task_cb));
+
     rv.set(promise.into());
 }
 
@@ -651,34 +592,27 @@ fn mkdir_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
 /// Describes what will run after the async rmdir_op completes.
 struct FsRmdirFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    output: Output,
+    result: Result<()>,
 }
 
 impl JsFuture for FsRmdirFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        // If the result is None then rmdir worked.
-        if self.output.is_none() {
-            let undefined = v8::undefined(scope);
-            self.promise
-                .open(scope)
-                .resolve(scope, undefined.into())
-                .unwrap();
-
-            return;
+        match self.result.as_ref() {
+            Ok(_) => {
+                let undefined = v8::undefined(scope);
+                self.promise
+                    .open(scope)
+                    .resolve(scope, undefined.into())
+                    .unwrap();
+            }
+            // An error happened during the operation.
+            Err(e) => {
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, message);
+                set_exception_code(scope, exception, &e);
+                self.promise.open(scope).reject(scope, exception);
+            }
         }
-
-        // If not, then an error happened during the operation.
-        let result = self.output.take().unwrap();
-
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception, &e);
-            self.promise.open(scope).reject(scope, exception);
-            return;
-        }
-
-        unreachable!();
     }
 }
 
@@ -694,25 +628,22 @@ fn rmdir(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
 
-    let task = move || match rmdir_op(path) {
-        Ok(_) => None,
-        Err(e) => Some(Result::Err(e)),
-    };
+    let task = || rmdir_op(path);
 
     let task_cb = {
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |_: LoopHandle, output: Output| {
+        move |_: LoopHandle, result: Result<()>| {
             let mut state = state_rc.borrow_mut();
-            let future = FsRmdirFuture { promise, output };
+            let future = FsRmdirFuture { promise, result };
 
             state.pending_futures.push(Box::new(future));
         }
     };
 
-    // Spawn the async task using the event-loop.
-    state.handle.spawn_with_callback(task, task_cb);
+    state.handle.spawn(task, Some(task_cb));
+
     rv.set(promise.into());
 }
 
@@ -729,43 +660,35 @@ fn rmdir_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
 /// Describes what will run after the async read_dir_op completes.
 struct ReadDirFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    output: Output,
+    result: Result<Vec<OsString>>,
 }
 
 impl JsFuture for ReadDirFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        // Unwrap the result.
-        let result = self.output.take().unwrap();
+        match self.result.as_ref() {
+            Ok(directory) => {
+                let directory: Vec<v8::Local<v8::Value>> = directory
+                    .iter()
+                    .map(|entry| entry.to_string_lossy())
+                    .map(|entry| v8::String::new(scope, &entry).unwrap())
+                    .map(|entry_value| entry_value.into())
+                    .collect();
 
-        // Check if something went wrong on directory read.
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception, &e);
-            self.promise.open(scope).reject(scope, exception);
-            return;
+                let directory_value = v8::Array::new_with_elements(scope, &directory);
+
+                self.promise
+                    .open(scope)
+                    .resolve(scope, directory_value.into())
+                    .unwrap();
+            }
+            // Something went wrong on directory read.
+            Err(e) => {
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, message);
+                set_exception_code(scope, exception, &e);
+                self.promise.open(scope).reject(scope, exception);
+            }
         }
-
-        // Otherwise, resolve the promise passing the result.
-        let result = result.unwrap();
-
-        // Deserialize the bytes back into the original Rust types. Unwrapping is
-        // considered safe here because the bytes were produced from Rust values,
-        // so the payload should never be corrupted.
-        let directory: Vec<OsString> = postcard::from_bytes(&result).unwrap();
-        let directory: Vec<v8::Local<v8::Value>> = directory
-            .iter()
-            .map(|entry| entry.to_string_lossy())
-            .map(|entry| v8::String::new(scope, &entry).unwrap())
-            .map(|entry_value| entry_value.into())
-            .collect();
-
-        let directory_value = v8::Array::new_with_elements(scope, &directory);
-
-        self.promise
-            .open(scope)
-            .resolve(scope, directory_value.into())
-            .unwrap();
     }
 }
 
@@ -781,24 +704,22 @@ fn readdir(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
 
-    let task = move || match readdir_op(path) {
-        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
-        Err(e) => Some(Result::Err(e)),
-    };
+    let task = || readdir_op(path);
 
     let task_cb = {
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |_: LoopHandle, output: Output| {
+        move |_: LoopHandle, result: Result<Vec<OsString>>| {
             let mut state = state_rc.borrow_mut();
-            let future = ReadDirFuture { promise, output };
+            let future = ReadDirFuture { promise, result };
 
             state.pending_futures.push(Box::new(future));
         }
     };
 
-    state.handle.spawn_with_callback(task, task_cb);
+    state.handle.spawn(task, Some(task_cb));
+
     rv.set(promise.into());
 }
 
@@ -832,31 +753,24 @@ fn readdir_sync(
 /// Describes what will run after the async rm_op completes.
 struct FsRmFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    output: Output,
+    result: Result<()>,
 }
 
 impl JsFuture for FsRmFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        // If the result is None then rm worked.
-        if self.output.is_none() {
-            let undefined = v8::undefined(scope).into();
-            self.promise.open(scope).resolve(scope, undefined).unwrap();
-
-            return;
+        match self.result.as_ref() {
+            Ok(_) => {
+                let undefined = v8::undefined(scope).into();
+                self.promise.open(scope).resolve(scope, undefined).unwrap();
+            }
+            // An error happened during the operation.
+            Err(e) => {
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, message);
+                set_exception_code(scope, exception, &e);
+                self.promise.open(scope).reject(scope, exception);
+            }
         }
-
-        // If not, then an error happened during the operation.
-        let result = self.output.take().unwrap();
-
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception, &e);
-            self.promise.open(scope).reject(scope, exception);
-            return;
-        }
-
-        unreachable!();
     }
 }
 
@@ -872,25 +786,22 @@ fn rm(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8:
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
 
-    let task = move || match rm_op(path) {
-        Ok(_) => None,
-        Err(e) => Some(Result::Err(e)),
-    };
+    let task = || rm_op(path);
 
     let task_cb = {
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |_: LoopHandle, output: Output| {
+        move |_: LoopHandle, result: Result<()>| {
             let mut state = state_rc.borrow_mut();
-            let future = FsRmFuture { promise, output };
+            let future = FsRmFuture { promise, result };
 
             state.pending_futures.push(Box::new(future));
         }
     };
 
-    // Spawn the async task using the event-loop.
-    state.handle.spawn_with_callback(task, task_cb);
+    state.handle.spawn(task, Some(task_cb));
+
     rv.set(promise.into());
 }
 
@@ -950,35 +861,27 @@ fn close_sync(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
 /// Describes what will run after the async rename_op completes.
 struct FsRenameFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    output: Output,
+    result: Result<()>,
 }
 
 impl JsFuture for FsRenameFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        // If the result is None then renaming worked.
-        if self.output.is_none() {
-            let undefined = v8::undefined(scope);
-            self.promise
-                .open(scope)
-                .resolve(scope, undefined.into())
-                .unwrap();
-
-            return;
+        match self.result.as_ref() {
+            Ok(_) => {
+                let undefined = v8::undefined(scope);
+                self.promise
+                    .open(scope)
+                    .resolve(scope, undefined.into())
+                    .unwrap();
+            }
+            // Something went wrong while renaming the file.
+            Err(e) => {
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, message);
+                set_exception_code(scope, exception, &e);
+                self.promise.open(scope).reject(scope, exception);
+            }
         }
-
-        // Something went wrong.
-        let result = self.output.take().unwrap();
-
-        // Something went wrong while renaming the file.
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception, &e);
-            self.promise.open(scope).reject(scope, exception);
-            return;
-        }
-
-        unreachable!();
     }
 }
 
@@ -996,25 +899,22 @@ fn rename(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv:
     let state = state_rc.borrow();
 
     // The actual async task.
-    let task = move || match rename_op(from, to) {
-        Ok(_) => None,
-        Err(e) => Some(Result::Err(e)),
-    };
+    let task = || rename_op(from, to);
 
     // The callback that will run after the above task completes.
     let task_cb = {
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |_: LoopHandle, output: Output| {
+        move |_: LoopHandle, result: Result<()>| {
             let mut state = state_rc.borrow_mut();
-            let future = FsRenameFuture { promise, output };
+            let future = FsRenameFuture { promise, result };
             state.pending_futures.push(Box::new(future));
         }
     };
 
-    // Spawn the async task using the event-loop.
-    state.handle.spawn_with_callback(task, task_cb);
+    state.handle.spawn(task, Some(task_cb));
+
     rv.set(promise.into());
 }
 
@@ -1315,7 +1215,7 @@ fn rename_op<P: AsRef<Path>>(from: P, to: P) -> Result<()> {
 /// Creates a JavaScript file stats object.
 fn create_v8_stats_object<'a>(
     scope: &mut v8::PinScope<'a, '_>,
-    stats: FileStatistics,
+    stats: &FileStatistics,
 ) -> v8::Local<'a, v8::Object> {
     // This will be out stats object.
     let target = v8::Object::new(scope);

@@ -4,7 +4,6 @@ use crate::bindings::set_property_to;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
-use crabuv::task::Output;
 use crabuv::LoopHandle;
 use dns_lookup::lookup_host;
 use std::net::IpAddr;
@@ -12,7 +11,6 @@ use std::net::IpAddr;
 pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
-
     set_function_to(scope, target, "lookup", dns_lookup);
 
     // Return v8 global handle.
@@ -22,50 +20,47 @@ pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
 /// Describes what will run after the async dns_lookup completes.
 struct DnsLookupFuture {
     promise: v8::Global<v8::PromiseResolver>,
-    output: Output,
+    result: Result<Vec<(String, String)>>,
 }
 
 impl JsFuture for DnsLookupFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
-        // Extract the result.
-        let result = self.output.take().unwrap();
+        // Get the IPs based on the DNS mappings.
+        match self.result.as_ref() {
+            Ok(mappings) => {
+                let ips: Vec<v8::Local<v8::Value>> = mappings
+                    .iter()
+                    .map(|(address, family)| {
+                        // Create new v8 handles.
+                        let ip = v8::Object::new(scope);
+                        let address = v8::String::new(scope, address).unwrap().into();
+                        let family = v8::String::new(scope, family).unwrap().into();
 
-        // Handle when something goes wrong on the DNS lookup.
-        if let Err(e) = result {
-            let message = v8::String::new(scope, &e.to_string()).unwrap();
-            let exception = v8::Exception::error(scope, message);
-            set_exception_code(scope, exception, &e);
-            // Reject the promise on failure.
-            self.promise.open(scope).reject(scope, exception);
-            return;
+                        // Set properties to IP object.
+                        set_property_to(scope, ip, "family", family);
+                        set_property_to(scope, ip, "address", address);
+
+                        ip.into()
+                    })
+                    .collect();
+
+                let ips_array = v8::Array::new_with_elements(scope, &ips);
+
+                self.promise
+                    .open(scope)
+                    .resolve(scope, ips_array.into())
+                    .unwrap();
+            }
+            // Handle when something goes wrong on the DNS lookup.
+            Err(e) => {
+                let message = v8::String::new(scope, &e.to_string()).unwrap();
+                let exception = v8::Exception::error(scope, message);
+                set_exception_code(scope, exception, &e);
+                // Reject the promise on failure.
+                self.promise.open(scope).reject(scope, exception);
+                return;
+            }
         }
-
-        // Otherwise, get the result and deserialize it.
-        let result = result.unwrap();
-        let result: Vec<(String, String)> = postcard::from_bytes(&result).unwrap();
-
-        let ips: Vec<v8::Local<v8::Value>> = result
-            .iter()
-            .map(|(address, family)| {
-                // Create new v8 handles.
-                let ip = v8::Object::new(scope);
-                let address = v8::String::new(scope, address).unwrap().into();
-                let family = v8::String::new(scope, family).unwrap().into();
-
-                // Set properties to IP object.
-                set_property_to(scope, ip, "family", family);
-                set_property_to(scope, ip, "address", address);
-
-                ip.into()
-            })
-            .collect();
-
-        let ips_array = v8::Array::new_with_elements(scope, &ips);
-
-        self.promise
-            .open(scope)
-            .resolve(scope, ips_array.into())
-            .unwrap();
     }
 }
 
@@ -85,25 +80,21 @@ fn dns_lookup(
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
 
-    // The actual async task.
-    let task = move || match dns_lookup_op(&host) {
-        Ok(result) => Some(Ok(postcard::to_stdvec(&result).unwrap())),
-        Err(e) => Some(Result::Err(e)),
-    };
+    let task = move || -> Result<Vec<(String, String)>> { dns_lookup_op(&host) };
 
     // The callback that will run after the above task completes.
     let task_cb = {
         let promise = v8::Global::new(scope, promise_resolver);
         let state_rc = state_rc.clone();
 
-        move |_: LoopHandle, output: Output| {
+        move |_: LoopHandle, result: Result<Vec<(String, String)>>| {
             let mut state = state_rc.borrow_mut();
-            let future = DnsLookupFuture { promise, output };
+            let future = DnsLookupFuture { promise, result };
             state.pending_futures.push(Box::new(future));
         }
     };
 
-    state.handle.spawn_with_callback(task, task_cb);
+    state.handle.spawn(task, Some(task_cb));
     rv.set(promise.into());
 }
 

@@ -10,7 +10,6 @@ use crate::runtime::JsRuntime;
 use anyhow::anyhow;
 use anyhow::Error;
 use anyhow::Result;
-use crabuv::task::Output;
 use crabuv::LoopHandle;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -272,7 +271,7 @@ impl ModuleGraph {
 pub struct EsModuleFuture {
     pub path: ModulePath,
     pub module: Rc<RefCell<EsModule>>,
-    pub output: Output,
+    pub result: Result<ModuleSource>,
 }
 
 impl EsModuleFuture {
@@ -303,9 +302,8 @@ impl JsFuture for EsModuleFuture {
         }
 
         // Extract module's source code.
-        let source = self.output.take().unwrap();
-        let source = match source {
-            Ok(source) => postcard::from_bytes::<String>(&source).unwrap(),
+        let source = match self.result.as_ref() {
+            Ok(source) => source,
             Err(e) => {
                 self.handle_failure(Error::msg(e.to_string()));
                 return;
@@ -393,28 +391,25 @@ impl JsFuture for EsModuleFuture {
             if seen_module.is_none() {
                 let task = {
                     let specifier = specifier.clone();
-                    move || match load_import(&specifier, skip_cache) {
-                        Ok(source) => Some(Ok(postcard::to_stdvec(&source).unwrap())),
-                        Err(e) => Some(Result::Err(e)),
-                    }
+                    move || load_import(&specifier, skip_cache)
                 };
 
                 let task_cb = {
                     let specifier = specifier.clone();
                     let state_rc = state_rc.clone();
-                    move |_: LoopHandle, output: Output| {
+                    move |_: LoopHandle, result: Result<ModuleSource>| {
                         let mut state = state_rc.borrow_mut();
                         let future = EsModuleFuture {
                             path: specifier,
                             module: Rc::clone(&module),
-                            output,
+                            result,
                         };
                         state.pending_futures.push(Box::new(future));
                     }
                 };
 
                 state.module_map.seen.insert(specifier, status);
-                state.handle.spawn_with_callback(task, task_cb);
+                state.handle.spawn(task, Some(task_cb));
             }
         }
 

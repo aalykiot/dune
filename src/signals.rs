@@ -6,7 +6,7 @@ use crate::bindings::wrap_gc_dropped;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::anyhow;
-use crabuv::signals::Lifetime;
+use crabuv::signals::Policy;
 use crabuv::signals::SignalHandle;
 use crabuv::signals::SignalKind as Signal;
 use std::rc::Rc;
@@ -134,7 +134,7 @@ fn start_signal(
     let state = state_rc.borrow();
     let signal = state
         .handle
-        .signal(signal_type, Lifetime::Persistent, signal_cb)
+        .signal(signal_type, Policy::Persistent, signal_cb)
         .unwrap();
 
     let signal = wrap_gc_dropped(scope, signal);

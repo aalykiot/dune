@@ -9,6 +9,7 @@ use crate::hooks::host_initialize_import_meta_object_cb;
 use crate::hooks::module_resolve_cb;
 use crate::hooks::promise_reject_cb;
 use crate::inspector::JsRuntimeInspector;
+use crate::modules::ModuleSource;
 use crate::modules::create_origin;
 use crate::modules::fetch_module_tree;
 use crate::modules::load_import;
@@ -23,7 +24,6 @@ use crate::process;
 use crate::repl::EvaluationContext;
 use crate::repl::EvaluationStatus;
 use anyhow::Result;
-use crabuv::task::Output;
 use crabuv::EventLoop;
 use crabuv::LoopHandle;
 use crabuv::LoopInterruptHandle;
@@ -395,35 +395,30 @@ impl JsRuntime {
             state.pending_futures.push(Box::new(EsModuleFuture {
                 path,
                 module: Rc::clone(&graph_rc.borrow().root_rc),
-                output: Some(Ok(postcard::to_stdvec(&source).unwrap())),
+                result: Ok(source.to_string()),
             }));
             return Ok(());
         }
 
-        /*  Use the event-loop to asynchronously load the requested module. */
-
         let task = {
             let specifier = path.clone();
-            move || match load_import(&specifier, true) {
-                anyhow::Result::Ok(source) => Some(Ok(postcard::to_stdvec(&source).unwrap())),
-                Err(e) => Some(Result::Err(e)),
-            }
+            move || load_import(&specifier, true)
         };
 
         let task_cb = {
             let state_rc = state_rc.clone();
-            move |_: LoopHandle, output: Output| {
+            move |_: LoopHandle, result: Result<ModuleSource>| {
                 let mut state = state_rc.borrow_mut();
                 let future = EsModuleFuture {
                     path: path.clone(),
                     module: Rc::clone(&graph_rc.borrow().root_rc),
-                    output,
+                    result,
                 };
                 state.pending_futures.push(Box::new(future));
             }
         };
 
-        state.handle.spawn_with_callback(task, task_cb);
+        state.handle.spawn(task, Some(task_cb));
 
         Ok(())
     }
