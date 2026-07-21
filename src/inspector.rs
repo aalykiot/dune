@@ -379,7 +379,7 @@ async fn serve(state: AppState) {
 
     // Build our application with some routes.
     let app = Router::new()
-        .route(&format!("/{}", &state.id), get(root))
+        .route(&format!("/{}", state.id), get(root))
         .route("/json", get(json))
         .route("/json/list", get(json))
         .route("/json/version", get(json_version))

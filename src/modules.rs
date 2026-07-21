@@ -511,9 +511,9 @@ impl ImportMap {
     /// Tries to match a specifier against an import-map entry.
     pub fn lookup(&self, specifier: &str) -> Option<String> {
         // Find a mapping if exists.
-        let (base, mut target) = match self.map.iter().find(|(k, _)| specifier.starts_with(k)) {
-            Some(mapping) => mapping.to_owned(),
-            None => return None,
+        let (base, mut target) = {
+            let mapping = self.map.iter().find(|(k, _)| specifier.starts_with(k))?;
+            mapping.to_owned()
         };
 
         // The following code treats "./" as an alias for the CWD.
