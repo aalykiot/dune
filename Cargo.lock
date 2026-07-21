@@ -796,7 +796,7 @@ checksum = "6a5577f010d4e1bb3f3c4d6081e05718eb6992cf20119cab4d3abadff198b5ae"
 
 [[package]]
 name = "dune"
-version = "0.11.2"
+version = "0.11.3"
 dependencies = [
  "anyhow",
  "assert_fs",
