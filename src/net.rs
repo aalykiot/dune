@@ -226,6 +226,7 @@ fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
         // For performance, we avoid copying and instead (unsafely) create a u8 slice
         // directly from the backing store’s raw c_void pointer.
         let store_ptr = store.data().unwrap();
+
         std::slice::from_raw_parts(store_ptr.as_ptr() as *const u8, store_length)
     };
 
