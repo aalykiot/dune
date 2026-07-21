@@ -115,7 +115,7 @@ impl JsFuture for FsOpenFuture {
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-                set_exception_code(scope, exception, &e);
+                set_exception_code(scope, exception, e);
                 self.promise.open(scope).reject(scope, exception);
             }
         }
@@ -218,7 +218,7 @@ impl JsFuture for FsReadFuture {
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-                set_exception_code(scope, exception, &e);
+                set_exception_code(scope, exception, e);
                 self.promise.open(scope).reject(scope, exception);
             }
         }
@@ -337,7 +337,7 @@ impl JsFuture for FsWriteFuture {
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-                set_exception_code(scope, exception, &e);
+                set_exception_code(scope, exception, e);
                 self.promise.open(scope).reject(scope, exception);
             }
         }
@@ -466,7 +466,7 @@ impl JsFuture for FsStatFuture {
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-                set_exception_code(scope, exception, &e);
+                set_exception_code(scope, exception, e);
                 self.promise.open(scope).reject(scope, exception);
             }
         }
@@ -539,7 +539,7 @@ impl JsFuture for FsMkdirFuture {
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-                set_exception_code(scope, exception, &e);
+                set_exception_code(scope, exception, e);
                 self.promise.open(scope).reject(scope, exception);
             }
         }
@@ -609,7 +609,7 @@ impl JsFuture for FsRmdirFuture {
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-                set_exception_code(scope, exception, &e);
+                set_exception_code(scope, exception, e);
                 self.promise.open(scope).reject(scope, exception);
             }
         }
@@ -685,7 +685,7 @@ impl JsFuture for ReadDirFuture {
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-                set_exception_code(scope, exception, &e);
+                set_exception_code(scope, exception, e);
                 self.promise.open(scope).reject(scope, exception);
             }
         }
@@ -767,7 +767,7 @@ impl JsFuture for FsRmFuture {
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-                set_exception_code(scope, exception, &e);
+                set_exception_code(scope, exception, e);
                 self.promise.open(scope).reject(scope, exception);
             }
         }
@@ -878,7 +878,7 @@ impl JsFuture for FsRenameFuture {
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
-                set_exception_code(scope, exception, &e);
+                set_exception_code(scope, exception, e);
                 self.promise.open(scope).reject(scope, exception);
             }
         }

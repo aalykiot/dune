@@ -275,7 +275,7 @@ fn write(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
         }
     };
 
-    stream.write(buffer.to_vec(), on_write);
+    stream.write(buffer, on_write);
 
     rv.set(promise.into());
 }

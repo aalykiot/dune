@@ -314,7 +314,7 @@ impl JsFuture for EsModuleFuture {
         let origin = create_origin(tc_scope, &self.path, true);
 
         // Compile source and get it's dependencies.
-        let source = v8::String::new(tc_scope, &source).unwrap();
+        let source = v8::String::new(tc_scope, source).unwrap();
         let mut source = v8::script_compiler::Source::new(source, Some(&origin));
 
         let module = match v8::script_compiler::compile_module(tc_scope, &mut source) {

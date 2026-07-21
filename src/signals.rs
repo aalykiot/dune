@@ -6,52 +6,52 @@ use crate::bindings::wrap_gc_dropped;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::anyhow;
+use crabuv::signals::Kind;
 use crabuv::signals::Policy;
 use crabuv::signals::SignalHandle;
-use crabuv::signals::SignalKind as Signal;
 use std::rc::Rc;
 
 #[cfg(windows)]
 const SIGNALS: [(&str, i32); 6] = [
-    ("SIGABRT", Signal::SIGABRT),
-    ("SIGFPE", Signal::SIGFPE),
-    ("SIGILL", Signal::SIGILL),
-    ("SIGINT", Signal::SIGINT),
-    ("SIGSEGV", Signal::SIGSEGV),
-    ("SIGTERM", Signal::SIGTERM),
+    ("SIGABRT", Kind::SIGABRT),
+    ("SIGFPE", Kind::SIGFPE),
+    ("SIGILL", Kind::SIGILL),
+    ("SIGINT", Kind::SIGINT),
+    ("SIGSEGV", Kind::SIGSEGV),
+    ("SIGTERM", Kind::SIGTERM),
 ];
 
 #[cfg(not(windows))]
 const SIGNALS: [(&str, i32); 29] = [
-    ("SIGABRT", Signal::SIGABRT),
-    ("SIGALRM", Signal::SIGALRM),
-    ("SIGBUS", Signal::SIGBUS),
-    ("SIGCHLD", Signal::SIGCHLD),
-    ("SIGCONT", Signal::SIGCONT),
-    ("SIGFPE", Signal::SIGFPE),
-    ("SIGHUP", Signal::SIGHUP),
-    ("SIGILL", Signal::SIGILL),
-    ("SIGINT", Signal::SIGINT),
-    ("SIGIO", Signal::SIGIO),
-    ("SIGKILL", Signal::SIGKILL),
-    ("SIGPIPE", Signal::SIGPIPE),
-    ("SIGPROF", Signal::SIGPROF),
-    ("SIGQUIT", Signal::SIGQUIT),
-    ("SIGSEGV", Signal::SIGSEGV),
-    ("SIGSTOP", Signal::SIGSTOP),
-    ("SIGSYS", Signal::SIGSYS),
-    ("SIGTERM", Signal::SIGTERM),
-    ("SIGTRAP", Signal::SIGTRAP),
-    ("SIGTSTP", Signal::SIGTSTP),
-    ("SIGTTIN", Signal::SIGTTIN),
-    ("SIGTTOU", Signal::SIGTTOU),
-    ("SIGURG", Signal::SIGURG),
-    ("SIGUSR1", Signal::SIGUSR1),
-    ("SIGUSR2", Signal::SIGUSR2),
-    ("SIGVTALRM", Signal::SIGVTALRM),
-    ("SIGWINCH", Signal::SIGWINCH),
-    ("SIGXCPU", Signal::SIGXCPU),
-    ("SIGXFSZ", Signal::SIGXFSZ),
+    ("SIGABRT", Kind::SIGABRT),
+    ("SIGALRM", Kind::SIGALRM),
+    ("SIGBUS", Kind::SIGBUS),
+    ("SIGCHLD", Kind::SIGCHLD),
+    ("SIGCONT", Kind::SIGCONT),
+    ("SIGFPE", Kind::SIGFPE),
+    ("SIGHUP", Kind::SIGHUP),
+    ("SIGILL", Kind::SIGILL),
+    ("SIGINT", Kind::SIGINT),
+    ("SIGIO", Kind::SIGIO),
+    ("SIGKILL", Kind::SIGKILL),
+    ("SIGPIPE", Kind::SIGPIPE),
+    ("SIGPROF", Kind::SIGPROF),
+    ("SIGQUIT", Kind::SIGQUIT),
+    ("SIGSEGV", Kind::SIGSEGV),
+    ("SIGSTOP", Kind::SIGSTOP),
+    ("SIGSYS", Kind::SIGSYS),
+    ("SIGTERM", Kind::SIGTERM),
+    ("SIGTRAP", Kind::SIGTRAP),
+    ("SIGTSTP", Kind::SIGTSTP),
+    ("SIGTTIN", Kind::SIGTTIN),
+    ("SIGTTOU", Kind::SIGTTOU),
+    ("SIGURG", Kind::SIGURG),
+    ("SIGUSR1", Kind::SIGUSR1),
+    ("SIGUSR2", Kind::SIGUSR2),
+    ("SIGVTALRM", Kind::SIGVTALRM),
+    ("SIGWINCH", Kind::SIGWINCH),
+    ("SIGXCPU", Kind::SIGXCPU),
+    ("SIGXFSZ", Kind::SIGXFSZ),
 ];
 
 pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
