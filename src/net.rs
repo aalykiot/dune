@@ -7,6 +7,7 @@ use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
 use crabuv::tcp_listener::TcpListenerHandle;
+use crabuv::tcp_stream::SocketInfo;
 use crabuv::tcp_stream::TcpStreamHandle;
 use crabuv::LoopHandle;
 use std::net::IpAddr;
@@ -37,38 +38,8 @@ impl JsFuture for TcpConnectFuture {
         match self.stream.as_ref() {
             Ok(stream) => {
                 // Extract info from the TcpSocketInfo.
-                let metadata = stream.info.as_ref();
-                let host = metadata.host.unwrap();
-                let host_port = host.port();
-                let host_address = host.ip().to_string();
-                let host_family = match metadata.host.unwrap().ip() {
-                    IpAddr::V4(_) => "IPv4",
-                    IpAddr::V6(_) => "IPv6",
-                };
-
-                let host = v8::Object::new(scope);
-
-                // Host IP attributes.
-                let port = v8::Integer::new(scope, host_port as i32);
-                let family = v8::String::new(scope, host_family).unwrap();
-                let address = v8::String::new(scope, &host_address).unwrap();
-
-                set_property_to(scope, host, "port", port.into());
-                set_property_to(scope, host, "family", family.into());
-                set_property_to(scope, host, "address", address.into());
-
-                // Remote IP attributes.
-                let remote = metadata.remote.unwrap();
-                let port = remote.port();
-                let address = remote.ip().to_string();
-
-                let remote = v8::Object::new(scope);
-
-                let port = v8::Integer::new(scope, port as i32);
-                let address = v8::String::new(scope, &address).unwrap();
-
-                set_property_to(scope, remote, "port", port.into());
-                set_property_to(scope, remote, "address", address.into());
+                let host = get_host_metadata(scope, &stream.info);
+                let remote = get_remote_metadata(scope, &stream.info);
 
                 // Create a JavaScript socket info object.
                 let socket = v8::Object::new(scope);
@@ -479,4 +450,66 @@ fn close(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     });
 
     rv.set(promise.into());
+}
+
+fn get_host_metadata<'s>(
+    scope: &mut v8::PinScope<'s, '_>,
+    info: &SocketInfo,
+) -> v8::Local<'s, v8::Object> {
+    // Host IP attributes.
+    let target = v8::Object::new(scope);
+    let undefined = v8::undefined(scope);
+
+    match info.host {
+        Some(host) => {
+            let port = host.port();
+            let address = host.ip();
+            let family = match address {
+                IpAddr::V4(_) => "IPv4",
+                IpAddr::V6(_) => "IPv6",
+            };
+
+            let port = v8::Integer::new(scope, port as i32);
+            let family = v8::String::new(scope, family).unwrap();
+            let address = v8::String::new(scope, &address.to_string()).unwrap();
+
+            set_property_to(scope, target, "port", port.into());
+            set_property_to(scope, target, "family", family.into());
+            set_property_to(scope, target, "address", address.into());
+        }
+        None => {
+            set_property_to(scope, target, "port", undefined.into());
+            set_property_to(scope, target, "family", undefined.into());
+            set_property_to(scope, target, "address", undefined.into());
+        }
+    };
+
+    target
+}
+
+fn get_remote_metadata<'s>(
+    scope: &mut v8::PinScope<'s, '_>,
+    info: &SocketInfo,
+) -> v8::Local<'s, v8::Object> {
+    // Remote IP attributes.
+    let target = v8::Object::new(scope);
+    let undefined = v8::undefined(scope);
+
+    match info.remote {
+        Some(remote) => {
+            let port = remote.port();
+            let address = remote.ip();
+            let port = v8::Integer::new(scope, port as i32);
+            let address = v8::String::new(scope, &address.to_string()).unwrap();
+
+            set_property_to(scope, target, "port", port.into());
+            set_property_to(scope, target, "address", address.into());
+        }
+        None => {
+            set_property_to(scope, target, "port", undefined.into());
+            set_property_to(scope, target, "address", undefined.into());
+        }
+    };
+
+    target
 }
