@@ -18,15 +18,16 @@ use crate::modules::ImportKind;
 use crate::modules::ImportMap;
 use crate::modules::ModuleGraph;
 use crate::modules::ModuleMap;
+use crate::modules::ModuleSource;
 use crate::modules::ModuleStatus;
 use crate::process;
 use crate::repl::EvaluationContext;
 use crate::repl::EvaluationStatus;
 use anyhow::Result;
-use dune_event_loop::EventLoop;
-use dune_event_loop::LoopHandle;
-use dune_event_loop::LoopInterruptHandle;
-use dune_event_loop::TaskResult;
+use crabuv::EventLoop;
+use crabuv::LoopHandle;
+use crabuv::LoopInterruptHandle;
+use crabuv::RunMode;
 use std::cell::RefCell;
 use std::cmp;
 use std::net::SocketAddrV4;
@@ -394,29 +395,24 @@ impl JsRuntime {
             state.pending_futures.push(Box::new(EsModuleFuture {
                 path,
                 module: Rc::clone(&graph_rc.borrow().root_rc),
-                maybe_result: Some(Ok(postcard::to_stdvec(&source).unwrap())),
+                result: Ok(source.to_string()),
             }));
             return Ok(());
         }
 
-        /*  Use the event-loop to asynchronously load the requested module. */
-
         let task = {
             let specifier = path.clone();
-            move || match load_import(&specifier, true) {
-                anyhow::Result::Ok(source) => Some(Ok(postcard::to_stdvec(&source).unwrap())),
-                Err(e) => Some(Result::Err(e)),
-            }
+            move || load_import(&specifier, true)
         };
 
         let task_cb = {
             let state_rc = state_rc.clone();
-            move |_: LoopHandle, maybe_result: TaskResult| {
+            move |_: LoopHandle, result: Result<ModuleSource>| {
                 let mut state = state_rc.borrow_mut();
                 let future = EsModuleFuture {
-                    path,
+                    path: path.clone(),
                     module: Rc::clone(&graph_rc.borrow().root_rc),
-                    maybe_result,
+                    result,
                 };
                 state.pending_futures.push(Box::new(future));
             }
@@ -431,7 +427,7 @@ impl JsRuntime {
     pub fn tick_event_loop(&mut self) {
         self.with_scope(run_next_tick_callbacks);
         self.fast_forward_imports();
-        self.event_loop.tick();
+        self.event_loop.run(RunMode::Once);
         self.run_pending_futures();
     }
 

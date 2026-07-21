@@ -1,3 +1,5 @@
+#![cfg_attr(test, allow(dead_code))]
+
 mod bindings;
 mod cli;
 mod dns;

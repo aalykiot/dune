@@ -1,8 +1,8 @@
 use crate::bindings::get_internal_ref;
 use crate::bindings::set_constant_to;
 use crate::bindings::set_function_to;
-use crate::bindings::set_internal_ref;
 use crate::bindings::throw_exception;
+use crate::bindings::wrap_gc_dropped;
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::Result;
@@ -14,7 +14,6 @@ use rusqlite::LoadExtensionGuard;
 use rusqlite::OpenFlags;
 use rusqlite::Row;
 use rusqlite::Statement;
-use std::cell::Cell;
 use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::HashMap;
@@ -22,7 +21,6 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 use std::ops::Drop;
 use std::path::Path;
-use std::rc::Rc;
 use std::str::FromStr;
 use std::vec;
 use uuid::Uuid;
@@ -118,7 +116,6 @@ fn open(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
         _ => Connection::open_with_flags(path, flags),
     };
 
-    let connection_wrap = v8::ObjectTemplate::new(scope);
     let connection = match connection {
         Ok(conn) => SQLiteConnection::new(conn),
         Err(e) => {
@@ -139,33 +136,7 @@ fn open(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v
         }
     }
 
-    connection_wrap.set_internal_field_count(2);
-
-    // Store Rust instance inside a V8 handle.
-    let connection_wrap = connection_wrap.new_instance(scope).unwrap();
-    let connection_ptr = set_internal_ref(scope, connection_wrap, 0, connection);
-    let weak_rc = Rc::new(Cell::new(None));
-
-    // Note: To automatically close the connection (i.e., drop the instance) when
-    // V8 garbage collects the object that internally holds the Rust connection,
-    // we use a Weak reference with a finalizer callback.
-    let connection_weak = v8::Weak::with_finalizer(
-        scope,
-        connection_wrap,
-        Box::new({
-            let weak_rc = weak_rc.clone();
-            move |isolate| unsafe {
-                drop(Box::from_raw(connection_ptr));
-                drop(v8::Weak::from_raw(isolate, weak_rc.get()));
-            }
-        }),
-    );
-
-    // Store the weak ref pointer into the "shared" cell.
-    weak_rc.set(connection_weak.into_raw());
-    set_internal_ref(scope, connection_wrap, 1, weak_rc);
-
-    rv.set(connection_wrap.into());
+    rv.set(wrap_gc_dropped(scope, connection).into());
 }
 
 /// Run multiple SQL statements (that cannot take any parameters).

@@ -182,7 +182,7 @@ export function createServer(onConnection) {
  * @property {string} address - The remote IP address.
  */
 
-const kSetSocketIdUnchecked = Symbol('kSetSocketIdUnchecked');
+const kSetSocketFdUnchecked = Symbol('kSetSocketFdUnchecked');
 const kAsyncGenerator = Symbol('kAsyncGenerator');
 
 /**
@@ -196,7 +196,7 @@ const kAsyncGenerator = Symbol('kAsyncGenerator');
  * @fires timeout - Emitted if the socket times out from (read) inactivity.
  */
 export class Socket extends EventEmitter {
-  #id;
+  #fd;
   #host;
   #connecting;
   #encoding;
@@ -251,7 +251,7 @@ export class Socket extends EventEmitter {
       throw new TypeError(`The "host" option must be of type string.`);
     }
 
-    if (this.#id) {
+    if (this.#fd) {
       throw new Error(
         `Socket is already connected to <${this.remoteAddress}:${this.remotePort}>.`
       );
@@ -267,12 +267,12 @@ export class Socket extends EventEmitter {
       ? addresses.filter((addr) => addr.family === 'IPv4')[0].address
       : addresses[0].address;
 
-    const { id, host, remote } = await binding.connect(
+    const { fd, host, remote } = await binding.connect(
       remoteHost,
       Number.parseInt(port)
     );
 
-    this.#id = id;
+    this.#fd = fd;
     this.#connecting = false;
     this.#writable = true;
     this.#host = host;
@@ -288,7 +288,7 @@ export class Socket extends EventEmitter {
     this.#timeoutHandle = signal;
     this.emit('connect', { host, remote });
 
-    binding.readStart(this.#id, onAvailableSocketData);
+    binding.readStart(this.#fd, onAvailableSocketData);
 
     return { host, remote };
   }
@@ -320,7 +320,7 @@ export class Socket extends EventEmitter {
       timeout = 0;
     }
 
-    if (this.#id) {
+    if (this.#fd) {
       // Timeout value changed after the socket began waiting.
       this.#timeoutHandle.emit('timeoutUpdate', timeout);
     }
@@ -335,7 +335,7 @@ export class Socket extends EventEmitter {
    */
   read() {
     // Check if the socket is connected to a host.
-    if (!this.#id) return null;
+    if (!this.#fd) return null;
 
     // HACK: The following is used to handle uncaught errors thrown
     // from the event-emitter when no one is subscribed to the `error` event.
@@ -369,7 +369,7 @@ export class Socket extends EventEmitter {
       );
     }
 
-    if (!this.#id) {
+    if (!this.#fd) {
       throw new Error(`Socket is not connected to a remote host.`);
     }
 
@@ -381,7 +381,7 @@ export class Socket extends EventEmitter {
     encoding = encoding || this.#encoding || 'utf-8';
 
     const bytes = toUint8Array(data, encoding);
-    const bytesWritten = await binding.write(this.#id, bytes);
+    const bytesWritten = await binding.write(this.#fd, bytes);
 
     this.bytesWritten += bytesWritten;
 
@@ -397,14 +397,14 @@ export class Socket extends EventEmitter {
    */
   async end(data, encoding = 'utf-8') {
     // Check socket connection.
-    if (!this.#id) return;
+    if (!this.#fd) return;
 
     // If data is given, write to stream.
     if (data) {
       await this.write(data, encoding);
     }
     this.#writable = false;
-    await binding.shutdown(this.#id);
+    await binding.shutdown(this.#fd);
   }
 
   /**
@@ -412,10 +412,10 @@ export class Socket extends EventEmitter {
    */
   async destroy() {
     // Check if the socket is indeed connected.
-    if (!this.#id) return;
+    if (!this.#fd) return;
 
     this.#timeoutHandle?.emit('timeoutUpdate', 0);
-    await binding.close(this.#id);
+    await binding.close(this.#fd);
 
     // Ignore pending reads.
     for (const promise of this.#pullQueue) {
@@ -440,7 +440,7 @@ export class Socket extends EventEmitter {
    * @ignore
    */
   #reset() {
-    this.#id = undefined;
+    this.#fd = undefined;
     this.#pushQueue = [];
     this.#pullQueue = [];
     this.#connecting = false;
@@ -496,13 +496,13 @@ export class Socket extends EventEmitter {
   }
 
   /**
-   * Hard-sets the ID of the socket (ONLY for internal use).
+   * Hard-sets the FD of the socket (ONLY for internal use).
    *
-   * @param {Number} id - The resource ID existing in the event-loop.
+   * @param {Object} fd - The resource FD existing in the event-loop.
    * @ignore
    */
-  [kSetSocketIdUnchecked](id) {
-    this.#id = id;
+  [kSetSocketFdUnchecked](fd) {
+    this.#fd = fd;
     this.#writable = true;
 
     const [onAvailableSocketData, signal] = callbackTimeout(
@@ -512,7 +512,7 @@ export class Socket extends EventEmitter {
     );
 
     this.#timeoutHandle = signal;
-    binding.readStart(this.#id, onAvailableSocketData);
+    binding.readStart(this.#fd, onAvailableSocketData);
   }
 
   async *[kAsyncGenerator](signal) {
@@ -545,7 +545,7 @@ export class Socket extends EventEmitter {
  * @fires error - Emitted when an error occurs.
  */
 export class Server extends EventEmitter {
-  #id;
+  #fd;
   #host;
   #pushQueue;
   #pullQueue;
@@ -581,7 +581,7 @@ export class Server extends EventEmitter {
       throw new TypeError(`The "host" option must be of type string.`);
     }
 
-    if (this.#id) {
+    if (this.#fd) {
       throw new Error(`Server is already listening for connections.`);
     }
 
@@ -594,14 +594,14 @@ export class Server extends EventEmitter {
       : addresses[0].address;
 
     // Bind server to address, and start listening for connections.
-    const socketInfo = binding.listen(
+    const server = binding.listen(
       host,
       port,
       this.#onAvailableConnection.bind(this)
     );
 
-    this.#id = socketInfo.id;
-    this.#host = socketInfo.host;
+    this.#fd = server.fd;
+    this.#host = server.host;
 
     this.emit('listening', this.#host);
 
@@ -615,7 +615,7 @@ export class Server extends EventEmitter {
    */
   accept() {
     // Check if the server is listening.
-    if (!this.#id) {
+    if (!this.#fd) {
       throw new Error(`Server is not bound to a port.`);
     }
 
@@ -630,10 +630,10 @@ export class Server extends EventEmitter {
       return promise;
     }
 
-    const socket = this.#pushQueue.shift();
-    const action = socket instanceof Error ? Promise.reject : Promise.resolve;
+    const client = this.#pushQueue.shift();
+    const action = client instanceof Error ? Promise.reject : Promise.resolve;
 
-    return action.call(Promise, socket);
+    return action.call(Promise, client);
   }
 
   /**
@@ -641,10 +641,10 @@ export class Server extends EventEmitter {
    */
   async close() {
     // Check if the server is already closed.
-    if (!this.#id) {
+    if (!this.#fd) {
       throw new Error('Server is already closed.');
     }
-    await binding.close(this.#id);
+    await binding.close(this.#fd);
     this.emit('close');
   }
 
@@ -667,7 +667,7 @@ export class Server extends EventEmitter {
     action(socket);
   }
 
-  #onAvailableConnection(err, sockInfo) {
+  #onAvailableConnection(err, client) {
     // Check for socket connection errors.
     if (err) {
       this.#asyncDispatch(err);
@@ -677,9 +677,9 @@ export class Server extends EventEmitter {
 
     // Create a new socket instance.
     const socket = new Socket();
-    const { id, remoteAddress, remotePort } = sockInfo;
+    const { fd, remoteAddress, remotePort } = client;
 
-    socket[kSetSocketIdUnchecked](id);
+    socket[kSetSocketFdUnchecked](fd);
     socket.remoteAddress = remoteAddress;
     socket.remotePort = remotePort;
 

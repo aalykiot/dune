@@ -10,8 +10,7 @@ use crate::runtime::JsRuntime;
 use anyhow::anyhow;
 use anyhow::Error;
 use anyhow::Result;
-use dune_event_loop::LoopHandle;
-use dune_event_loop::TaskResult;
+use crabuv::LoopHandle;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;
@@ -272,7 +271,7 @@ impl ModuleGraph {
 pub struct EsModuleFuture {
     pub path: ModulePath,
     pub module: Rc<RefCell<EsModule>>,
-    pub maybe_result: TaskResult,
+    pub result: Result<ModuleSource>,
 }
 
 impl EsModuleFuture {
@@ -303,9 +302,8 @@ impl JsFuture for EsModuleFuture {
         }
 
         // Extract module's source code.
-        let source = self.maybe_result.take().unwrap();
-        let source = match source {
-            Ok(source) => postcard::from_bytes::<String>(&source).unwrap(),
+        let source = match self.result.as_ref() {
+            Ok(source) => source,
             Err(e) => {
                 self.handle_failure(Error::msg(e.to_string()));
                 return;
@@ -316,7 +314,7 @@ impl JsFuture for EsModuleFuture {
         let origin = create_origin(tc_scope, &self.path, true);
 
         // Compile source and get it's dependencies.
-        let source = v8::String::new(tc_scope, &source).unwrap();
+        let source = v8::String::new(tc_scope, source).unwrap();
         let mut source = v8::script_compiler::Source::new(source, Some(&origin));
 
         let module = match v8::script_compiler::compile_module(tc_scope, &mut source) {
@@ -393,21 +391,18 @@ impl JsFuture for EsModuleFuture {
             if seen_module.is_none() {
                 let task = {
                     let specifier = specifier.clone();
-                    move || match load_import(&specifier, skip_cache) {
-                        Ok(source) => Some(Ok(postcard::to_stdvec(&source).unwrap())),
-                        Err(e) => Some(Result::Err(e)),
-                    }
+                    move || load_import(&specifier, skip_cache)
                 };
 
                 let task_cb = {
                     let specifier = specifier.clone();
                     let state_rc = state_rc.clone();
-                    move |_: LoopHandle, maybe_result: TaskResult| {
+                    move |_: LoopHandle, result: Result<ModuleSource>| {
                         let mut state = state_rc.borrow_mut();
                         let future = EsModuleFuture {
                             path: specifier,
                             module: Rc::clone(&module),
-                            maybe_result,
+                            result,
                         };
                         state.pending_futures.push(Box::new(future));
                     }
@@ -516,9 +511,9 @@ impl ImportMap {
     /// Tries to match a specifier against an import-map entry.
     pub fn lookup(&self, specifier: &str) -> Option<String> {
         // Find a mapping if exists.
-        let (base, mut target) = match self.map.iter().find(|(k, _)| specifier.starts_with(k)) {
-            Some(mapping) => mapping.to_owned(),
-            None => return None,
+        let (base, mut target) = {
+            let mapping = self.map.iter().find(|(k, _)| specifier.starts_with(k))?;
+            mapping.to_owned()
         };
 
         // The following code treats "./" as an alias for the CWD.

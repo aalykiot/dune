@@ -1,54 +1,57 @@
+use crate::bindings::get_internal_ref;
 use crate::bindings::set_function_to;
 use crate::bindings::set_property_to;
 use crate::bindings::throw_exception;
+use crate::bindings::wrap_gc_dropped;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::anyhow;
-use dune_event_loop::LoopHandle;
-use dune_event_loop::Signal;
+use crabuv::signals::Kind;
+use crabuv::signals::Policy;
+use crabuv::signals::SignalHandle;
 use std::rc::Rc;
 
 #[cfg(windows)]
 const SIGNALS: [(&str, i32); 6] = [
-    ("SIGABRT", Signal::SIGABRT),
-    ("SIGFPE", Signal::SIGFPE),
-    ("SIGILL", Signal::SIGILL),
-    ("SIGINT", Signal::SIGINT),
-    ("SIGSEGV", Signal::SIGSEGV),
-    ("SIGTERM", Signal::SIGTERM),
+    ("SIGABRT", Kind::SIGABRT),
+    ("SIGFPE", Kind::SIGFPE),
+    ("SIGILL", Kind::SIGILL),
+    ("SIGINT", Kind::SIGINT),
+    ("SIGSEGV", Kind::SIGSEGV),
+    ("SIGTERM", Kind::SIGTERM),
 ];
 
 #[cfg(not(windows))]
 const SIGNALS: [(&str, i32); 29] = [
-    ("SIGABRT", Signal::SIGABRT),
-    ("SIGALRM", Signal::SIGALRM),
-    ("SIGBUS", Signal::SIGBUS),
-    ("SIGCHLD", Signal::SIGCHLD),
-    ("SIGCONT", Signal::SIGCONT),
-    ("SIGFPE", Signal::SIGFPE),
-    ("SIGHUP", Signal::SIGHUP),
-    ("SIGILL", Signal::SIGILL),
-    ("SIGINT", Signal::SIGINT),
-    ("SIGIO", Signal::SIGIO),
-    ("SIGKILL", Signal::SIGKILL),
-    ("SIGPIPE", Signal::SIGPIPE),
-    ("SIGPROF", Signal::SIGPROF),
-    ("SIGQUIT", Signal::SIGQUIT),
-    ("SIGSEGV", Signal::SIGSEGV),
-    ("SIGSTOP", Signal::SIGSTOP),
-    ("SIGSYS", Signal::SIGSYS),
-    ("SIGTERM", Signal::SIGTERM),
-    ("SIGTRAP", Signal::SIGTRAP),
-    ("SIGTSTP", Signal::SIGTSTP),
-    ("SIGTTIN", Signal::SIGTTIN),
-    ("SIGTTOU", Signal::SIGTTOU),
-    ("SIGURG", Signal::SIGURG),
-    ("SIGUSR1", Signal::SIGUSR1),
-    ("SIGUSR2", Signal::SIGUSR2),
-    ("SIGVTALRM", Signal::SIGVTALRM),
-    ("SIGWINCH", Signal::SIGWINCH),
-    ("SIGXCPU", Signal::SIGXCPU),
-    ("SIGXFSZ", Signal::SIGXFSZ),
+    ("SIGABRT", Kind::SIGABRT),
+    ("SIGALRM", Kind::SIGALRM),
+    ("SIGBUS", Kind::SIGBUS),
+    ("SIGCHLD", Kind::SIGCHLD),
+    ("SIGCONT", Kind::SIGCONT),
+    ("SIGFPE", Kind::SIGFPE),
+    ("SIGHUP", Kind::SIGHUP),
+    ("SIGILL", Kind::SIGILL),
+    ("SIGINT", Kind::SIGINT),
+    ("SIGIO", Kind::SIGIO),
+    ("SIGKILL", Kind::SIGKILL),
+    ("SIGPIPE", Kind::SIGPIPE),
+    ("SIGPROF", Kind::SIGPROF),
+    ("SIGQUIT", Kind::SIGQUIT),
+    ("SIGSEGV", Kind::SIGSEGV),
+    ("SIGSTOP", Kind::SIGSTOP),
+    ("SIGSYS", Kind::SIGSYS),
+    ("SIGTERM", Kind::SIGTERM),
+    ("SIGTRAP", Kind::SIGTRAP),
+    ("SIGTSTP", Kind::SIGTSTP),
+    ("SIGTTIN", Kind::SIGTTIN),
+    ("SIGTTOU", Kind::SIGTTOU),
+    ("SIGURG", Kind::SIGURG),
+    ("SIGUSR1", Kind::SIGUSR1),
+    ("SIGUSR2", Kind::SIGUSR2),
+    ("SIGVTALRM", Kind::SIGVTALRM),
+    ("SIGWINCH", Kind::SIGWINCH),
+    ("SIGXCPU", Kind::SIGXCPU),
+    ("SIGXFSZ", Kind::SIGXFSZ),
 ];
 
 pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
@@ -120,7 +123,7 @@ fn start_signal(
 
     let signal_cb = {
         let state_rc = state_rc.clone();
-        move |_: LoopHandle, _: i32| {
+        move |_: SignalHandle, _: i32| {
             let mut state = state_rc.borrow_mut();
             let future = SignalFuture(Rc::clone(&callback));
             state.pending_futures.push(Box::new(future));
@@ -129,10 +132,13 @@ fn start_signal(
 
     // Schedule a new signal listener to the event-loop.
     let state = state_rc.borrow();
-    let id = state.handle.signal_start(signal_type, signal_cb).unwrap();
+    let signal = state
+        .handle
+        .signal(signal_type, Policy::Persistent, signal_cb)
+        .unwrap();
 
-    // Return timeout's internal id.
-    rv.set(v8::Number::new(scope, id as f64).into());
+    let signal = wrap_gc_dropped(scope, signal);
+    rv.set(signal.into());
 }
 
 /// Removes a signal listener to the event-loop.
@@ -141,9 +147,9 @@ fn cancel_signal(
     args: v8::FunctionCallbackArguments,
     _: v8::ReturnValue,
 ) {
-    // Get handlers internal token.
-    let id = args.get(0).int32_value(scope).unwrap() as u32;
-    let state_rc = JsRuntime::state(scope);
+    // Get the signal handle from the object.
+    let wrapper = args.get(0).to_object(scope).unwrap();
+    let signal = get_internal_ref::<SignalHandle>(scope, wrapper, 0);
 
-    state_rc.borrow().handle.signal_stop(&id);
+    signal.stop();
 }

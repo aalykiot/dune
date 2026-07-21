@@ -13,7 +13,7 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Json;
 use axum::Router;
-use dune_event_loop::LoopInterruptHandle;
+use crabuv::LoopInterruptHandle;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use serde::Serialize;
@@ -379,7 +379,7 @@ async fn serve(state: AppState) {
 
     // Build our application with some routes.
     let app = Router::new()
-        .route(&format!("/{}", &state.id), get(root))
+        .route(&format!("/{}", state.id), get(root))
         .route("/json", get(json))
         .route("/json/list", get(json))
         .route("/json/version", get(json_version))

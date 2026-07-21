@@ -5,10 +5,11 @@ use crate::modules::load_import;
 use crate::modules::resolve_import;
 use crate::modules::EsModuleFuture;
 use crate::modules::ModuleGraph;
+use crate::modules::ModuleSource;
 use crate::modules::ModuleStatus;
 use crate::runtime::JsRuntime;
-use dune_event_loop::LoopHandle;
-use dune_event_loop::TaskResult;
+use anyhow::Result;
+use crabuv::LoopHandle;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -219,30 +220,24 @@ pub fn host_import_module_dynamically_cb<'s>(
     state.module_map.pending.push(Rc::clone(&graph_rc));
     state.module_map.seen.insert(specifier.clone(), status);
 
-    /*  Use the event-loop to asynchronously load the requested module. */
-
     let task = {
         let specifier = specifier.clone();
-        move || match load_import(&specifier, true) {
-            anyhow::Result::Ok(source) => Some(Ok(postcard::to_stdvec(&source).unwrap())),
-            Err(e) => Some(Result::Err(e)),
-        }
+        move || load_import(&specifier, true)
     };
 
     let task_cb = {
         let state_rc = state_rc.clone();
-        move |_: LoopHandle, maybe_result: TaskResult| {
+        move |_: LoopHandle, result: Result<ModuleSource>| {
             let mut state = state_rc.borrow_mut();
             let future = EsModuleFuture {
                 path: specifier,
                 module: Rc::clone(&graph_rc.borrow().root_rc),
-                maybe_result,
+                result,
             };
             state.pending_futures.push(Box::new(future));
         }
     };
 
     state.handle.spawn(task, Some(task_cb));
-
     Some(promise)
 }
