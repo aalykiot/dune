@@ -15,6 +15,7 @@ use crate::signals;
 use crate::sqlite;
 use crate::stdio;
 use crate::timers;
+use crate::tty;
 use anyhow::Error;
 use lazy_static::lazy_static;
 use std::cell::Cell;
@@ -39,6 +40,7 @@ lazy_static! {
             ("signals", signals::initialize),
             ("exceptions", exceptions::initialize),
             ("sqlite", sqlite::initialize),
+            ("tty", tty::initialize),
         ];
         HashMap::from_iter(bindings.into_iter())
     };
