@@ -173,7 +173,7 @@ fn read_start(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
     let state_rc = JsRuntime::state(scope);
 
     // Start reading from the ipen TCP stream.
-    stream.set_read_callback({
+    stream.start_reading({
         move |_: TcpStreamHandle, data: Result<Vec<u8>>| {
             let mut state = state_rc.borrow_mut();
             let on_read = Rc::clone(&on_read);
@@ -400,7 +400,7 @@ fn shutdown(
 
     let state_rc = JsRuntime::state(scope);
 
-    stream.shutdown({
+    stream.shutdown_write({
         let promise = v8::Global::new(scope, promise_resolver);
         move |_: LoopHandle| {
             let promise = promise.clone();
