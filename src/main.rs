@@ -25,6 +25,7 @@ mod timers;
 mod tools;
 mod transpilers;
 mod watcher;
+mod tty;
 
 use crate::cli::process_cli_arguments;
 use crate::errors::generic_error;
