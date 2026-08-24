@@ -14,7 +14,7 @@ pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     v8::Global::new(scope, target)
 }
 
-// Set the TTY to raw or normal mode based on the provided mode argument.
+/// Sets the TTY to raw or normal mode based on the provided mode argument.
 fn set_raw_mode(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get the tty wrapper object.
     let tty = args.get(0).to_object(scope).unwrap();
