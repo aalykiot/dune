@@ -349,7 +349,7 @@ Body Mixins
 - [x] `isTTY`: A boolean that is always true for `tty.ReadStream` instances.
 - [x] `read()`: Reads data from the stdin stream.
 - [x] `setRawMode(mode)`: Configures `tty.ReadStream` to operate in raw mode.
-- [x] `setEncoding(encoding)`: Sets the encoding for stream.
+- [x] `setEncoding(encoding)`: Sets the encoding for the stream.
 
 #### `tty.WriteStream`
 
@@ -360,7 +360,7 @@ Body Mixins
 - [] `rows`: A number specifying the number of rows the TTY currently has.
 - [] `clearLine(direction)`: clears the current line of this WriteStream.
 - [] `cursorTo(x, y)`: moves this WriteStream's cursor to the specified position.
-- [] `getWindowSize()`: eturns the size of the TTY.
+- [] `getWindowSize()`: returns the size of the TTY.
 
 ##### Events
 
