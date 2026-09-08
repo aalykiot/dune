@@ -2,6 +2,7 @@ use crate::bindings::get_internal_ref;
 use crate::bindings::set_exception_code;
 use crate::bindings::set_function_to;
 use crate::bindings::throw_exception;
+use crate::bindings::wrap_gc_dropped;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
 use anyhow::Result;
@@ -13,6 +14,7 @@ pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
     let target = v8::Object::new(scope);
 
+    set_function_to(scope, target, "tty", tty);
     set_function_to(scope, target, "isTTY", is_tty);
     set_function_to(scope, target, "setRawMode", set_raw_mode);
     set_function_to(scope, target, "readStart", read_start);
@@ -83,6 +85,15 @@ fn read_start(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
             state.pending_futures.push(Box::new(future));
         }
     });
+}
+
+/// Creates a new TTY instance.
+fn tty(scope: &mut v8::PinScope, _: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow_mut();
+    let tty = state.handle.tty();
+
+    rv.set(wrap_gc_dropped(scope, tty).into());
 }
 
 /// Sets the TTY to raw or normal mode based on the provided mode argument.

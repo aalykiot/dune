@@ -168,6 +168,7 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `stat()`: Retrieves statistics for the file.
 - [x] `write(data, offset?)`: Writes data to the file.
 
+
 ### Net
 
 - [x] `createServer(connectionHandler?)`: Creates a new TCP server.
@@ -335,6 +336,35 @@ Body Mixins
 - [x] `setReadBigInts(flag)`: Enables or disables the use of `BigInt`s when reading `INTEGER` fields.
 - [x] `sourceSQL`: The source SQL text of the prepared statement.
 - [x] `expandedSQL`: The source SQL text of the prepared statement with parameter placeholders replaced.
+
+### TTY
+
+- [x] `isatty(fd)`: Returns true if the given fd is associated with a TTY.
+
+#### `tty.ReadStream`
+
+> tty.ReadStream is a class extending `EventEmitter` and implements `@@asyncIterator`.
+
+- [x] `isRaw`: A boolean indicating whether the TTY is in raw mode.
+- [x] `isTTY`: A boolean that is always true for `tty.ReadStream` instances.
+- [x] `read()`: Reads data from the stdin stream.
+- [x] `setRawMode(mode)`: Configures `tty.ReadStream` to operate in raw mode.
+- [x] `setEncoding(encoding)`: Sets the encoding for stream.
+
+#### `tty.WriteStream`
+
+> tty.WriteStream is a class extending `EventEmitter`.
+
+- [] `isTTY`: A boolean that is always true.
+- [] `columns`: A number specifying the number of columns the TTY currently has.
+- [] `rows`: A number specifying the number of rows the TTY currently has.
+- [] `clearLine(direction)`: clears the current line of this WriteStream.
+- [] `cursorTo(x, y)`: moves this WriteStream's cursor to the specified position.
+- [] `getWindowSize()`: eturns the size of the TTY.
+
+##### Events
+
+- [] `resize`: Emitted when the TTY window size changes.
 
 ### Test Runner
 
