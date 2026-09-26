@@ -88,10 +88,14 @@ fn read_start(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
 }
 
 /// Creates a new TTY instance.
-fn tty(scope: &mut v8::PinScope, _: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+fn tty(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+    // Get the provided file descriptor number.
+    let fd = args.get(0).to_uint32(scope).unwrap().value();
+    let fd = into_raw(fd);
+
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow_mut();
-    let tty = state.handle.tty();
+    let tty = state.handle.tty(fd);
 
     rv.set(wrap_gc_dropped(scope, tty).into());
 }
@@ -133,4 +137,14 @@ fn is_tty(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv:
 fn is_tty(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // TODO: implement a version for windows..
     panic!("not yet implemented");
+}
+
+#[cfg(unix)]
+fn into_raw(val: u32) -> std::os::unix::io::RawFd {
+    val as std::os::unix::io::RawFd
+}
+
+#[cfg(windows)]
+fn into_raw(val: u32) -> std::os::windows::io::RawHandle {
+    val as usize as std::os::windows::io::RawHandle
 }
