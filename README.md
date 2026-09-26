@@ -341,7 +341,7 @@ Body Mixins
 
 - [x] `isatty(fd)`: Returns true if the given fd is associated with a TTY.
 
-#### `tty.ReadStream`
+#### `tty.ReadStream(fd)`
 
 > tty.ReadStream is a class extending `EventEmitter` and implements `@@asyncIterator`.
 
@@ -351,13 +351,14 @@ Body Mixins
 - [x] `setRawMode(mode)`: Configures `tty.ReadStream` to operate in raw mode.
 - [x] `setEncoding(encoding)`: Sets the encoding for the stream.
 
-#### `tty.WriteStream`
+#### `tty.WriteStream(fd)`
 
 > tty.WriteStream is a class extending `EventEmitter`.
 
 - [] `isTTY`: A boolean that is always true.
 - [] `columns`: A number specifying the number of columns the TTY currently has.
 - [] `rows`: A number specifying the number of rows the TTY currently has.
+- [] `write(data)`: Writes data to the TTY stream.
 - [] `clearLine(direction)`: clears the current line of this WriteStream.
 - [] `cursorTo(x, y)`: moves this WriteStream's cursor to the specified position.
 - [] `getWindowSize()`: returns the size of the TTY.

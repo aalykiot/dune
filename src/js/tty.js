@@ -45,7 +45,7 @@ export class ReadStream extends EventEmitter {
     this.#pushQueue = [];
     this.#pullQueue = [];
     this.#active = false;
-    this.isTTY = true;
+    this.isTTY = isatty(fd);
     this.isRaw = false;
   }
 

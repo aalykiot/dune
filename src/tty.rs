@@ -18,6 +18,7 @@ pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "isTTY", is_tty);
     set_function_to(scope, target, "setRawMode", set_raw_mode);
     set_function_to(scope, target, "readStart", read_start);
+    set_function_to(scope, target, "getWindowSize", get_window_size);
 
     v8::Global::new(scope, target)
 }
@@ -118,6 +119,30 @@ fn set_raw_mode(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _
     if let Err(e) = tty.set_mode(mode) {
         throw_exception(scope, &e);
     };
+}
+
+/// Returns the current window size of the provided TTY.
+fn get_window_size(
+    scope: &mut v8::PinScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    // Get the tty wrapper object.
+    let tty = args.get(0).to_object(scope).unwrap();
+    let tty = get_internal_ref::<TtyHandle>(scope, tty, 0);
+
+    let window_size = match tty.window_size() {
+        Ok(window) => &[
+            v8::Integer::new(scope, window.columns as i32).into(),
+            v8::Integer::new(scope, window.rows as i32).into(),
+        ],
+        Err(e) => {
+            throw_exception(scope, &e);
+            return;
+        }
+    };
+
+    rv.set(v8::Array::new_with_elements(scope, window_size).into());
 }
 
 /// Queries if the provided file descriptor is a TTY.
