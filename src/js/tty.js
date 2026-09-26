@@ -11,7 +11,7 @@
 
 import assert from 'assert';
 import { EventEmitter } from 'events';
-import { makeDeferredPromise } from 'util';
+import { makeDeferredPromise, toUint8Array } from 'util';
 
 const binding = process.binding('tty');
 const kAsyncGenerator = Symbol('kAsyncGenerator');
@@ -25,6 +25,65 @@ const kAsyncGenerator = Symbol('kAsyncGenerator');
 export function isatty(fd) {
   assert.integer(fd);
   return binding.isTTY(fd);
+}
+
+export class WriteStream extends EventEmitter {
+  #tty;
+  #encoding;
+
+  /**
+   * Creates a new TTY write stream.
+   *
+   * @returns {WriteStream}
+   */
+  constructor(fd = 1) {
+    super();
+    this.#tty = binding.tty(fd);
+    this.isTTY = isatty(fd);
+
+    // Get the initial window size and set the TTY's columns and rows.
+    const [columns, rows] = binding.getWindowSize(this.#tty);
+
+    this.columns = columns;
+    this.rows = rows;
+  }
+
+  /**
+   * Writes contents to the TTY stream.
+   *
+   * @param {String|Uint8Array} data - The data to be written to the TTY.
+   * @param {String} [encoding] - The character encoding to use.
+   */
+  write(data, encoding = 'utf-8') {
+    // Check the data argument type.
+    if (!(data instanceof Uint8Array) && typeof data !== 'string') {
+      throw new TypeError(
+        `The "data" argument must be of type string or Uint8Array.`
+      );
+    }
+
+    if (!this.#tty) {
+      throw new Error(`The TTY stream is closed.`);
+    }
+
+    // Default to UTF-8 encoding.
+    encoding = encoding || this.#encoding || 'utf-8';
+
+    binding.write(this.#tty, toUint8Array(data, encoding));
+  }
+
+  /**
+   * Sets the encoding for the TTY write stream.
+   *
+   * @param {String} [encoding] - The character encoding to use.
+   */
+  setEncoding(encoding = 'utf-8') {
+    // Check the parameter type.
+    if (typeof encoding !== 'string') {
+      throw new TypeError('The "encoding" argument must be of type string.');
+    }
+    this.#encoding = encoding;
+  }
 }
 
 export class ReadStream extends EventEmitter {
@@ -172,4 +231,5 @@ export class ReadStream extends EventEmitter {
 export default {
   isatty,
   ReadStream,
+  WriteStream,
 };
