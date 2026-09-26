@@ -39,9 +39,9 @@ export class ReadStream extends EventEmitter {
    *
    * @returns {ReadStream}
    */
-  constructor() {
+  constructor(fd = 0) {
     super();
-    this.#tty = binding.tty();
+    this.#tty = binding.tty(fd);
     this.#pushQueue = [];
     this.#pullQueue = [];
     this.#active = false;
