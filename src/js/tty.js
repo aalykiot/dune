@@ -84,6 +84,15 @@ export class WriteStream extends EventEmitter {
     }
     this.#encoding = encoding;
   }
+
+  /**
+   * Returns the size of the TTY.
+   *
+   * @returns {number[]} An array containing 2 numbers [numColumns, numRows].
+   */
+  getWindowSize() {
+    return binding.getWindowSize();
+  }
 }
 
 export class ReadStream extends EventEmitter {
@@ -167,6 +176,26 @@ export class ReadStream extends EventEmitter {
     this.#encoding = encoding;
   }
 
+  /**
+   * Stops the TTY stream from reading input.
+   */
+  destroy() {
+    // Check whether the TTY stream is valid and, if active,
+    // stop reading from it.
+    if (!this.#tty) return;
+    if (this.#active) binding.readStop(this.#tty);
+
+    // Ignore pending reads.
+    for (const promise of this.#pullQueue) {
+      promise.resolve(null);
+    }
+
+    this.#tty = undefined;
+    this.#active = false;
+
+    this.emit('close');
+  }
+
   #asyncDispatch(value) {
     if (this.#pullQueue.length === 0) {
       this.#pushQueue.push(value);
@@ -202,10 +231,7 @@ export class ReadStream extends EventEmitter {
 
   async *[kAsyncGenerator](signal) {
     // Close socket on stream pipeline errors.
-    if (signal)
-      signal.on('uncaughtStreamException', () => {
-        /** TODO: close the TTY stream */
-      });
+    if (signal) signal.on('uncaughtStreamException', () => this.destroy());
 
     let data;
     while ((data = await this.read())) {
@@ -219,17 +245,17 @@ export class ReadStream extends EventEmitter {
    * @ignore
    */
   [Symbol.asyncIterator](signal) {
-    const iterator = {
+    return Object.assign(this[kAsyncGenerator](signal), {
       return: () => {
-        /** TODO: close the TTY stream */
+        this.destroy();
+        return Promise.resolve({ done: true });
       },
-    };
-    return Object.assign(this[kAsyncGenerator](signal), iterator);
+    });
   }
 }
 
 export default {
   isatty,
-  ReadStream,
   WriteStream,
+  ReadStream,
 };

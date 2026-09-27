@@ -19,9 +19,23 @@ pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "setRawMode", set_raw_mode);
     set_function_to(scope, target, "write", write);
     set_function_to(scope, target, "readStart", read_start);
+    set_function_to(scope, target, "readStop", read_stop);
     set_function_to(scope, target, "getWindowSize", get_window_size);
 
     v8::Global::new(scope, target)
+}
+
+/// Creates a new TTY instance.
+fn tty(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+    // Get the provided file descriptor number.
+    let fd = args.get(0).to_uint32(scope).unwrap().value();
+    let fd = into_raw(fd);
+
+    let state_rc = JsRuntime::state(scope);
+    let state = state_rc.borrow_mut();
+    let tty = state.handle.tty(fd);
+
+    rv.set(wrap_gc_dropped(scope, tty).into());
 }
 
 struct TTYReadFuture {
@@ -65,19 +79,6 @@ impl JsFuture for TTYReadFuture {
     }
 }
 
-/// Creates a new TTY instance.
-fn tty(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
-    // Get the provided file descriptor number.
-    let fd = args.get(0).to_uint32(scope).unwrap().value();
-    let fd = into_raw(fd);
-
-    let state_rc = JsRuntime::state(scope);
-    let state = state_rc.borrow_mut();
-    let tty = state.handle.tty(fd);
-
-    rv.set(wrap_gc_dropped(scope, tty).into());
-}
-
 /// Starts reading from a TTY stream.
 fn read_start(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
     // Get the tty wrapper object.
@@ -100,6 +101,15 @@ fn read_start(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
             state.pending_futures.push(Box::new(future));
         }
     });
+}
+
+/// Stops reading from the TTY stream.
+fn read_stop(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: v8::ReturnValue) {
+    // Get the tty wrapper object.
+    let tty = args.get(0).to_object(scope).unwrap();
+    let tty = get_internal_ref::<TtyHandle>(scope, tty, 0);
+
+    tty.stop_reading();
 }
 
 /// Writes data to the undeerline TTY stream.
