@@ -289,7 +289,9 @@ pub fn start(mut runtime: JsRuntime) {
     //
     // https://doc.rust-lang.org/std/time/struct.Instant.html#os-specific-behaviors
     let handle = runtime.event_loop.handle();
-    handle.timer(Duration::from_millis(u64::MAX), TimerKind::Interval, |_| {});
+    let max_delay = Duration::from_millis(u32::MAX as u64);
+
+    handle.timer(max_delay, TimerKind::Interval, |_| {});
 
     // Spawn the REPL thread.
     thread::spawn(move || {

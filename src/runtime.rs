@@ -487,7 +487,7 @@ impl JsRuntime {
         // of them to avoid borrowing panics at runtime.
 
         let futures: Vec<Box<dyn JsFuture>> =
-            state_rc.borrow_mut().pending_futures.drain(..).collect();
+            std::mem::take(&mut state_rc.borrow_mut().pending_futures);
 
         // NOTE: After every future executes (aka v8's call stack gets empty) we will drain
         // the MicroTask and NextTick Queue.
@@ -684,7 +684,7 @@ impl JsRuntime {
 /// Runs callbacks stored in the next-tick queue.
 fn run_next_tick_callbacks(scope: &mut v8::PinScope) {
     let state_rc = JsRuntime::state(scope);
-    let callbacks: NextTickQueue = state_rc.borrow_mut().next_tick_queue.drain(..).collect();
+    let callbacks: NextTickQueue = std::mem::take(&mut state_rc.borrow_mut().next_tick_queue);
 
     let undefined = v8::undefined(scope);
     v8::tc_scope!(let tc_scope, scope);
@@ -771,12 +771,8 @@ pub fn check_exceptions(scope: &mut v8::PinScope) -> Option<JsError> {
         return Some(error);
     }
 
-    let promise_rejections: Vec<PromiseRejectionEntry> = state_rc
-        .borrow_mut()
-        .exceptions
-        .promise_rejections
-        .drain(..)
-        .collect();
+    let promise_rejections: Vec<PromiseRejectionEntry> =
+        std::mem::take(&mut state_rc.borrow_mut().exceptions.promise_rejections);
 
     // Then, check for unhandled rejections.
     for (promise, exception) in promise_rejections.iter() {
