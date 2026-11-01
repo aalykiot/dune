@@ -33,7 +33,14 @@ fn tty(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8
 
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow_mut();
-    let tty = state.handle.tty(fd);
+
+    let tty = match state.handle.tty(fd) {
+        Ok(tty) => tty,
+        Err(e) => {
+            throw_exception(scope, &e);
+            return;
+        }
+    };
 
     rv.set(wrap_gc_dropped(scope, tty).into());
 }
@@ -183,11 +190,9 @@ fn get_window_size(
 /// Queries if the provided file descriptor is a TTY.
 #[cfg(unix)]
 fn is_tty(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
-    use std::os::fd::BorrowedFd;
     // Get the provided file descriptor.
     let fd = args.get(0).int32_value(scope).unwrap();
-    let fd = unsafe { BorrowedFd::borrow_raw(fd.into()) };
-    let is_tty = rustix::termios::isatty(fd);
+    let is_tty = crabuv::tty::is_tty(fd);
 
     rv.set(v8::Boolean::new(scope, is_tty).into());
 }
