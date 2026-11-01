@@ -12,13 +12,14 @@ use crabuv::signals::SignalHandle;
 use std::rc::Rc;
 
 #[cfg(windows)]
-const SIGNALS: [(&str, i32); 6] = [
+const SIGNALS: [(&str, i32); 7] = [
     ("SIGABRT", Kind::SIGABRT),
     ("SIGFPE", Kind::SIGFPE),
     ("SIGILL", Kind::SIGILL),
     ("SIGINT", Kind::SIGINT),
     ("SIGSEGV", Kind::SIGSEGV),
     ("SIGTERM", Kind::SIGTERM),
+    ("SIGWINCH", Kind::SIGWINCH),
 ];
 
 #[cfg(not(windows))]

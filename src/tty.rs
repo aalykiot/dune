@@ -1,4 +1,5 @@
 use crate::bindings::get_internal_ref;
+use crate::bindings::set_constant_to;
 use crate::bindings::set_exception_code;
 use crate::bindings::set_function_to;
 use crate::bindings::throw_exception;
@@ -9,6 +10,29 @@ use anyhow::Result;
 use crabuv::tty::Mode;
 use crabuv::tty::TtyHandle;
 use std::rc::Rc;
+use std::sync::LazyLock;
+
+macro_rules! io_stream {
+    ($f:ident) => {
+        LazyLock::new(|| {
+            #[cfg(unix)]
+            {
+                use std::os::fd::AsRawFd;
+                std::io::$f().as_raw_fd()
+            }
+            #[cfg(windows)]
+            {
+                use std::os::windows::io::AsRawHandle;
+                std::io::$f().as_raw_handle() as isize as i32
+            }
+        })
+    };
+}
+
+pub static STDIN: LazyLock<i32> = io_stream!(stdin);
+
+pub static STDOUT: LazyLock<i32> = io_stream!(stdout);
+pub static STDERR: LazyLock<i32> = io_stream!(stderr);
 
 pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
@@ -21,6 +45,18 @@ pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     set_function_to(scope, target, "readStart", read_start);
     set_function_to(scope, target, "readStop", read_stop);
     set_function_to(scope, target, "getWindowSize", get_window_size);
+
+    let constants = v8::Object::new(scope);
+
+    let stdin = v8::Integer::new(scope, *STDIN);
+    let stdout = v8::Integer::new(scope, *STDOUT);
+    let stderr = v8::Integer::new(scope, *STDERR);
+
+    set_constant_to(scope, constants, "STDIN", stdin.into());
+    set_constant_to(scope, constants, "STDOUT", stdout.into());
+    set_constant_to(scope, constants, "STDERR", stderr.into());
+
+    set_constant_to(scope, target, "constants", constants.into());
 
     v8::Global::new(scope, target)
 }
@@ -200,8 +236,12 @@ fn is_tty(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv:
 /// Queries if the provided file descriptor is a TTY.
 #[cfg(windows)]
 fn is_tty(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
-    // TODO: implement a version for windows..
-    panic!("not yet implemented");
+    use std::ffi::c_void;
+    // Get the provided file descriptor.
+    let fd = args.get(0).int32_value(scope).unwrap();
+    let is_tty = crabuv::tty::is_tty(fd as isize as *mut c_void);
+
+    rv.set(v8::Boolean::new(scope, is_tty).into());
 }
 
 #[cfg(unix)]
