@@ -16,6 +16,8 @@ import { makeDeferredPromise, toUint8Array } from 'util';
 const binding = process.binding('tty');
 const kAsyncGenerator = Symbol('kAsyncGenerator');
 
+const { STDOUT, STDIN } = binding.constants;
+
 /**
  * Returns true if the given fd is associated with a TTY and false if it is not.
  *
@@ -36,16 +38,13 @@ export class WriteStream extends EventEmitter {
    *
    * @returns {WriteStream}
    */
-  constructor(fd = 1) {
+  constructor(fd = STDOUT) {
     super();
     this.#tty = binding.tty(fd);
-    this.isTTY = isatty(fd);
+    this.isTTY = true;
+    this.#refreshSize();
 
-    // Get the initial window size and set the TTY's columns and rows.
-    const [columns, rows] = binding.getWindowSize(this.#tty);
-
-    this.columns = columns;
-    this.rows = rows;
+    process.on('SIGWINCH', () => this.#refreshSize());
   }
 
   /**
@@ -91,7 +90,15 @@ export class WriteStream extends EventEmitter {
    * @returns {number[]} An array containing 2 numbers [numColumns, numRows].
    */
   getWindowSize() {
-    return binding.getWindowSize();
+    return binding.getWindowSize(this.#tty);
+  }
+
+  #refreshSize() {
+    const [columns, rows] = this.getWindowSize();
+
+    this.columns = columns;
+    this.rows = rows;
+    this.emit('resize');
   }
 }
 
@@ -107,13 +114,13 @@ export class ReadStream extends EventEmitter {
    *
    * @returns {ReadStream}
    */
-  constructor(fd = 0) {
+  constructor(fd = STDIN) {
     super();
     this.#tty = binding.tty(fd);
     this.#pushQueue = [];
     this.#pullQueue = [];
     this.#active = false;
-    this.isTTY = isatty(fd);
+    this.isTTY = true;
     this.isRaw = false;
   }
 

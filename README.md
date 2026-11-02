@@ -355,17 +355,17 @@ Body Mixins
 
 > tty.WriteStream is a class extending `EventEmitter`.
 
-- [] `isTTY`: A boolean that is always true.
-- [] `columns`: A number specifying the number of columns the TTY currently has.
-- [] `rows`: A number specifying the number of rows the TTY currently has.
-- [] `write(data)`: Writes data to the TTY stream.
+- [x] `isTTY`: A boolean that is always true.
+- [x] `columns`: A number specifying the number of columns the TTY currently has.
+- [x] `rows`: A number specifying the number of rows the TTY currently has.
+- [x] `write(data)`: Writes data to the TTY stream.
 - [] `clearLine(direction)`: clears the current line of this WriteStream.
 - [] `cursorTo(x, y)`: moves this WriteStream's cursor to the specified position.
-- [] `getWindowSize()`: returns the size of the TTY.
+- [x] `getWindowSize()`: returns the size of the TTY.
 
 ##### Events
 
-- [] `resize`: Emitted when the TTY window size changes.
+- [x] `resize`: Emitted when the TTY window size changes.
 
 ### Test Runner
 
