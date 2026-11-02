@@ -359,9 +359,11 @@ Body Mixins
 - [x] `columns`: A number specifying the number of columns the TTY currently has.
 - [x] `rows`: A number specifying the number of rows the TTY currently has.
 - [x] `write(data)`: Writes data to the TTY stream.
-- [] `clearLine(direction)`: clears the current line of this WriteStream.
-- [] `cursorTo(x, y)`: moves this WriteStream's cursor to the specified position.
-- [x] `getWindowSize()`: returns the size of the TTY.
+- [x] `clearLine(direction)`: Clears the current line in this WriteStream.
+- [x] `clearScreenDown()`: Clears the WriteStream downward from the cursor.
+- [] `cursorTo(x, y)`: Moves this WriteStream's cursor to the specified position.
+- [] `moveCursor(dx, dy)`: Moves this WriteStream's cursor relative to its current position.
+- [x] `getWindowSize()`: Returns the size of the TTY.
 
 ##### Events
 

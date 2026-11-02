@@ -18,6 +18,12 @@ const kAsyncGenerator = Symbol('kAsyncGenerator');
 
 const { STDOUT, STDIN } = binding.constants;
 
+const ESCAPE = '\x1b';
+const CLEAR_TO_LINE_BEGINNING = '\x1b[1K';
+const CLEAR_TO_LINE_END = '\x1b[0K';
+const CLEAR_LINE = '\x1b[2K';
+const CLEAR_SCREEN_DOWN = '\x1b[0J';
+
 /**
  * Returns true if the given fd is associated with a TTY and false if it is not.
  *
@@ -82,6 +88,32 @@ export class WriteStream extends EventEmitter {
       throw new TypeError('The "encoding" argument must be of type string.');
     }
     this.#encoding = encoding;
+  }
+
+  /**
+   * Clears the current line in this WriteStream.
+   *
+   *  @param {number} [direction=1] - Which part of the line to clear:
+   *  `-1` clears to the left of the cursor, `1` clears to the right,
+   *  and `0` clears the entire line.
+   */
+  clearLine(direction) {
+    // Validate the type of the parameter.
+    if (typeof direction !== 'number' || Number.isNaN(direction)) {
+      throw new TypeError('The "direction" argument must be of type number.');
+    }
+
+    if (direction < 0) return this.write(CLEAR_TO_LINE_BEGINNING);
+    if (direction > 0) return this.write(CLEAR_TO_LINE_END);
+
+    this.write(CLEAR_LINE);
+  }
+
+  /**
+   * Clears the WriteStream downward from the cursor.
+   */
+  clearScreenDown() {
+    this.write(CLEAR_SCREEN_DOWN);
   }
 
   /**
