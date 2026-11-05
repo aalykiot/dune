@@ -361,8 +361,8 @@ Body Mixins
 - [x] `write(data)`: Writes data to the TTY stream.
 - [x] `clearLine(direction)`: Clears the current line in this WriteStream.
 - [x] `clearScreenDown()`: Clears the WriteStream downward from the cursor.
-- [] `cursorTo(x, y)`: Moves this WriteStream's cursor to the specified position.
-- [] `moveCursor(dx, dy)`: Moves this WriteStream's cursor relative to its current position.
+- [x] `cursorTo(x, y)`: Moves this WriteStream's cursor to the specified position.
+- [x] `moveCursor(dx, dy)`: Moves this WriteStream's cursor relative to its current position.
 - [x] `getWindowSize()`: Returns the size of the TTY.
 
 ##### Events

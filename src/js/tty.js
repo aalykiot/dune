@@ -18,7 +18,7 @@ const kAsyncGenerator = Symbol('kAsyncGenerator');
 
 const { STDOUT, STDIN } = binding.constants;
 
-const ESCAPE = '\x1b';
+const CSI = '\x1b[';
 const CLEAR_TO_LINE_BEGINNING = '\x1b[1K';
 const CLEAR_TO_LINE_END = '\x1b[0K';
 const CLEAR_LINE = '\x1b[2K';
@@ -83,10 +83,7 @@ export class WriteStream extends EventEmitter {
    * @param {String} [encoding] - The character encoding to use.
    */
   setEncoding(encoding = 'utf-8') {
-    // Check the parameter type.
-    if (typeof encoding !== 'string') {
-      throw new TypeError('The "encoding" argument must be of type string.');
-    }
+    assert.string(encoding, 'The "encoding" argument must be of type string.');
     this.#encoding = encoding;
   }
 
@@ -99,9 +96,10 @@ export class WriteStream extends EventEmitter {
    */
   clearLine(direction) {
     // Validate the type of the parameter.
-    if (typeof direction !== 'number' || Number.isNaN(direction)) {
-      throw new TypeError('The "direction" argument must be of type number.');
-    }
+    assert.number(
+      direction,
+      'The "direction" argument must be of type number.'
+    );
 
     if (direction < 0) return this.write(CLEAR_TO_LINE_BEGINNING);
     if (direction > 0) return this.write(CLEAR_TO_LINE_END);
@@ -114,6 +112,42 @@ export class WriteStream extends EventEmitter {
    */
   clearScreenDown() {
     this.write(CLEAR_SCREEN_DOWN);
+  }
+
+  /**
+   * Moves this WriteStream's cursor to the specified position.
+   *
+   * @param {number} x - The horizontal position (column).
+   * @param {number} [y] - The vertical position (row). If omitted, only the horizontal position is changed.
+   */
+  cursorTo(x, y) {
+    // The X coordinate must aleays be defined.
+    assert.number(x, 'The "x" argument must be of type number.');
+    const sequense =
+      typeof y === 'number' ? `${CSI}${y + 1};${x + 1}H` : `${CSI}${x + 1}G`;
+
+    this.write(sequense);
+  }
+
+  /**
+   * Moves this WriteStream's cursor relative to its current position.
+   *
+   * @param {number} dx - The horizontal displacement.
+   * @param {number} dy - The vertical displacement.
+   */
+  moveCursor(dx, dy) {
+    // Dx and Dy must always be defined.
+    assert.number(dx, 'The "dx" argument must be of type number.');
+    assert.number(dy, 'The "dy" argument must be of type number.');
+
+    let sequense = '';
+
+    if (dx < 0) sequense += `${CSI}${-dx}D`;
+    if (dx > 0) sequense += `${CSI}${dx}C`;
+    if (dy < 0) sequense += `${CSI}${-dy}A`;
+    if (dy > 0) sequense += `${CSI}${dy}B`;
+
+    this.write(sequense);
   }
 
   /**
