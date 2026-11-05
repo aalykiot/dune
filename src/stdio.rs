@@ -1,5 +1,5 @@
-use crate::bindings::set_function_to;
-use crate::bindings::throw_exception;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::throw_exception;
 use std::io;
 use std::io::Write;
 

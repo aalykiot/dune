@@ -1,8 +1,8 @@
-use crate::bindings::get_internal_ref;
-use crate::bindings::set_constant_to;
-use crate::bindings::set_function_to;
-use crate::bindings::throw_exception;
-use crate::bindings::wrap_gc_dropped;
+use crate::v8_utils::get_internal_ref;
+use crate::v8_utils::set_constant_to;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::throw_exception;
+use crate::v8_utils::wrap_gc_dropped;
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::Result;

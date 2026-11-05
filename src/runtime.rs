@@ -23,6 +23,7 @@ use crate::modules::ModuleStatus;
 use crate::process;
 use crate::repl::EvaluationContext;
 use crate::repl::EvaluationStatus;
+use crate::v8_utils::get_property;
 use anyhow::Result;
 use crabuv::EventLoop;
 use crabuv::LoopHandle;
@@ -464,6 +465,10 @@ impl JsRuntime {
             });
         }
 
+        // Before exiting, we need to emit the exit event on the JS side
+        // to allow any user-defined cleanup code to run.
+        self.emit_exit_event();
+
         // We can now notify debugger that the program has finished running
         // and we're ready to exit the process.
         if let Some(inspector) = self.inspector() {
@@ -613,6 +618,39 @@ impl JsRuntime {
         // point to allow resources behind a promise to be scheduled correctly
         // to the event-loop.
         run_next_tick_callbacks(scope);
+    }
+
+    /// Emits the `exit` event on the JS side.
+    pub(crate) fn emit_exit_event(&mut self) {
+        self.with_scope(|scope| {
+            let state_rc = JsRuntime::state(scope);
+            v8::tc_scope!(let tc_scope, scope);
+
+            let context = tc_scope.get_current_context();
+            let global = context.global(tc_scope);
+            let process = get_property::<v8::Object>(tc_scope, global, "process").unwrap();
+            let emit = get_property::<v8::Function>(tc_scope, process, "emit").unwrap();
+
+            let event = v8::String::new(tc_scope, "exit").unwrap();
+            let args = [event.into()];
+
+            emit.call(tc_scope, process.into(), &args);
+
+            // On exception, report it and handle the error.
+            if tc_scope.has_caught() {
+                let exception = tc_scope.exception().unwrap();
+                let exception = v8::Global::new(tc_scope, exception);
+                let mut state = state_rc.borrow_mut();
+                state.exceptions.capture_exception(exception);
+
+                drop(state);
+
+                // Check for uncaught errors (capture callbacks might be in place).
+                if let Some(error) = check_exceptions(tc_scope) {
+                    report_and_exit(error);
+                }
+            }
+        });
     }
 
     /// Returns if unhandled promise rejections where caught.

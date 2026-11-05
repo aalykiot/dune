@@ -1,10 +1,10 @@
-use crate::bindings::get_internal_ref;
-use crate::bindings::set_exception_code;
-use crate::bindings::set_function_to;
-use crate::bindings::set_property_to;
-use crate::bindings::wrap_gc_dropped;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
+use crate::v8_utils::get_internal_ref;
+use crate::v8_utils::set_exception_code;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::set_property_to;
+use crate::v8_utils::wrap_gc_dropped;
 use anyhow::Result;
 use crabuv::tcp_listener::TcpListenerHandle;
 use crabuv::tcp_stream::SocketInfo;

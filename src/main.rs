@@ -24,8 +24,9 @@ mod stdio;
 mod timers;
 mod tools;
 mod transpilers;
-mod watcher;
 mod tty;
+mod v8_utils;
+mod watcher;
 
 use crate::cli::process_cli_arguments;
 use crate::errors::generic_error;

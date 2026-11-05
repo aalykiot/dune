@@ -1,8 +1,8 @@
-use crate::bindings::get_internal_ref;
-use crate::bindings::set_function_to;
-use crate::bindings::wrap_gc_dropped;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
+use crate::v8_utils::get_internal_ref;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::wrap_gc_dropped;
 use crabuv::check::CheckHandle;
 use crabuv::timers::TimerHandle;
 use crabuv::timers::TimerKind;
