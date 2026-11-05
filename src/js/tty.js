@@ -16,8 +16,6 @@ import { makeDeferredPromise, toUint8Array } from 'util';
 const binding = process.binding('tty');
 const kAsyncGenerator = Symbol('kAsyncGenerator');
 
-const { STDOUT, STDIN } = binding.constants;
-
 const CSI = '\x1b[';
 const CLEAR_TO_LINE_BEGINNING = '\x1b[1K';
 const CLEAR_TO_LINE_END = '\x1b[0K';
@@ -42,11 +40,16 @@ export class WriteStream extends EventEmitter {
   /**
    * Creates a new TTY write stream.
    *
+   * @param {number} fd - The file descriptor to write to.
    * @returns {WriteStream}
    */
-  constructor(fd = STDOUT) {
+  constructor(fd) {
     super();
+    assert.integer(fd, 'The "fd" must be a positive integer.');
+    assert.greaterThanOrEqual(0, fd, 'The "fd" must be a positive integer.');
+
     this.#tty = binding.tty(fd);
+    this.fd = fd;
     this.isTTY = true;
     this.#refreshSize();
 
@@ -96,10 +99,7 @@ export class WriteStream extends EventEmitter {
    */
   clearLine(direction) {
     // Validate the type of the parameter.
-    assert.number(
-      direction,
-      'The "direction" argument must be of type number.'
-    );
+    assert.integer(direction, 'The "direction" argument must be an integer.');
 
     if (direction < 0) return this.write(CLEAR_TO_LINE_BEGINNING);
     if (direction > 0) return this.write(CLEAR_TO_LINE_END);
@@ -122,7 +122,7 @@ export class WriteStream extends EventEmitter {
    */
   cursorTo(x, y) {
     // The X coordinate must aleays be defined.
-    assert.number(x, 'The "x" argument must be of type number.');
+    assert.integer(x, 'The "x" argument must be an integer.');
     const sequense =
       typeof y === 'number' ? `${CSI}${y + 1};${x + 1}H` : `${CSI}${x + 1}G`;
 
@@ -137,8 +137,8 @@ export class WriteStream extends EventEmitter {
    */
   moveCursor(dx, dy) {
     // Dx and Dy must always be defined.
-    assert.number(dx, 'The "dx" argument must be of type number.');
-    assert.number(dy, 'The "dy" argument must be of type number.');
+    assert.integer(dx, 'The "dx" argument must be an integer.');
+    assert.integer(dy, 'The "dy" argument must be an integer.');
 
     let sequense = '';
 
@@ -178,14 +178,19 @@ export class ReadStream extends EventEmitter {
   /**
    * Creates a new TTY read stream.
    *
+   * @param {number} fd - The file descriptor to read from.
    * @returns {ReadStream}
    */
-  constructor(fd = STDIN) {
+  constructor(fd) {
     super();
+    assert.integer(fd, 'The "fd" must be a positive integer.');
+    assert.greaterThanOrEqual(0, fd, 'The "fd" must be a positive integer.');
+
     this.#tty = binding.tty(fd);
     this.#pushQueue = [];
     this.#pullQueue = [];
     this.#active = false;
+    this.fd = fd;
     this.isTTY = true;
     this.isRaw = false;
   }
