@@ -36,6 +36,7 @@ export function isatty(fd) {
 export class WriteStream extends EventEmitter {
   #tty;
   #encoding;
+  #writable;
 
   /**
    * Creates a new TTY write stream.
@@ -49,8 +50,10 @@ export class WriteStream extends EventEmitter {
     assert.greaterThanOrEqual(0, fd, 'The "fd" must be a positive integer.');
 
     this.#tty = binding.tty(fd);
-    this.fd = fd;
+    this.#writable = true;
     this.isTTY = true;
+    this.fd = fd;
+
     this.#refreshSize();
 
     process.on('SIGWINCH', () => this.#refreshSize());
@@ -62,22 +65,33 @@ export class WriteStream extends EventEmitter {
    * @param {String|Uint8Array} data - The data to be written to the TTY.
    * @param {String} [encoding] - The character encoding to use.
    */
-  write(data, encoding = 'utf-8') {
+  write(data, encoding) {
     // Check the data argument type.
     if (!(data instanceof Uint8Array) && typeof data !== 'string') {
       throw new TypeError(
-        `The "data" argument must be of type string or Uint8Array.`
+        'The "data" argument must be of type string or Uint8Array.'
       );
     }
 
-    if (!this.#tty) {
-      throw new Error(`The TTY stream is closed.`);
+    if (!this.#writable) {
+      throw new Error('The stream has already been closed.');
     }
 
     // Default to UTF-8 encoding.
     encoding = encoding || this.#encoding || 'utf-8';
 
     binding.write(this.#tty, toUint8Array(data, encoding));
+  }
+
+  /**
+   * Marks the TTY stream as no longer writable.
+   *
+   * @param {String|Uint8Array} data - The last data to be written to the TTY stream.
+   * @param {String} [encoding] - The character encoding to use.
+   */
+  end(data, encoding) {
+    if (data) this.write(data, encoding);
+    this.#writable = false;
   }
 
   /**
