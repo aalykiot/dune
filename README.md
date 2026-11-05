@@ -407,29 +407,29 @@ await runner.run();
 
 > The assertion API is copied from: https://assert-js.norbert.tech/
 
-- [x] `true(value)`: Asserts that value is equal to true.
-- [x] `false(value)`: Asserts that value is equal to false.
-- [x] `instanceOf(value, class)`: Asserts that value is an instance of specific class.
-- [x] `integer(value)`: Asserts that value is valid integer.
-- [x] `number(value)`: Asserts that value is valid number (integer, float).
-- [x] `oddNumber(value)`: Asserts that value is odd number.
-- [x] `evenNumber(value)`: Asserts that value is event number.
-- [x] `greaterThan(value, limit)`: Asserts that number is greater than.
-- [x] `greaterThanOrEqual(value, limit)`: Asserts that number is greater than or equal.
-- [x] `lessThan(value, limit)`: Asserts that number is less than.
-- [x] `lessThanOrEqual(value, limit)`: Asserts that number is less than or equal.
-- [x] `string(value)`: Asserts that value is valid string.
-- [x] `boolean(value)`: Asserts that value is valid boolean.
-- [x] `equal(actual, expected)`: Asserts that value is equal to expected value.
-- [x] `objectEqual(actual, expected)`: Asserts that value is equal to expected value.
-- [x] `object(value)`: Asserts that value is valid object.
-- [x] `hasFunction(name, object)`: Asserts that object has function.
-- [x] `hasProperty(name, object)`: Asserts that object has property.
-- [x] `isFunction(fn)`: Asserts that value is valid function.
-- [x] `array(value)`: Asserts that value is valid array.
-- [x] `count(expected, arrayValue)`: Asserts that array have specific number of elements.
-- [x] `notEmpty(arrayValue)`: Asserts that array is not empty.
-- [x] `throws(fn, error)`: Asserts that function throws expected exception.
+- [x] `true(value)`: Asserts that `value` is true.
+- [x] `false(value)`: Asserts that `value` is false.
+- [x] `instanceOf(object, class)`: Asserts that `object` is an instance of `class`.
+- [x] `integer(value)`: Asserts that `value` is an integer.
+- [x] `number(value)`: Asserts that `value` is a number (integer or float).
+- [x] `oddNumber(value)`: Asserts that `value` is an odd number.
+- [x] `evenNumber(value)`: Asserts that `value` is an even number.
+- [x] `greaterThan(expected, value)`: Asserts that `value` is greater than `expected`.
+- [x] `greaterThanOrEqual(expected, value)`: Asserts that `value` is greater than or equal to `expected`.
+- [x] `lessThan(expected, value)`: Asserts that `value` is less than `expected`.
+- [x] `lessThanOrEqual(expected, value)`: Asserts that `value` is less than or equal to `expected`.
+- [x] `string(value)`: Asserts that `value` is a string.
+- [x] `boolean(value)`: Asserts that `value` is a boolean.
+- [x] `equal(value, expected)`: Asserts that `value` equals `expected`.
+- [x] `objectEqual(object, expected)`: Asserts that `object` equals `expected` by comparing their properties.
+- [x] `object(value)`: Asserts that `value` is an object.
+- [x] `hasFunction(name, object)`: Asserts that `object` has a function named `name`.
+- [x] `hasProperty(name, object)`: Asserts that `object` has a property named `name`.
+- [x] `isFunction(value)`: Asserts that `value` is a function.
+- [x] `array(value)`: Asserts that `value` is an array.
+- [x] `count(expected, array)`: Asserts that `array` has exactly `expected` elements.
+- [x] `notEmpty(value)`: Asserts that `value` is not empty.
+- [x] `throws(callback, error)`: Asserts that invoking `callback` throws `error`.
 
 ## Testing
 
