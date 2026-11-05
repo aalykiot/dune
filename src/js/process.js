@@ -1,3 +1,4 @@
+import { WriteStream, ReadStream } from 'tty';
 import { EventEmitter } from 'events';
 import { cloneFunction as clone } from 'util';
 
@@ -45,20 +46,11 @@ function defineStream(name, getter) {
   });
 }
 
-const io = process.binding('stdio');
+const { STDOUT, STDERR, STDIN } = process.binding('tty').constants;
 
-defineStream('stdout', () => ({
-  write: io.write,
-  end() {},
-}));
-
-defineStream('stdin', () => ({
-  read: io.read,
-}));
-
-defineStream('stderr', () => ({
-  write: io.writeError,
-}));
+defineStream('stdout', () => new WriteStream(STDOUT));
+defineStream('stderr', () => new WriteStream(STDERR));
+defineStream('stdin', () => new ReadStream(STDIN));
 
 const os = process.binding('signals');
 
