@@ -30,7 +30,6 @@ mod watcher;
 
 use crate::cli::process_cli_arguments;
 use crate::errors::generic_error;
-use crabuv::tty::set_utf8_code_pages;
 use runtime::JsRuntime;
 use std::env;
 use tools::bundle;
@@ -80,7 +79,7 @@ fn main() {
     {
         // In shitty platforms like Windows we have to manually enable ANSI colors. ¯\_(ツ)_/¯
         let _ = enable_ansi_support::enable_ansi_support();
-        let _ = set_utf8_code_pages();
+        let _ = crabuv::tty::set_utf8_code_pages();
     }
 
     // Try run dune as a compiled standalone program.
