@@ -1,3 +1,4 @@
+use crate::console;
 use crate::dns;
 use crate::errors::report_and_exit;
 use crate::exceptions;
@@ -11,7 +12,6 @@ use crate::runtime::check_exceptions;
 use crate::runtime::JsRuntime;
 use crate::signals;
 use crate::sqlite;
-use crate::stdio;
 use crate::timers;
 use crate::tty;
 use crate::v8_utils::set_function_to;
@@ -24,9 +24,9 @@ type BindingInitFn = fn(&mut v8::PinScope) -> v8::Global<v8::Object>;
 lazy_static! {
     pub static ref BINDINGS: HashMap<&'static str, BindingInitFn> = {
         let bindings: Vec<(&'static str, BindingInitFn)> = vec![
-            ("stdio", stdio::initialize),
             ("timers", timers::initialize),
             ("fs", file::initialize),
+            ("console", console::initialize),
             ("perf_hooks", perf_hooks::initialize),
             ("dns", dns::initialize),
             ("net", net::initialize),

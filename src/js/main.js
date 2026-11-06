@@ -2,7 +2,7 @@ import process from 'process';
 import timers from 'timers';
 import fetch from '@web/fetch';
 import structuredClone from '@web/clone';
-import { Console, prompt, wrapConsole } from 'console';
+import { Console, wrapConsole } from 'console';
 import { AbortController, AbortSignal } from '@web/abort';
 import { TextEncoder, TextDecoder } from '@web/text_encoding';
 
@@ -45,7 +45,6 @@ wrapConsole(console, consoleFromV8);
 makeGlobal('process', process);
 makeGlobal('queueMicrotask', queueMicrotask);
 makeGlobal('console', console);
-makeGlobal('prompt', prompt);
 
 makeGlobal('setTimeout', timers.setTimeout);
 makeGlobal('setInterval', timers.setInterval);

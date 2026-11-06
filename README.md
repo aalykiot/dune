@@ -97,7 +97,6 @@ For more examples look at the <a href="./examples">examples</a> directory.
 - [x] `global`: Reference to the global object.
 - [x] `globalThis`: Same as `global`.
 - [x] `console`: A subset of the WHATWG console.
-- [x] `prompt`: Shows the given message and waits for the user's input.
 - [x] `TextEncoder` / `TextDecoder`: WHATWG encoding API.
 - [x] `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval`: DOM style timers.
 - [x] `setImmediate` / `clearImmediate`: Node.js like immediate timers.

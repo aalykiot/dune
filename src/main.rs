@@ -2,6 +2,7 @@
 
 mod bindings;
 mod cli;
+mod console;
 mod dns;
 mod dotenv;
 mod errors;
@@ -20,7 +21,6 @@ mod repl;
 mod runtime;
 mod signals;
 mod sqlite;
-mod stdio;
 mod timers;
 mod tools;
 mod transpilers;
