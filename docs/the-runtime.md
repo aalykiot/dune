@@ -170,6 +170,8 @@ fn write(scope: &mut v8::HandleScope, args: v8::FunctionCallbackArguments, _: v8
 
 ```
 
+> **Note:** The example above uses Rust's `io::stdout()` for writing to the console, which is from an older version of Dune. Current versions use the `crabuv` TTY module (`crabuv::tty::TtyHandle`) for stdout/stderr writes. The overall JS → Rust bridge pattern, however, remains identical — `process.binding()` retrieves the Rust namespace, arguments are converted from V8 handles to Rust types, the native function executes, and the result crosses back to JavaScript.
+
 This looks simple enough, even for Rust:
 
 1. **`set_function_to(...)`**: This line is setting a function named `write` under the **stdio** binding namespace.
