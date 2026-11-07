@@ -230,7 +230,6 @@ fn query(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     // of the result columns.
     let column_names: Vec<_> = statement
         .column_names()
-        .iter()
         .map(|name| name.to_string())
         .collect();
 
@@ -312,7 +311,6 @@ fn query_one(
     // of the result columns.
     let column_names: Vec<_> = statement
         .column_names()
-        .iter()
         .map(|name| name.to_string())
         .collect();
 
@@ -475,7 +473,6 @@ fn columns(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv
     let columns_metadata = statement.columns_with_metadata();
 
     let metadata: Vec<v8::Local<v8::Value>> = columns
-        .iter()
         .zip(columns_metadata)
         .map(|(column, metadata)| {
             // Get necessary information from SQLite.
