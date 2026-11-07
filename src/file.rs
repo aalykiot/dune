@@ -106,17 +106,17 @@ impl JsFuture for FsOpenFuture {
 
                 set_constant_to(scope, file_wrap, "fd", fd.into());
 
-                self.promise
-                    .open(scope)
-                    .resolve(scope, file_wrap.into())
-                    .unwrap();
+                let promise = unsafe { self.promise.open(scope) };
+                promise.resolve(scope, file_wrap.into()).unwrap();
             }
             // Handle when something goes wrong with opening the file.
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
-                self.promise.open(scope).reject(scope, exception);
+
+                let promise = unsafe { self.promise.open(scope) };
+                promise.reject(scope, exception);
             }
         }
     }
@@ -196,7 +196,8 @@ impl JsFuture for FsReadFuture {
                 // We reached the end of the file.
                 if *n == 0 {
                     let undefined = v8::undefined(scope);
-                    self.promise.open(scope).resolve(scope, undefined.into());
+                    let promise = unsafe { self.promise.open(scope) };
+                    promise.resolve(scope, undefined.into());
                     return;
                 }
 
@@ -209,17 +210,17 @@ impl JsFuture for FsReadFuture {
                 let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(store);
                 let array_buffer = v8::ArrayBuffer::with_backing_store(scope, &store.make_shared());
 
-                self.promise
-                    .open(scope)
-                    .resolve(scope, array_buffer.into())
-                    .unwrap();
+                let promise = unsafe { self.promise.open(scope) };
+                promise.resolve(scope, array_buffer.into()).unwrap();
             }
             // Something went wrong while reading the file.
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
-                self.promise.open(scope).reject(scope, exception);
+
+                let promise = unsafe { self.promise.open(scope) };
+                promise.reject(scope, exception);
             }
         }
     }
@@ -328,17 +329,17 @@ impl JsFuture for FsWriteFuture {
         match self.result.as_ref() {
             Ok(_) => {
                 let undefined = v8::undefined(scope);
-                self.promise
-                    .open(scope)
-                    .resolve(scope, undefined.into())
-                    .unwrap();
+                let promise = unsafe { self.promise.open(scope) };
+                promise.resolve(scope, undefined.into()).unwrap();
             }
             // Something went wrong.
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
-                self.promise.open(scope).reject(scope, exception);
+
+                let promise = unsafe { self.promise.open(scope) };
+                promise.reject(scope, exception);
             }
         }
     }
@@ -457,17 +458,17 @@ impl JsFuture for FsStatFuture {
             // Resolve the promise passing the result.
             Ok(stats) => {
                 let stats = create_v8_stats_object(scope, stats);
-                self.promise
-                    .open(scope)
-                    .resolve(scope, stats.into())
-                    .unwrap();
+                let promise = unsafe { self.promise.open(scope) };
+                promise.resolve(scope, stats.into()).unwrap();
             }
             // Something went wrong while getting the file's stats.
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
-                self.promise.open(scope).reject(scope, exception);
+
+                let promise = unsafe { self.promise.open(scope) };
+                promise.reject(scope, exception);
             }
         }
     }
@@ -530,17 +531,17 @@ impl JsFuture for FsMkdirFuture {
         match self.result.as_ref() {
             Ok(_) => {
                 let undefined = v8::undefined(scope);
-                self.promise
-                    .open(scope)
-                    .resolve(scope, undefined.into())
-                    .unwrap();
+                let promise = unsafe { self.promise.open(scope) };
+                promise.resolve(scope, undefined.into()).unwrap();
             }
             // An error happened during the operation.
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
-                self.promise.open(scope).reject(scope, exception);
+
+                let promise = unsafe { self.promise.open(scope) };
+                promise.reject(scope, exception);
             }
         }
     }
@@ -600,17 +601,17 @@ impl JsFuture for FsRmdirFuture {
         match self.result.as_ref() {
             Ok(_) => {
                 let undefined = v8::undefined(scope);
-                self.promise
-                    .open(scope)
-                    .resolve(scope, undefined.into())
-                    .unwrap();
+                let promise = unsafe { self.promise.open(scope) };
+                promise.resolve(scope, undefined.into()).unwrap();
             }
             // An error happened during the operation.
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
-                self.promise.open(scope).reject(scope, exception);
+
+                let promise = unsafe { self.promise.open(scope) };
+                promise.reject(scope, exception);
             }
         }
     }
@@ -676,17 +677,17 @@ impl JsFuture for ReadDirFuture {
 
                 let directory_value = v8::Array::new_with_elements(scope, &directory);
 
-                self.promise
-                    .open(scope)
-                    .resolve(scope, directory_value.into())
-                    .unwrap();
+                let promise = unsafe { self.promise.open(scope) };
+                promise.resolve(scope, directory_value.into()).unwrap();
             }
             // Something went wrong on directory read.
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
-                self.promise.open(scope).reject(scope, exception);
+
+                let promise = unsafe { self.promise.open(scope) };
+                promise.reject(scope, exception);
             }
         }
     }
@@ -761,14 +762,17 @@ impl JsFuture for FsRmFuture {
         match self.result.as_ref() {
             Ok(_) => {
                 let undefined = v8::undefined(scope).into();
-                self.promise.open(scope).resolve(scope, undefined).unwrap();
+                let promise = unsafe { self.promise.open(scope) };
+                promise.resolve(scope, undefined).unwrap();
             }
             // An error happened during the operation.
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
-                self.promise.open(scope).reject(scope, exception);
+
+                let promise = unsafe { self.promise.open(scope) };
+                promise.reject(scope, exception);
             }
         }
     }
@@ -869,17 +873,17 @@ impl JsFuture for FsRenameFuture {
         match self.result.as_ref() {
             Ok(_) => {
                 let undefined = v8::undefined(scope);
-                self.promise
-                    .open(scope)
-                    .resolve(scope, undefined.into())
-                    .unwrap();
+                let promise = unsafe { self.promise.open(scope) };
+                promise.resolve(scope, undefined.into()).unwrap();
             }
             // Something went wrong while renaming the file.
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
-                self.promise.open(scope).reject(scope, exception);
+
+                let promise = unsafe { self.promise.open(scope) };
+                promise.reject(scope, exception);
             }
         }
     }

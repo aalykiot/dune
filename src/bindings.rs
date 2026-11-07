@@ -93,7 +93,9 @@ fn global_queue_micro(
     let callback = v8::Local::<v8::Function>::try_from(args.get(0)).unwrap();
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();
-    let ctx = state.context.open(scope);
+    let ctx = unsafe { state.context.open(scope) };
 
-    ctx.get_microtask_queue().enqueue_microtask(scope, callback);
+    if let Some(queue) = ctx.get_microtask_queue() {
+        queue.enqueue_microtask(scope, callback);
+    }
 }

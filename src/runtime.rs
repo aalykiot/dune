@@ -120,7 +120,6 @@ impl JsRuntime {
     pub fn with_options(options: JsRuntimeOptions) -> JsRuntime {
         // Configuration flags for V8.
         let mut flags = String::from(concat!(
-            " --no-validate-asm",
             " --turbo_fast_api_calls",
             " --harmony-temporal",
             " --js-float16array",
@@ -312,7 +311,7 @@ impl JsRuntime {
         let state = state_rc.borrow();
 
         let promise = state.repl_context.as_ref().unwrap().promise.clone();
-        let promise = promise.open(scope);
+        let promise = unsafe { promise.open(scope) };
 
         // Freeing the state here to avoid panics since the `check_exceptions`
         // borrows the state again internally.
@@ -332,7 +331,7 @@ impl JsRuntime {
         // Get the REPL's result from the module's namespace.
         let state = state_rc.borrow();
         let module = state.repl_context.as_ref().unwrap().module.clone();
-        let module = module.open(scope);
+        let module = unsafe { module.open(scope) };
         let namespace = module.get_module_namespace();
         let namespace = v8::Local::<v8::Object>::try_from(namespace).unwrap();
         let key = v8::String::new(scope, "default").unwrap();
@@ -540,7 +539,7 @@ impl JsRuntime {
                     ImportKind::Static => unreachable!(),
                     ImportKind::Dynamic(main_promise) => {
                         for promise in [main_promise].iter().chain(graph.same_origin.iter()) {
-                            promise.open(scope).reject(scope, exception);
+                            unsafe { promise.open(scope) }.reject(scope, exception);
                         }
                     }
                 }
@@ -609,7 +608,7 @@ impl JsRuntime {
 
                 // We need to resolve all identical dynamic imports.
                 for promise in [main_promise].iter().chain(graph.same_origin.iter()) {
-                    promise.open(tc_scope).resolve(tc_scope, namespace);
+                    unsafe { promise.open(tc_scope) }.resolve(tc_scope, namespace);
                 }
             }
         }

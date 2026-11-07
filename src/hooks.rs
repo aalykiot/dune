@@ -187,7 +187,7 @@ pub fn host_import_module_dynamically_cb<'s>(
     if state.module_map.by_path.contains_key(&specifier) && !dynamic_import_being_fetched {
         // Create a local handle for the module.
         let module = state.module_map.get_module(&specifier).unwrap();
-        let module = module.open(scope);
+        let module = unsafe { module.open(scope) };
 
         // Note: Since this is a dynamic import will resolve the promise
         // with the module's namespace object instead of it's evaluation result.
