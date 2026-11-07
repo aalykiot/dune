@@ -288,6 +288,18 @@ export class ReadStream extends EventEmitter {
     this.emit('close');
   }
 
+  on(event, ...args) {
+    // Override to start the internal TTY reading when a listener is registered,
+    // without an active TTY read operation, the event loop has nothing to keep
+    // it alive and may exit before receiving terminal input.
+    EventEmitter.prototype['on'].call(this, event, ...args);
+
+    if (!this.#active) {
+      binding.readStart(this.#tty, this.#onAvailableTTYData.bind(this));
+      this.#active = true;
+    }
+  }
+
   #asyncDispatch(value) {
     if (this.#pullQueue.length === 0) {
       this.#pushQueue.push(value);
