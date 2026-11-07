@@ -28,7 +28,7 @@ pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     v8::Global::new(scope, target)
 }
 
-fn now(scope: &mut v8::PinScope, _args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+fn now(scope: &mut v8::PinScope, _: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get a reference to runtime's state.
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();

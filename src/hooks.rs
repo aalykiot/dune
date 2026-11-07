@@ -1,5 +1,3 @@
-use crate::v8_utils::set_exception_code;
-use crate::v8_utils::throw_type_error;
 use crate::errors::unwrap_or_exit;
 use crate::modules::load_import;
 use crate::modules::resolve_import;
@@ -8,6 +6,8 @@ use crate::modules::ModuleGraph;
 use crate::modules::ModuleSource;
 use crate::modules::ModuleStatus;
 use crate::runtime::JsRuntime;
+use crate::v8_utils::set_exception_code;
+use crate::v8_utils::throw_type_error;
 use anyhow::Result;
 use crabuv::LoopHandle;
 use std::cell::RefCell;
