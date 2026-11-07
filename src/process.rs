@@ -3,12 +3,12 @@
 // This module contains part of the functions/attributes of the Node.js' process object.
 // https://nodejs.org/dist/latest-v17.x/docs/api/process.html
 
-use crate::bindings::create_object_under;
-use crate::bindings::set_constant_to;
-use crate::bindings::set_function_to;
-use crate::bindings::set_property_to;
-use crate::bindings::throw_exception;
 use crate::bindings::BINDINGS;
+use crate::v8_utils::create_object_under;
+use crate::v8_utils::set_constant_to;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::set_property_to;
+use crate::v8_utils::throw_exception;
 use crate::JsRuntime;
 use lazy_static::lazy_static;
 use std::collections::HashMap;

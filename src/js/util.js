@@ -12,3 +12,21 @@ export function cloneFunction(fn) {
   }
   return temp;
 }
+
+export function toUint8Array(data, encoding) {
+  if (!(data instanceof Uint8Array)) {
+    return new TextEncoder(encoding).encode(data);
+  }
+  return data;
+}
+
+export function makeDeferredPromise() {
+  // Extract the resolve method from the promise.
+  const promiseExt = {};
+  const promise = new Promise((resolve, reject) => {
+    promiseExt.resolve = resolve;
+    promiseExt.reject = reject;
+  });
+
+  return { promise, promiseExt };
+}

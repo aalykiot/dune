@@ -367,7 +367,12 @@ pub fn start(mut runtime: JsRuntime) {
         }
 
         let mut input = match command.unwrap() {
-            ReplCommand::Terminate => break,
+            ReplCommand::Terminate => {
+                // Before exiting, we need to emit the exit event on the JS side
+                // to allow any user-defined cleanup code to run.
+                runtime.emit_exit_event();
+                break;
+            }
             ReplCommand::Evaluate(prompt) => match ParsedInput::parse(prompt) {
                 Ok(input) => input,
                 Err(e) => {

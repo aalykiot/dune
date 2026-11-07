@@ -23,6 +23,7 @@ use crate::modules::ModuleStatus;
 use crate::process;
 use crate::repl::EvaluationContext;
 use crate::repl::EvaluationStatus;
+use crate::v8_utils::get_property;
 use anyhow::Result;
 use crabuv::EventLoop;
 use crabuv::LoopHandle;
@@ -119,7 +120,6 @@ impl JsRuntime {
     pub fn with_options(options: JsRuntimeOptions) -> JsRuntime {
         // Configuration flags for V8.
         let mut flags = String::from(concat!(
-            " --no-validate-asm",
             " --turbo_fast_api_calls",
             " --harmony-temporal",
             " --js-float16array",
@@ -311,7 +311,7 @@ impl JsRuntime {
         let state = state_rc.borrow();
 
         let promise = state.repl_context.as_ref().unwrap().promise.clone();
-        let promise = promise.open(scope);
+        let promise = unsafe { promise.open(scope) };
 
         // Freeing the state here to avoid panics since the `check_exceptions`
         // borrows the state again internally.
@@ -331,7 +331,7 @@ impl JsRuntime {
         // Get the REPL's result from the module's namespace.
         let state = state_rc.borrow();
         let module = state.repl_context.as_ref().unwrap().module.clone();
-        let module = module.open(scope);
+        let module = unsafe { module.open(scope) };
         let namespace = module.get_module_namespace();
         let namespace = v8::Local::<v8::Object>::try_from(namespace).unwrap();
         let key = v8::String::new(scope, "default").unwrap();
@@ -464,6 +464,10 @@ impl JsRuntime {
             });
         }
 
+        // Before exiting, we need to emit the exit event on the JS side
+        // to allow any user-defined cleanup code to run.
+        self.emit_exit_event();
+
         // We can now notify debugger that the program has finished running
         // and we're ready to exit the process.
         if let Some(inspector) = self.inspector() {
@@ -535,7 +539,7 @@ impl JsRuntime {
                     ImportKind::Static => unreachable!(),
                     ImportKind::Dynamic(main_promise) => {
                         for promise in [main_promise].iter().chain(graph.same_origin.iter()) {
-                            promise.open(scope).reject(scope, exception);
+                            unsafe { promise.open(scope) }.reject(scope, exception);
                         }
                     }
                 }
@@ -604,7 +608,7 @@ impl JsRuntime {
 
                 // We need to resolve all identical dynamic imports.
                 for promise in [main_promise].iter().chain(graph.same_origin.iter()) {
-                    promise.open(tc_scope).resolve(tc_scope, namespace);
+                    unsafe { promise.open(tc_scope) }.resolve(tc_scope, namespace);
                 }
             }
         }
@@ -613,6 +617,39 @@ impl JsRuntime {
         // point to allow resources behind a promise to be scheduled correctly
         // to the event-loop.
         run_next_tick_callbacks(scope);
+    }
+
+    /// Emits the `exit` event on the JS side.
+    pub(crate) fn emit_exit_event(&mut self) {
+        self.with_scope(|scope| {
+            let state_rc = JsRuntime::state(scope);
+            v8::tc_scope!(let tc_scope, scope);
+
+            let context = tc_scope.get_current_context();
+            let global = context.global(tc_scope);
+            let process = get_property::<v8::Object>(tc_scope, global, "process").unwrap();
+            let emit = get_property::<v8::Function>(tc_scope, process, "emit").unwrap();
+
+            let event = v8::String::new(tc_scope, "exit").unwrap();
+            let args = [event.into()];
+
+            emit.call(tc_scope, process.into(), &args);
+
+            // On exception, report it and handle the error.
+            if tc_scope.has_caught() {
+                let exception = tc_scope.exception().unwrap();
+                let exception = v8::Global::new(tc_scope, exception);
+                let mut state = state_rc.borrow_mut();
+                state.exceptions.capture_exception(exception);
+
+                drop(state);
+
+                // Check for uncaught errors (capture callbacks might be in place).
+                if let Some(error) = check_exceptions(tc_scope) {
+                    report_and_exit(error);
+                }
+            }
+        });
     }
 
     /// Returns if unhandled promise rejections where caught.

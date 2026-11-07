@@ -1,10 +1,10 @@
-use crate::bindings::get_internal_ref;
-use crate::bindings::set_exception_code;
-use crate::bindings::set_function_to;
-use crate::bindings::set_property_to;
-use crate::bindings::wrap_gc_dropped;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
+use crate::v8_utils::get_internal_ref;
+use crate::v8_utils::set_exception_code;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::set_property_to;
+use crate::v8_utils::wrap_gc_dropped;
 use anyhow::Result;
 use crabuv::tcp_listener::TcpListenerHandle;
 use crabuv::tcp_stream::SocketInfo;
@@ -49,17 +49,22 @@ impl JsFuture for TcpConnectFuture {
                 set_property_to(scope, socket, "host", host.into());
                 set_property_to(scope, socket, "remote", remote.into());
 
-                self.promise
-                    .open(scope)
-                    .resolve(scope, socket.into())
-                    .unwrap();
+                unsafe {
+                    self.promise
+                        .open(scope)
+                        .resolve(scope, socket.into())
+                        .unwrap()
+                };
             }
             Err(e) => {
                 // Reject the promise.
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
-                self.promise.open(scope).reject(scope, exception).unwrap();
+
+                unsafe {
+                    self.promise.open(scope).reject(scope, exception).unwrap();
+                }
             }
         }
     }
@@ -173,7 +178,7 @@ fn read_start(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, _: 
     let state_rc = JsRuntime::state(scope);
 
     // Start reading from the ipen TCP stream.
-    stream.set_read_callback({
+    stream.start_reading({
         move |_: TcpStreamHandle, data: Result<Vec<u8>>| {
             let mut state = state_rc.borrow_mut();
             let on_read = Rc::clone(&on_read);
@@ -196,18 +201,18 @@ impl JsFuture for TcpWriteFuture {
                 // Create a v8 value from the usize.
                 let bytes = *bytes as i32;
                 let bytes = v8::Integer::new(scope, bytes);
+                let promise = unsafe { self.promise.open(scope) };
 
-                self.promise
-                    .open(scope)
-                    .resolve(scope, bytes.into())
-                    .unwrap();
+                promise.resolve(scope, bytes.into()).unwrap();
             }
             Err(e) => {
                 // Reject the promise.
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
-                self.promise.open(scope).reject(scope, exception).unwrap();
+
+                let promise = unsafe { self.promise.open(scope) };
+                promise.reject(scope, exception).unwrap();
             }
         }
     }
@@ -377,10 +382,9 @@ struct TcpShutdownFuture {
 impl JsFuture for TcpShutdownFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
         let undefined = v8::undefined(scope);
-        self.promise
-            .open(scope)
-            .resolve(scope, undefined.into())
-            .unwrap();
+        let promise = unsafe { self.promise.open(scope) };
+
+        promise.resolve(scope, undefined.into()).unwrap();
     }
 }
 
@@ -400,7 +404,7 @@ fn shutdown(
 
     let state_rc = JsRuntime::state(scope);
 
-    stream.shutdown({
+    stream.shutdown_write({
         let promise = v8::Global::new(scope, promise_resolver);
         move |_: LoopHandle| {
             let promise = promise.clone();
@@ -420,10 +424,9 @@ struct TcpCloseFuture {
 impl JsFuture for TcpCloseFuture {
     fn run(&mut self, scope: &mut v8::PinScope) {
         let undefined = v8::undefined(scope);
-        self.promise
-            .open(scope)
-            .resolve(scope, undefined.into())
-            .unwrap();
+        let promise = unsafe { self.promise.open(scope) };
+
+        promise.resolve(scope, undefined.into()).unwrap();
     }
 }
 

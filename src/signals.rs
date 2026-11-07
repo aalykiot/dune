@@ -1,10 +1,10 @@
-use crate::bindings::get_internal_ref;
-use crate::bindings::set_function_to;
-use crate::bindings::set_property_to;
-use crate::bindings::throw_exception;
-use crate::bindings::wrap_gc_dropped;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
+use crate::v8_utils::get_internal_ref;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::set_property_to;
+use crate::v8_utils::throw_exception;
+use crate::v8_utils::wrap_gc_dropped;
 use anyhow::anyhow;
 use crabuv::signals::Kind;
 use crabuv::signals::Policy;
@@ -12,13 +12,14 @@ use crabuv::signals::SignalHandle;
 use std::rc::Rc;
 
 #[cfg(windows)]
-const SIGNALS: [(&str, i32); 6] = [
+const SIGNALS: [(&str, i32); 7] = [
     ("SIGABRT", Kind::SIGABRT),
     ("SIGFPE", Kind::SIGFPE),
     ("SIGILL", Kind::SIGILL),
     ("SIGINT", Kind::SIGINT),
     ("SIGSEGV", Kind::SIGSEGV),
     ("SIGTERM", Kind::SIGTERM),
+    ("SIGWINCH", Kind::SIGWINCH),
 ];
 
 #[cfg(not(windows))]
