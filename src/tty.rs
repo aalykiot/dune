@@ -12,7 +12,7 @@ use crabuv::tty::TtyHandle;
 use std::rc::Rc;
 use std::sync::LazyLock;
 
-macro_rules! std_stream_handle {
+macro_rules! std_stream_fd {
     ($f:ident) => {
         LazyLock::new(|| {
             #[cfg(unix)]
@@ -29,10 +29,9 @@ macro_rules! std_stream_handle {
     };
 }
 
-pub static STDIN: LazyLock<i32> = std_stream_handle!(stdin);
-
-pub static STDOUT: LazyLock<i32> = std_stream_handle!(stdout);
-pub static STDERR: LazyLock<i32> = std_stream_handle!(stderr);
+pub static STDIN: LazyLock<i32> = std_stream_fd!(stdin);
+pub static STDOUT: LazyLock<i32> = std_stream_fd!(stdout);
+pub static STDERR: LazyLock<i32> = std_stream_fd!(stderr);
 
 pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     // Create local JS object.
