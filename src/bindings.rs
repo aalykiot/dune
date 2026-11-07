@@ -15,31 +15,29 @@ use crate::sqlite;
 use crate::timers;
 use crate::tty;
 use crate::v8_utils::set_function_to;
-use lazy_static::lazy_static;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 /// Function pointer for the bindings initializers.
 type BindingInitFn = fn(&mut v8::PinScope) -> v8::Global<v8::Object>;
 
-lazy_static! {
-    pub static ref BINDINGS: HashMap<&'static str, BindingInitFn> = {
-        let bindings: Vec<(&'static str, BindingInitFn)> = vec![
-            ("timers", timers::initialize),
-            ("fs", file::initialize),
-            ("console", console::initialize),
-            ("perf_hooks", perf_hooks::initialize),
-            ("dns", dns::initialize),
-            ("net", net::initialize),
-            ("promise", promise::initialize),
-            ("http_parser", http_parser::initialize),
-            ("signals", signals::initialize),
-            ("exceptions", exceptions::initialize),
-            ("sqlite", sqlite::initialize),
-            ("tty", tty::initialize),
-        ];
-        HashMap::from_iter(bindings.into_iter())
-    };
-}
+pub static BINDINGS: LazyLock<HashMap<&'static str, BindingInitFn>> = LazyLock::new(|| {
+    let bindings: Vec<(&'static str, BindingInitFn)> = vec![
+        ("timers", timers::initialize),
+        ("fs", file::initialize),
+        ("console", console::initialize),
+        ("perf_hooks", perf_hooks::initialize),
+        ("dns", dns::initialize),
+        ("net", net::initialize),
+        ("promise", promise::initialize),
+        ("http_parser", http_parser::initialize),
+        ("signals", signals::initialize),
+        ("exceptions", exceptions::initialize),
+        ("sqlite", sqlite::initialize),
+        ("tty", tty::initialize),
+    ];
+    HashMap::from_iter(bindings.into_iter())
+});
 
 /// Populates a new JavaScript context with low-level Rust bindings.
 pub fn create_new_context<'s, 'i>(

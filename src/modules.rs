@@ -11,7 +11,6 @@ use anyhow::anyhow;
 use anyhow::Error;
 use anyhow::Result;
 use crabuv::LoopHandle;
-use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;
 use std::cell::RefCell;
@@ -22,35 +21,34 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::rc::Rc;
+use std::sync::LazyLock;
 use url::Url;
 
-lazy_static! {
-    pub static ref CORE_MODULES: HashMap<&'static str, &'static str> = {
-        let modules = vec![
-            ("console", include_str!("./js/console.js")),
-            ("events", include_str!("./js/events.js")),
-            ("process", include_str!("./js/process.js")),
-            ("timers", include_str!("./js/timers.js")),
-            ("assert", include_str!("./js/assert.js")),
-            ("util", include_str!("./js/util.js")),
-            ("fs", include_str!("./js/fs.js")),
-            ("perf_hooks", include_str!("./js/perf-hooks.js")),
-            ("colors", include_str!("./js/colors.js")),
-            ("dns", include_str!("./js/dns.js")),
-            ("net", include_str!("./js/net.js")),
-            ("test", include_str!("./js/test.js")),
-            ("stream", include_str!("./js/stream.js")),
-            ("http", include_str!("./js/http.js")),
-            ("sqlite", include_str!("./js/sqlite.js")),
-            ("tty", include_str!("./js/tty.js")),
-            ("@web/abort", include_str!("./js/abort-controller.js")),
-            ("@web/text_encoding", include_str!("./js/text-encoding.js")),
-            ("@web/clone", include_str!("./js/structured-clone.js")),
-            ("@web/fetch", include_str!("./js/fetch.js")),
-        ];
-        HashMap::from_iter(modules.into_iter())
-    };
-}
+pub static CORE_MODULES: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
+    let modules = vec![
+        ("console", include_str!("./js/console.js")),
+        ("events", include_str!("./js/events.js")),
+        ("process", include_str!("./js/process.js")),
+        ("timers", include_str!("./js/timers.js")),
+        ("assert", include_str!("./js/assert.js")),
+        ("util", include_str!("./js/util.js")),
+        ("fs", include_str!("./js/fs.js")),
+        ("perf_hooks", include_str!("./js/perf-hooks.js")),
+        ("colors", include_str!("./js/colors.js")),
+        ("dns", include_str!("./js/dns.js")),
+        ("net", include_str!("./js/net.js")),
+        ("test", include_str!("./js/test.js")),
+        ("stream", include_str!("./js/stream.js")),
+        ("http", include_str!("./js/http.js")),
+        ("sqlite", include_str!("./js/sqlite.js")),
+        ("tty", include_str!("./js/tty.js")),
+        ("@web/abort", include_str!("./js/abort-controller.js")),
+        ("@web/text_encoding", include_str!("./js/text-encoding.js")),
+        ("@web/clone", include_str!("./js/structured-clone.js")),
+        ("@web/fetch", include_str!("./js/fetch.js")),
+    ];
+    HashMap::from_iter(modules.into_iter())
+});
 
 /// Creates v8 script origins.
 pub fn create_origin<'s>(
@@ -419,12 +417,10 @@ impl JsFuture for EsModuleFuture {
     }
 }
 
-lazy_static! {
-    // Windows absolute path regex validator.
-    static ref WINDOWS_REGEX: Regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
-    // URL regex validator (string begins with http:// or https://).
-    static ref URL_REGEX: Regex = Regex::new(r"^(http|https)://").unwrap();
-}
+// Windows absolute path regex validator.
+static WINDOWS_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-zA-Z]:\\").unwrap());
+// URL regex validator (string begins with http:// or https://).
+static URL_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(http|https)://").unwrap());
 
 /// Resolves an import using the appropriate loader.
 pub fn resolve_import(

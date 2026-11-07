@@ -7,7 +7,6 @@
 
 use anyhow::bail;
 use anyhow::Result;
-use lazy_static::lazy_static;
 use path_absolutize::*;
 use pest::iterators::Pair;
 use pest::Parser;
@@ -17,6 +16,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::sync::LazyLock;
 
 #[derive(Parser)]
 #[grammar = "dotenv.pest"]
@@ -102,12 +102,11 @@ fn parse_value(pair: Pair<Rule>) -> Env {
     }
 }
 
-lazy_static! {
-    // Regex to match "${x}" keywords.
-    static ref VAR_REGEX: Regex = Regex::new(r"\$\{[^}]+\}").unwrap();
-    // Stores all systems env variables.
-    static ref SYS_VARIABLES: HashMap<String, String> = HashMap::from_iter(env::vars());
-}
+// Regex to match "${x}" keywords.
+static VAR_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\$\{[^}]+\}").unwrap());
+// Stores all systems env variables.
+static SYS_VARIABLES: LazyLock<HashMap<String, String>> =
+    LazyLock::new(|| HashMap::from_iter(env::vars()));
 
 /// Handles variable substitutions for env variables.
 fn populate(value: &str, vars: &HashMap<String, String>) -> String {

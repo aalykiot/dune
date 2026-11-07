@@ -10,19 +10,17 @@ use crate::v8_utils::set_function_to;
 use crate::v8_utils::set_property_to;
 use crate::v8_utils::throw_exception;
 use crate::JsRuntime;
-use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::env;
 use std::process::Command;
+use std::sync::LazyLock;
 
-lazy_static! {
-    static ref VERSIONS: HashMap<&'static str, &'static str> = {
-        let mut map = HashMap::new();
-        map.insert("dune", env!("CARGO_PKG_VERSION"));
-        map.insert("v8", v8::V8::get_version());
-        map
-    };
-}
+static VERSIONS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
+    let mut map = HashMap::new();
+    map.insert("dune", env!("CARGO_PKG_VERSION"));
+    map.insert("v8", v8::V8::get_version());
+    map
+});
 
 pub fn initialize<'s>(
     scope: &mut v8::PinScope<'s, '_>,

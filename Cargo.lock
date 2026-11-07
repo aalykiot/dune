@@ -874,7 +874,6 @@ dependencies = [
  "futures",
  "httparse",
  "indicatif",
- "lazy_static",
  "nix",
  "notify",
  "path-absolutize",
@@ -884,7 +883,6 @@ dependencies = [
  "postcard",
  "regex",
  "rusqlite",
- "rustix 1.1.6",
  "rustyline",
  "rustyline-derive",
  "serde",
@@ -1714,12 +1712,6 @@ dependencies = [
  "bitflags",
  "libc",
 ]
-
-[[package]]
-name = "lazy_static"
-version = "1.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 
 [[package]]
 name = "libc"

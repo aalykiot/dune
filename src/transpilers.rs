@@ -1,8 +1,8 @@
 use anyhow::bail;
 use anyhow::Result;
 use base64::prelude::*;
-use lazy_static::lazy_static;
 use regex::Regex;
+use std::sync::LazyLock;
 use swc_common::comments::SingleThreadedComments;
 use swc_common::errors::ColorConfig;
 use swc_common::errors::Handler;
@@ -30,9 +30,7 @@ use swc_ecma_transforms_react::react;
 use swc_ecma_transforms_react::Options;
 use swc_ecma_transforms_typescript::strip;
 
-lazy_static! {
-    static ref PRAGMA_REGEX: Regex = Regex::new(r"@jsx\s+([^\s]+)").unwrap();
-}
+static PRAGMA_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"@jsx\s+([^\s]+)").unwrap());
 
 pub struct TypeScript;
 
