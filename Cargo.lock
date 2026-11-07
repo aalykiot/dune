@@ -559,18 +559,18 @@ dependencies = [
 
 [[package]]
 name = "crabuv"
-version = "0.5.3"
-source = "git+https://github.com/aalykiot/crabuv?rev=cec9b24#cec9b24390f0b567e17e59e87ed804859b2374a8"
+version = "0.5.4"
+source = "git+https://github.com/aalykiot/crabuv?rev=8621445#86214451101d8810eb3f053b41e4e4f402a1d23d"
 dependencies = [
  "anyhow",
  "crossterm",
  "ctrlc",
  "downcast-rs",
- "libc",
  "mio",
  "notify",
  "rand 0.10.3",
  "rayon",
+ "rustix 1.1.6",
  "signal-hook 0.4.6",
  "signal-hook-mio 0.3.0",
  "slotmap",

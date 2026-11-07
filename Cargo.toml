@@ -15,7 +15,7 @@ name = "dune"
 
 [dependencies.crabuv]
 git = "https://github.com/aalykiot/crabuv"
-rev = "cec9b24"
+rev = "8621445"
 
 [dependencies]
 v8 = { version = "152.2.0", default-features = false }
