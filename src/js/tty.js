@@ -135,12 +135,12 @@ export class WriteStream extends EventEmitter {
    * @param {number} [y] - The vertical position (row). If omitted, only the horizontal position is changed.
    */
   cursorTo(x, y) {
-    // The X coordinate must aleays be defined.
+    // The X coordinate must always be defined.
     assert.integer(x, 'The "x" argument must be an integer.');
-    const sequense =
+    const sequence =
       typeof y === 'number' ? `${CSI}${y + 1};${x + 1}H` : `${CSI}${x + 1}G`;
 
-    this.write(sequense);
+    this.write(sequence);
   }
 
   /**
@@ -154,14 +154,14 @@ export class WriteStream extends EventEmitter {
     assert.integer(dx, 'The "dx" argument must be an integer.');
     assert.integer(dy, 'The "dy" argument must be an integer.');
 
-    let sequense = '';
+    let sequence = '';
 
-    if (dx < 0) sequense += `${CSI}${-dx}D`;
-    if (dx > 0) sequense += `${CSI}${dx}C`;
-    if (dy < 0) sequense += `${CSI}${-dy}A`;
-    if (dy > 0) sequense += `${CSI}${dy}B`;
+    if (dx < 0) sequence += `${CSI}${-dx}D`;
+    if (dx > 0) sequence += `${CSI}${dx}C`;
+    if (dy < 0) sequence += `${CSI}${-dy}A`;
+    if (dy > 0) sequence += `${CSI}${dy}B`;
 
-    this.write(sequense);
+    this.write(sequence);
   }
 
   /**
