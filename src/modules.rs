@@ -47,7 +47,7 @@ pub static CORE_MODULES: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
         ("@web/clone", include_str!("./js/structured-clone.js")),
         ("@web/fetch", include_str!("./js/fetch.js")),
     ];
-    HashMap::from_iter(modules.into_iter())
+    HashMap::from_iter(modules)
 });
 
 /// Creates v8 script origins.

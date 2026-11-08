@@ -36,7 +36,7 @@ pub static BINDINGS: LazyLock<HashMap<&'static str, BindingInitFn>> = LazyLock::
         ("sqlite", sqlite::initialize),
         ("tty", tty::initialize),
     ];
-    HashMap::from_iter(bindings.into_iter())
+    HashMap::from_iter(bindings)
 });
 
 /// Populates a new JavaScript context with low-level Rust bindings.
