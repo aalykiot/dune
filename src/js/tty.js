@@ -86,7 +86,7 @@ export class WriteStream extends EventEmitter {
   /**
    * Marks the TTY stream as no longer writable.
    *
-   * @param {String|Uint8Array} data - The last data to be written to the TTY stream.
+   * @param {String|Uint8Array} [data] - The last data to be written to the TTY stream.
    * @param {String} [encoding] - The character encoding to use.
    */
   end(data, encoding) {
