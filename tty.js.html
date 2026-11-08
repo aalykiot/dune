@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>tty.js - Documentation</title>
+
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav>
+    <li class="nav-link nav-home-link"><a href="index.html">Home</a></li><li class="nav-heading">Classes</li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Assert-Assert.html">Assert</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.array">array</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.boolean">boolean</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.count">count</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.equal">equal</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.evenNumber">evenNumber</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.false">false</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.greaterThan">greaterThan</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.greaterThanOrEqual">greaterThanOrEqual</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.hasFunction">hasFunction</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.hasProperty">hasProperty</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.instanceOf">instanceOf</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.integer">integer</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.isFunction">isFunction</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.lessThan">lessThan</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.lessThanOrEqual">lessThanOrEqual</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.notEmpty">notEmpty</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.number">number</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.object">object</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.objectEqual">objectEqual</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.oddNumber">oddNumber</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.string">string</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.throws">throws</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Assert-Assert.html#.true">true</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Console.Console.html">Console</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#clear">clear</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#debug">debug</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#error">error</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#info">info</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#log">log</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#time">time</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#timeEnd">timeEnd</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#timeLog">timeLog</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Console.Console.html#warn">warn</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html">EventEmitter</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#emit">emit</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#eventNames">eventNames</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#listenerCount">listenerCount</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#listeners">listeners</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#on">on</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#once">once</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#removeAllListeners">removeAllListeners</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Events-EventEmitter.html#removeListener">removeListener</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-File-System.File.html">File</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#closeSync">closeSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#open">open</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#openSync">openSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#read">read</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#readSync">readSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#stat">stat</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#statSync">statSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#write">write</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.File.html#writeSync">writeSync</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-File-System-FsWatcher.html">FsWatcher</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System-FsWatcher.html#close">close</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP.Server.html">Server</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.Server.html#accept">accept</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.Server.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.Server.html#listen">listen</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP.ServerRequest.html">ServerRequest</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.ServerRequest.html#json">json</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.ServerRequest.html#text">text</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP-Body.html">Body</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-Body.html#json">json</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-Body.html#text">text</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP-IncomingResponse.html">IncomingResponse</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html">ServerResponse</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#end">end</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#getHeader">getHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#getHeaderNames">getHeaderNames</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#getHeaders">getHeaders</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#hasHeader">hasHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#removeHeader">removeHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#setHeader">setHeader</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#write">write</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP-ServerResponse.html#writeHead">writeHead</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Net.Server.html">Server</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#accept">accept</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#address">address</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Server.html#listen">listen</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Net.Socket.html">Socket</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#address">address</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#connect">connect</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#destroy">destroy</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#end">end</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#read">read</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#setEncoding">setEncoding</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#setTimeout">setTimeout</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.Socket.html#write">write</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-SQLite.Database.html">Database</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-SQLite.Database.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-SQLite.Database.html#enableLoadExtension">enableLoadExtension</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-SQLite.Database.html#exec">exec</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-SQLite.Database.html#loadExtension">loadExtension</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-SQLite.Database.html#open">open</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-SQLite.Database.html#prepare">prepare</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-SQLite-Statement.html">Statement</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-SQLite-Statement.html#all">all</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-SQLite-Statement.html#columns">columns</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-SQLite-Statement.html#get">get</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-SQLite-Statement.html#run">run</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-SQLite-Statement.html#setReadBigInts">setReadBigInts</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-TTY.ReadStream.html">ReadStream</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.ReadStream.html#destroy">destroy</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.ReadStream.html#read">read</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.ReadStream.html#setEncoding">setEncoding</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.ReadStream.html#setRawMode">setRawMode</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-TTY.WriteStream.html">WriteStream</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.WriteStream.html#clearLine">clearLine</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.WriteStream.html#clearScreenDown">clearScreenDown</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.WriteStream.html#cursorTo">cursorTo</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.WriteStream.html#end">end</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.WriteStream.html#getWindowSize">getWindowSize</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.WriteStream.html#moveCursor">moveCursor</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.WriteStream.html#setEncoding">setEncoding</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.WriteStream.html#write">write</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="module-Test-Runner.TestRunner.html">TestRunner</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Test-Runner.TestRunner.html#importTests">importTests</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Test-Runner.TestRunner.html#run">run</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Test-Runner.TestRunner.html#test">test</a></span></li><li class="nav-heading">Modules</li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Assert.html">Assert</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Console.html">Console</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-DNS.html">DNS</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-DNS.html#.lookup">lookup</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Events.html">Events</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-File-System.html">File-System</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.copyFile">copyFile</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.copyFileSync">copyFileSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.createReadStream">createReadStream</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.createWriteStream">createWriteStream</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.mkdir">mkdir</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.mkdirSync">mkdirSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.open">open</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.openSync">openSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readFile">readFile</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readFileSync">readFileSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readdir">readdir</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.readdirSync">readdirSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rename">rename</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.renameSync">renameSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rm">rm</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rmSync">rmSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rmdir">rmdir</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.rmdirSync">rmdirSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.stat">stat</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.statSync">statSync</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.watch">watch</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.writeFile">writeFile</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-File-System.html#.writeFileSync">writeFileSync</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-HTTP.html">HTTP</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.html#.createServer">createServer</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-HTTP.html#.request">request</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Net.html">Net</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.html#.createConnection">createConnection</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Net.html#.createServer">createServer</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-SQLite.html">SQLite</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Stream.html">Stream</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Stream.html#.compose">compose</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Stream.html#.pipeline">pipeline</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-TTY.html">TTY</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-TTY.html#.isatty">isatty</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Test-Runner.html">Test-Runner</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Test-Runner.html#~test">test</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-Timers.html">Timers</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.clearImmediate">clearImmediate</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.clearInterval">clearInterval</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.clearTimeout">clearTimeout</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.setImmediate">setImmediate</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.setInterval">setInterval</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="module-Timers.html#.setTimeout">setTimeout</a></span></li>
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">tty.js</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * TTY APIs
+ *
+ * The TTY module provides the ReadStream and WriteStream classes. In most cases,
+ * however, it is not necessary to use this module directly.
+ *
+ * @see {@link https://nodejs.org/dist/latest-v18.x/docs/api/tty.html}
+ *
+ * @module TTY
+ */
+
+import assert from 'assert';
+import { EventEmitter } from 'events';
+import { makeDeferredPromise, toUint8Array } from 'util';
+
+const binding = process.binding('tty');
+const kAsyncGenerator = Symbol('kAsyncGenerator');
+
+const CSI = '\x1b[';
+const CLEAR_TO_LINE_BEGINNING = '\x1b[1K';
+const CLEAR_TO_LINE_END = '\x1b[0K';
+const CLEAR_LINE = '\x1b[2K';
+const CLEAR_SCREEN_DOWN = '\x1b[0J';
+
+/**
+ * Returns true if the given fd is associated with a TTY and false if it is not.
+ *
+ * @param {number} fd - File descriptor
+ * @returns {boolean}
+ */
+export function isatty(fd) {
+  assert.integer(fd);
+  return binding.isTTY(fd);
+}
+
+export class WriteStream extends EventEmitter {
+  #tty;
+  #encoding;
+  #writable;
+
+  /**
+   * Creates a new TTY write stream.
+   *
+   * @param {number} fd - The file descriptor to write to.
+   * @returns {WriteStream}
+   */
+  constructor(fd) {
+    super();
+    assert.integer(fd, 'The "fd" must be a positive integer.');
+    assert.greaterThanOrEqual(0, fd, 'The "fd" must be a positive integer.');
+
+    this.#tty = binding.tty(fd);
+    this.#writable = true;
+    this.isTTY = true;
+    this.fd = fd;
+
+    this.#refreshSize();
+
+    process.on('SIGWINCH', () => this.#refreshSize());
+  }
+
+  /**
+   * Writes contents to the TTY stream.
+   *
+   * @param {String|Uint8Array} data - The data to be written to the TTY.
+   * @param {String} [encoding] - The character encoding to use.
+   */
+  write(data, encoding) {
+    // Check the data argument type.
+    if (!(data instanceof Uint8Array) &amp;&amp; typeof data !== 'string') {
+      throw new TypeError(
+        'The "data" argument must be of type string or Uint8Array.'
+      );
+    }
+
+    if (!this.#writable) {
+      throw new Error('The stream has already been closed.');
+    }
+
+    // Default to UTF-8 encoding.
+    encoding = encoding || this.#encoding || 'utf-8';
+
+    binding.write(this.#tty, toUint8Array(data, encoding));
+  }
+
+  /**
+   * Marks the TTY stream as no longer writable.
+   *
+   * @param {String|Uint8Array} [data] - The last data to be written to the TTY stream.
+   * @param {String} [encoding] - The character encoding to use.
+   */
+  end(data, encoding) {
+    if (data) this.write(data, encoding);
+    this.#writable = false;
+  }
+
+  /**
+   * Sets the encoding for the TTY write stream.
+   *
+   * @param {String} [encoding] - The character encoding to use.
+   */
+  setEncoding(encoding = 'utf-8') {
+    assert.string(encoding, 'The "encoding" argument must be of type string.');
+    this.#encoding = encoding;
+  }
+
+  /**
+   * Clears the current line in this WriteStream.
+   *
+   *  @param {number} [direction=1] - Which part of the line to clear:
+   *  `-1` clears to the left of the cursor, `1` clears to the right,
+   *  and `0` clears the entire line.
+   */
+  clearLine(direction) {
+    // Validate the type of the parameter.
+    assert.integer(direction, 'The "direction" argument must be an integer.');
+
+    if (direction &lt; 0) return this.write(CLEAR_TO_LINE_BEGINNING);
+    if (direction > 0) return this.write(CLEAR_TO_LINE_END);
+
+    this.write(CLEAR_LINE);
+  }
+
+  /**
+   * Clears the WriteStream downward from the cursor.
+   */
+  clearScreenDown() {
+    this.write(CLEAR_SCREEN_DOWN);
+  }
+
+  /**
+   * Moves this WriteStream's cursor to the specified position.
+   *
+   * @param {number} x - The horizontal position (column).
+   * @param {number} [y] - The vertical position (row). If omitted, only the horizontal position is changed.
+   */
+  cursorTo(x, y) {
+    // The X coordinate must always be defined.
+    assert.integer(x, 'The "x" argument must be an integer.');
+    const sequence =
+      typeof y === 'number' ? `${CSI}${y + 1};${x + 1}H` : `${CSI}${x + 1}G`;
+
+    this.write(sequence);
+  }
+
+  /**
+   * Moves this WriteStream's cursor relative to its current position.
+   *
+   * @param {number} dx - The horizontal displacement.
+   * @param {number} dy - The vertical displacement.
+   */
+  moveCursor(dx, dy) {
+    // Dx and Dy must always be defined.
+    assert.integer(dx, 'The "dx" argument must be an integer.');
+    assert.integer(dy, 'The "dy" argument must be an integer.');
+
+    let sequence = '';
+
+    if (dx &lt; 0) sequence += `${CSI}${-dx}D`;
+    if (dx > 0) sequence += `${CSI}${dx}C`;
+    if (dy &lt; 0) sequence += `${CSI}${-dy}A`;
+    if (dy > 0) sequence += `${CSI}${dy}B`;
+
+    this.write(sequence);
+  }
+
+  /**
+   * Returns the size of the TTY.
+   *
+   * @returns {number[]} An array containing 2 numbers [numColumns, numRows].
+   */
+  getWindowSize() {
+    return binding.getWindowSize(this.#tty);
+  }
+
+  #refreshSize() {
+    const [columns, rows] = this.getWindowSize();
+
+    this.columns = columns;
+    this.rows = rows;
+    this.emit('resize');
+  }
+}
+
+export class ReadStream extends EventEmitter {
+  #tty;
+  #pushQueue;
+  #pullQueue;
+  #encoding;
+  #active;
+
+  /**
+   * Creates a new TTY read stream.
+   *
+   * @param {number} fd - The file descriptor to read from.
+   * @returns {ReadStream}
+   */
+  constructor(fd) {
+    super();
+    assert.integer(fd, 'The "fd" must be a positive integer.');
+    assert.greaterThanOrEqual(0, fd, 'The "fd" must be a positive integer.');
+
+    this.#tty = binding.tty(fd);
+    this.#pushQueue = [];
+    this.#pullQueue = [];
+    this.#active = false;
+    this.fd = fd;
+    this.isTTY = true;
+    this.isRaw = false;
+  }
+
+  /**
+   * Returns a promise which is fulfilled when stdin can return a chunk.
+   *
+   * @returns {Promise&lt;(Uint8Array|string)>} The chunk read from stdin.
+   */
+  read() {
+    // Check if a TTY is attached to the stream.
+    if (!this.#tty) return null;
+
+    // Start reading from the TTY if the stream is not yet active.
+    if (!this.#active) {
+      binding.readStart(this.#tty, this.#onAvailableTTYData.bind(this));
+      this.#active = true;
+    }
+
+    // HACK: The following is used to handle uncaught errors thrown
+    // from the event-emitter when no one is subscribed to the `error` event.
+    if (this.listenerCount('error') === 0) this.on('error', () => {});
+
+    // No available value to read yet.
+    if (this.#pushQueue.length === 0) {
+      const { promise, promiseExt } = makeDeferredPromise();
+      this.#pullQueue.push(promiseExt);
+      return promise;
+    }
+
+    const value = this.#pushQueue.shift();
+    const action = value instanceof Error ? Promise.reject : Promise.resolve;
+
+    return action.call(Promise, value);
+  }
+
+  /**
+   * Configures tty.ReadStream to operate in raw mode.
+   *
+   * @param {boolean} [mode] -  Whether to enable raw mode. Defaults to false.
+   */
+  setRawMode(mode = false) {
+    // Check the parameter type.
+    if (typeof mode !== 'boolean') {
+      throw new TypeError('The "mode" argument must be of type boolean.');
+    }
+    binding.setRawMode(this.#tty, mode);
+    this.isRaw = mode;
+  }
+
+  /**
+   * Sets the encoding for the TTY read stream.
+   *
+   * @param {String} [encoding] - The character encoding to use.
+   */
+  setEncoding(encoding = 'utf-8') {
+    // Check the parameter type.
+    if (typeof encoding !== 'string') {
+      throw new TypeError('The "encoding" argument must be of type string.');
+    }
+    this.#encoding = encoding;
+  }
+
+  /**
+   * Stops the TTY stream from reading input.
+   */
+  destroy() {
+    // Check whether the TTY stream is valid and, if active,
+    // stop reading from it.
+    if (!this.#tty) return;
+    if (this.#active) binding.readStop(this.#tty);
+
+    // Ignore pending reads.
+    for (const promise of this.#pullQueue) {
+      promise.resolve(null);
+    }
+
+    this.#tty = undefined;
+    this.#active = false;
+
+    this.emit('close');
+  }
+
+  on(event, ...args) {
+    // Override to start the internal TTY reading when a listener is registered,
+    // without an active TTY read operation, the event loop has nothing to keep
+    // it alive and may exit before receiving terminal input.
+    EventEmitter.prototype['on'].call(this, event, ...args);
+
+    if (!this.#active) {
+      binding.readStart(this.#tty, this.#onAvailableTTYData.bind(this));
+      this.#active = true;
+    }
+  }
+
+  #asyncDispatch(value) {
+    if (this.#pullQueue.length === 0) {
+      this.#pushQueue.push(value);
+      return;
+    }
+    const promise = this.#pullQueue.shift();
+    const action = value instanceof Error ? promise.reject : promise.resolve;
+    action(value);
+  }
+
+  #onAvailableTTYData(err, arrayBufferView) {
+    // Check for errors during TTY read.
+    if (err) {
+      this.#asyncDispatch(err);
+      this.emit('error', err);
+      return;
+    }
+
+    // Transform ArrayBuffer into a Uint8Array we can use.
+    const data = new Uint8Array(arrayBufferView);
+    const transformed = this.#encoding
+      ? new TextDecoder(this.#encoding).decode(new Uint8Array(data))
+      : data;
+
+    // Use the EE mode instead of the async-iterator.
+    if (this.listenerCount('data') > 0) {
+      this.emit('data', transformed);
+      return;
+    }
+
+    this.#asyncDispatch(transformed);
+  }
+
+  async *[kAsyncGenerator](signal) {
+    // Close socket on stream pipeline errors.
+    if (signal) signal.on('uncaughtStreamException', () => this.destroy());
+
+    let data;
+    while ((data = await this.read())) {
+      if (!data) break;
+      yield data;
+    }
+  }
+
+  /**
+   * The TTY stream should be async iterable.
+   * @ignore
+   */
+  [Symbol.asyncIterator](signal) {
+    return Object.assign(this[kAsyncGenerator](signal), {
+      return: () => {
+        this.destroy();
+        return Promise.resolve({ done: true });
+      },
+    });
+  }
+}
+
+export default {
+  isatty,
+  WriteStream,
+  ReadStream,
+};
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<br class="clear">
+
+<footer>
+    Generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Nov 08 2026 21:48:17 GMT+0000 (Coordinated Universal Time) using the Minami theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/linenumber.js"></script>
+</body>
+</html>
