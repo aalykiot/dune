@@ -14,7 +14,7 @@
 import { performance } from 'perf_hooks';
 import { green, yellow, cyan, red, bright_black } from 'colors';
 
-const { callConsole } = process.binding('stdio');
+const { callConsole } = process.binding('console');
 
 // Returns a string with as many spaces as the parameter specified.
 function pre(amount) {
@@ -347,21 +347,6 @@ function stringifyObject(value, seen = new WeakSet(), depth) {
 }
 
 /**
- * Shows the given message and waits for the user's input.
- *
- * @param {String} [message] - A string of text to display to the user.
- * @param {String} [defaultValue] - A string containing the default value displayed in the text input field.
- */
-export function prompt(message = 'Prompt', defaultValue = null) {
-  // Write prompt message to stdout.
-  process.stdout.write(
-    `${message} ${defaultValue ? `[${defaultValue}] ` : ''}`
-  );
-  // Read and return user's input.
-  return process.stdin.read() || defaultValue;
-}
-
-/**
  * Console is a subset implementation of MDN's Console API.
  */
 export class Console {
@@ -420,13 +405,12 @@ export class Console {
   }
 
   /**
-   * Clears the console if the environment allows it.
+   * Clears the console.
    */
   clear() {
-    try {
-      process.binding('stdio').clear();
-    } catch (e) {
-      this.warn('This environment does not support console clearing', e);
+    if (process.stdout.isTTY) {
+      process.stdout.cursorTo(0, 0);
+      process.stdout.clearScreenDown();
     }
   }
 
@@ -504,4 +488,4 @@ export function wrapConsole(console, consoleFromV8) {
   }
 }
 
-export default { Console, prompt, wrapConsole };
+export default { Console, wrapConsole };

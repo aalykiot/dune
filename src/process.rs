@@ -3,26 +3,24 @@
 // This module contains part of the functions/attributes of the Node.js' process object.
 // https://nodejs.org/dist/latest-v17.x/docs/api/process.html
 
-use crate::bindings::create_object_under;
-use crate::bindings::set_constant_to;
-use crate::bindings::set_function_to;
-use crate::bindings::set_property_to;
-use crate::bindings::throw_exception;
 use crate::bindings::BINDINGS;
+use crate::v8_utils::create_object_under;
+use crate::v8_utils::set_constant_to;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::set_property_to;
+use crate::v8_utils::throw_exception;
 use crate::JsRuntime;
-use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::env;
 use std::process::Command;
+use std::sync::LazyLock;
 
-lazy_static! {
-    static ref VERSIONS: HashMap<&'static str, &'static str> = {
-        let mut map = HashMap::new();
-        map.insert("dune", env!("CARGO_PKG_VERSION"));
-        map.insert("v8", v8::V8::get_version());
-        map
-    };
-}
+static VERSIONS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
+    let mut map = HashMap::new();
+    map.insert("dune", env!("CARGO_PKG_VERSION"));
+    map.insert("v8", v8::V8::get_version());
+    map
+});
 
 pub fn initialize<'s>(
     scope: &mut v8::PinScope<'s, '_>,

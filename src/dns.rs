@@ -1,8 +1,8 @@
-use crate::bindings::set_exception_code;
-use crate::bindings::set_function_to;
-use crate::bindings::set_property_to;
 use crate::runtime::JsFuture;
 use crate::runtime::JsRuntime;
+use crate::v8_utils::set_exception_code;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::set_property_to;
 use anyhow::Result;
 use crabuv::LoopHandle;
 use dns_lookup::lookup_host;
@@ -45,19 +45,19 @@ impl JsFuture for DnsLookupFuture {
                     .collect();
 
                 let ips_array = v8::Array::new_with_elements(scope, &ips);
+                let promise = unsafe { self.promise.open(scope) };
 
-                self.promise
-                    .open(scope)
-                    .resolve(scope, ips_array.into())
-                    .unwrap();
+                promise.resolve(scope, ips_array.into()).unwrap();
             }
             // Handle when something goes wrong on the DNS lookup.
             Err(e) => {
                 let message = v8::String::new(scope, &e.to_string()).unwrap();
                 let exception = v8::Exception::error(scope, message);
                 set_exception_code(scope, exception, e);
+
                 // Reject the promise on failure.
-                self.promise.open(scope).reject(scope, exception);
+                let promise = unsafe { self.promise.open(scope) };
+                promise.reject(scope, exception);
             }
         }
     }

@@ -1,5 +1,3 @@
-use crate::bindings::set_exception_code;
-use crate::bindings::throw_type_error;
 use crate::errors::unwrap_or_exit;
 use crate::modules::load_import;
 use crate::modules::resolve_import;
@@ -8,6 +6,8 @@ use crate::modules::ModuleGraph;
 use crate::modules::ModuleSource;
 use crate::modules::ModuleStatus;
 use crate::runtime::JsRuntime;
+use crate::v8_utils::set_exception_code;
+use crate::v8_utils::throw_type_error;
 use anyhow::Result;
 use crabuv::LoopHandle;
 use std::cell::RefCell;
@@ -187,7 +187,7 @@ pub fn host_import_module_dynamically_cb<'s>(
     if state.module_map.by_path.contains_key(&specifier) && !dynamic_import_being_fetched {
         // Create a local handle for the module.
         let module = state.module_map.get_module(&specifier).unwrap();
-        let module = module.open(scope);
+        let module = unsafe { module.open(scope) };
 
         // Note: Since this is a dynamic import will resolve the promise
         // with the module's namespace object instead of it's evaluation result.

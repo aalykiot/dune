@@ -1,8 +1,8 @@
-use crate::bindings::get_internal_ref;
-use crate::bindings::set_constant_to;
-use crate::bindings::set_function_to;
-use crate::bindings::throw_exception;
-use crate::bindings::wrap_gc_dropped;
+use crate::v8_utils::get_internal_ref;
+use crate::v8_utils::set_constant_to;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::throw_exception;
+use crate::v8_utils::wrap_gc_dropped;
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::Result;
@@ -230,7 +230,6 @@ fn query(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv: 
     // of the result columns.
     let column_names: Vec<_> = statement
         .column_names()
-        .iter()
         .map(|name| name.to_string())
         .collect();
 
@@ -312,7 +311,6 @@ fn query_one(
     // of the result columns.
     let column_names: Vec<_> = statement
         .column_names()
-        .iter()
         .map(|name| name.to_string())
         .collect();
 
@@ -475,7 +473,6 @@ fn columns(scope: &mut v8::PinScope, args: v8::FunctionCallbackArguments, mut rv
     let columns_metadata = statement.columns_with_metadata();
 
     let metadata: Vec<v8::Local<v8::Value>> = columns
-        .iter()
         .zip(columns_metadata)
         .map(|(column, metadata)| {
             // Get necessary information from SQLite.

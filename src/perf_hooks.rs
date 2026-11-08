@@ -3,9 +3,9 @@
 // This module provides an implementation of a subset of the W3C Web Performance APIs
 // https://nodejs.org/api/perf_hooks.html#performance-measurement-apis
 
-use crate::bindings::create_object_under;
-use crate::bindings::set_function_to;
-use crate::bindings::set_property_to;
+use crate::v8_utils::create_object_under;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::set_property_to;
 use crate::JsRuntime;
 
 pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
@@ -28,7 +28,7 @@ pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {
     v8::Global::new(scope, target)
 }
 
-fn now(scope: &mut v8::PinScope, _args: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
+fn now(scope: &mut v8::PinScope, _: v8::FunctionCallbackArguments, mut rv: v8::ReturnValue) {
     // Get a reference to runtime's state.
     let state_rc = JsRuntime::state(scope);
     let state = state_rc.borrow();

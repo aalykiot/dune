@@ -1,6 +1,6 @@
-use crate::bindings::set_constant_to;
-use crate::bindings::set_exception_code;
-use crate::bindings::set_function_to;
+use crate::v8_utils::set_constant_to;
+use crate::v8_utils::set_exception_code;
+use crate::v8_utils::set_function_to;
 use anyhow::bail;
 use anyhow::Result;
 

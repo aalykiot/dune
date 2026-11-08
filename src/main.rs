@@ -2,6 +2,7 @@
 
 mod bindings;
 mod cli;
+mod console;
 mod dns;
 mod dotenv;
 mod errors;
@@ -20,10 +21,11 @@ mod repl;
 mod runtime;
 mod signals;
 mod sqlite;
-mod stdio;
 mod timers;
 mod tools;
 mod transpilers;
+mod tty;
+mod v8_utils;
 mod watcher;
 
 use crate::cli::process_cli_arguments;
@@ -73,10 +75,11 @@ fn main() {
         setup_panic_hook();
     }
 
-    #[cfg(target_family = "windows")]
+    #[cfg(windows)]
     {
         // In shitty platforms like Windows we have to manually enable ANSI colors. ¯\_(ツ)_/¯
         let _ = enable_ansi_support::enable_ansi_support();
+        let _ = crabuv::tty::set_utf8_code_pages();
     }
 
     // Try run dune as a compiled standalone program.

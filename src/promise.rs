@@ -1,6 +1,6 @@
-use crate::bindings::set_function_to;
-use crate::bindings::set_property_to;
-use crate::bindings::throw_exception;
+use crate::v8_utils::set_function_to;
+use crate::v8_utils::set_property_to;
+use crate::v8_utils::throw_exception;
 use anyhow::anyhow;
 
 pub fn initialize(scope: &mut v8::PinScope) -> v8::Global<v8::Object> {

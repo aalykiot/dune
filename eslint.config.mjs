@@ -24,7 +24,6 @@ export default defineConfig([
         global: true,
         globalThis: true,
         process: true,
-        prompt: true,
         setImmediate: true,
         clearImmediate: true,
       },

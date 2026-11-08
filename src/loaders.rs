@@ -8,7 +8,6 @@ use crate::transpilers::Wasm;
 use anyhow::bail;
 use anyhow::Result;
 use colored::*;
-use lazy_static::lazy_static;
 use path_absolutize::*;
 use regex::Regex;
 use sha::sha1::Sha1;
@@ -18,6 +17,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 use url::Url;
 
 /// Defines the interface of a module loader.
@@ -27,6 +27,7 @@ pub trait ModuleLoader {
 }
 
 static EXTENSIONS: &[&str] = &["js", "jsx", "ts", "tsx", "json", "wasm"];
+static WINDOWS_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-zA-Z]:\\").unwrap());
 
 #[derive(Default)]
 pub struct FsModuleLoader;
@@ -96,11 +97,6 @@ impl FsModuleLoader {
 
 impl ModuleLoader for FsModuleLoader {
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath> {
-        // Windows platform full path regex.
-        lazy_static! {
-            static ref WINDOWS_REGEX: Regex = Regex::new(r"^[a-zA-Z]:\\").unwrap();
-        }
-
         // Resolve absolute import.
         if specifier.starts_with('/') || WINDOWS_REGEX.is_match(specifier) {
             return Ok(self.transform(Path::new(specifier).absolutize()?.to_path_buf()));
@@ -151,14 +147,14 @@ impl ModuleLoader for FsModuleLoader {
     }
 }
 
-lazy_static! {
-    // Use local cache directory in development.
-    pub static ref CACHE_DIR: PathBuf = if cfg!(debug_assertions) {
+/// Cache directory for downloaded modules.
+pub static CACHE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    if cfg!(debug_assertions) {
         PathBuf::from(".cache")
     } else {
         dirs::home_dir().unwrap().join(".dune/cache")
-    };
-}
+    }
+});
 
 #[derive(Default)]
 /// Loader supporting URL imports.
