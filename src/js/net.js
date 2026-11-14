@@ -201,6 +201,7 @@ export class Socket extends EventEmitter {
   #connecting;
   #encoding;
   #writable;
+  #destroyed;
   #pushQueue;
   #pullQueue;
   #timeoutHandle;
@@ -215,6 +216,7 @@ export class Socket extends EventEmitter {
     this.#pushQueue = [];
     this.#pullQueue = [];
     this.#connecting = false;
+    this.#destroyed = false;
     this.#timeoutHandle = undefined;
     this.bytesRead = 0;
     this.bytesWritten = 0;
@@ -361,7 +363,7 @@ export class Socket extends EventEmitter {
    * @param {String} [encoding] - The character encoding to use.
    * @returns {Promise<Number>} The number of bytes written.
    */
-  async write(data, encoding = 'utf-8') {
+  async write(data, encoding) {
     // Check the data argument type.
     if (!(data instanceof Uint8Array) && typeof data !== 'string') {
       throw new TypeError(
@@ -391,11 +393,11 @@ export class Socket extends EventEmitter {
   /**
    * Half-closes the TCP stream.
    *
-   * @param {String|Uint8Array} data - The (last) data to be written to the socket.
+   * @param {String|Uint8Array} [data] - The (last) data to be written to the socket.
    * @param {String} [encoding] - The character encoding to use.
    * @returns {Promise<void>}
    */
-  async end(data, encoding = 'utf-8') {
+  async end(data, encoding) {
     // Check socket connection.
     if (!this.#fd) return;
 
@@ -414,7 +416,9 @@ export class Socket extends EventEmitter {
     // Check if the socket is indeed connected.
     if (!this.#fd) return;
 
+    this.#destroyed = true;
     this.#timeoutHandle?.emit('timeoutUpdate', 0);
+
     await binding.close(this.#fd);
 
     // Ignore pending reads.
@@ -444,6 +448,7 @@ export class Socket extends EventEmitter {
     this.#pushQueue = [];
     this.#pullQueue = [];
     this.#connecting = false;
+    this.#destroyed = false;
     this.#timeoutHandle = undefined;
     this.bytesRead = 0;
     this.bytesWritten = 0;
@@ -463,6 +468,10 @@ export class Socket extends EventEmitter {
   }
 
   #onAvailableSocketData(err, arrayBufferView) {
+    // HACK: The Rust side may invoke this callback even after the JS socket
+    // stream has been destroyed. If that happens, return early.
+    if (this.#destroyed) return;
+
     // Check for errors during socket read.
     if (err) {
       this.#asyncDispatch(err);
